@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<h3>🔗 Nostr WoT</h3>
+
+<label>My Pubkey (hex)</label>
+<input id="myPubkey" placeholder="abc123... (64 hex characters)">
+
+<label>Mode</label>
+<select id="mode">
+    <option value="remote">Remote Oracle</option>
+    <option value="local">Local Graph</option>
+    <option value="hybrid">Hybrid (local + remote fallback)</option>
+</select>
+
+<div id="oracleSection">
+    <label>Oracle URL</label>
+    <input id="oracleUrl" placeholder="https://wot-oracle.mappingbitcoin.com">
+</div>
+
+<div id="localSection">
+    <label>Relays (comma-separated)</label>
+    <textarea id="relays" placeholder="wss://relay.damus.io,wss://nos.lol"></textarea>
+
+    <button id="sync" class="secondary">Sync Local Graph (2 hops)</button>
+    <button id="clear" class="danger">Clear Local Data</button>
+
+    <div id="stats" class="stats">Local graph: not synced</div>
+</div>
+
+<button id="save" class="primary">Save Settings</button>
+
+<div class="section">
+    <div class="section-title">Test Query</div>
+    <div class="test-section">
+        <input id="testTarget" placeholder="Target pubkey (hex)">
+        <button id="test" class="secondary">Check</button>
+    </div>
+</div>
+
+<div id="status" class="status"></div>
+
+<script src="popup.js"></script>
+</body>
+</html>
