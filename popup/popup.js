@@ -4,29 +4,48 @@ document.addEventListener('DOMContentLoaded', async () => {
         'mode',
         'oracleUrl',
         'myPubkey',
-        'relays'
+        'relays',
+        'syncDepth'
     ]);
 
-    document.getElementById('mode').value = data.mode || 'remote';
+    // Set mode radio button
+    const mode = data.mode || 'remote';
+    const modeRadio = document.getElementById(`mode-${mode}`);
+    if (modeRadio) modeRadio.checked = true;
+
     document.getElementById('oracleUrl').value = data.oracleUrl || 'https://wot-oracle.mappingbitcoin.com';
     document.getElementById('myPubkey').value = data.myPubkey || '';
-    document.getElementById('relays').value = data.relays || 'wss://relay.damus.io,wss://nos.lol';
+    document.getElementById('syncDepth').value = data.syncDepth || '2';
 
-    updateUI(data.mode || 'remote');
+    // Format relays for display (one per line)
+    const relays = data.relays || 'wss://relay.damus.io,wss://nos.lol,wss://relay.nostr.band';
+    document.getElementById('relays').value = relays.split(',').map(r => r.trim()).join('\n');
+
+    updateUI(mode);
     loadStats();
 });
 
 // Mode change
-document.getElementById('mode').addEventListener('change', (e) => {
-    updateUI(e.target.value);
+document.querySelectorAll('input[name="mode"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        updateUI(e.target.value);
+    });
 });
 
 // Save settings
 document.getElementById('save').addEventListener('click', async () => {
-    const mode = document.getElementById('mode').value;
+    const mode = document.querySelector('input[name="mode"]:checked')?.value || 'remote';
     const oracleUrl = document.getElementById('oracleUrl').value.trim();
     const myPubkey = document.getElementById('myPubkey').value.trim();
-    const relays = document.getElementById('relays').value.trim();
+    const syncDepth = document.getElementById('syncDepth').value;
+
+    // Parse relays (support both newline and comma separated)
+    const relaysText = document.getElementById('relays').value.trim();
+    const relays = relaysText
+        .split(/[\n,]+/)
+        .map(r => r.trim())
+        .filter(Boolean)
+        .join(',');
 
     // Validate pubkey
     if (myPubkey && (myPubkey.length !== 64 || !/^[a-f0-9]+$/i.test(myPubkey))) {
@@ -34,7 +53,7 @@ document.getElementById('save').addEventListener('click', async () => {
         return;
     }
 
-    await chrome.storage.sync.set({ mode, oracleUrl, myPubkey, relays });
+    await chrome.storage.sync.set({ mode, oracleUrl, myPubkey, relays, syncDepth });
 
     // Notify background script
     chrome.runtime.sendMessage({ method: 'configUpdated' });
@@ -45,25 +64,32 @@ document.getElementById('save').addEventListener('click', async () => {
 // Sync local graph
 document.getElementById('sync').addEventListener('click', async () => {
     const myPubkey = document.getElementById('myPubkey').value.trim();
+    const depth = parseInt(document.getElementById('syncDepth').value, 10);
 
     if (!myPubkey) {
         setStatus('Set your pubkey first', 'error');
         return;
     }
 
-    setStatus('Syncing...', 'info');
+    // Save settings first
+    document.getElementById('save').click();
+
+    setStatus(`Syncing ${depth} hops...`, 'info');
     document.getElementById('sync').disabled = true;
 
     try {
         const response = await chrome.runtime.sendMessage({
             method: 'syncGraph',
-            params: { depth: 2 }
+            params: { depth }
         });
 
         if (response.error) {
             setStatus(`Sync failed: ${response.error}`, 'error');
         } else {
-            setStatus(`Synced ${response.result.nodes} nodes`, 'success');
+            const { nodes, failed } = response.result;
+            let msg = `Synced ${nodes} nodes`;
+            if (failed > 0) msg += ` (${failed} failed)`;
+            setStatus(msg, 'success');
             loadStats();
         }
     } catch (e) {
@@ -89,9 +115,16 @@ document.getElementById('clear').addEventListener('click', async () => {
 // Test query
 document.getElementById('test').addEventListener('click', async () => {
     const target = document.getElementById('testTarget').value.trim();
+    const testResult = document.getElementById('testResult');
 
     if (!target) {
-        setStatus('Enter a target pubkey', 'error');
+        showTestResult('Enter a target pubkey', 'error');
+        return;
+    }
+
+    // Validate target pubkey
+    if (target.length !== 64 || !/^[a-f0-9]+$/i.test(target)) {
+        showTestResult('Invalid pubkey format (need 64 hex chars)', 'error');
         return;
     }
 
@@ -102,48 +135,61 @@ document.getElementById('test').addEventListener('click', async () => {
         });
 
         if (response.error) {
-            setStatus(`Error: ${response.error}`, 'error');
+            showTestResult(`Error: ${response.error}`, 'error');
         } else if (response.result === null) {
-            setStatus('Not connected', 'info');
+            showTestResult('Not connected (no path found)', 'info');
+        } else if (response.result === 0) {
+            showTestResult('That\'s you!', 'success');
         } else {
-            setStatus(`Distance: ${response.result} hops`, 'success');
+            const hops = response.result;
+            const label = hops === 1 ? 'hop' : 'hops';
+            showTestResult(`Distance: ${hops} ${label}`, 'success');
         }
     } catch (e) {
-        setStatus(`Query failed: ${e.message}`, 'error');
+        showTestResult(`Query failed: ${e.message}`, 'error');
     }
 });
 
 // Load local graph stats
 async function loadStats() {
+    const statsStatus = document.getElementById('statsStatus');
+    const statsNodes = document.getElementById('statsNodes');
+    const statsEdges = document.getElementById('statsEdges');
+
     try {
         const response = await chrome.runtime.sendMessage({ method: 'getStats' });
         if (response.result) {
             const { nodes, edges, lastSync } = response.result;
-            document.getElementById('stats').innerHTML = `
-        <strong>Local graph:</strong> ${nodes} nodes, ${edges} edges
-        ${lastSync ? `<br>Last sync: ${new Date(lastSync).toLocaleString()}` : ''}
-      `;
+
+            if (nodes > 0) {
+                statsStatus.textContent = lastSync
+                    ? `Synced ${formatTimeAgo(lastSync)}`
+                    : 'Synced';
+                statsStatus.classList.add('synced');
+            } else {
+                statsStatus.textContent = 'Not synced';
+                statsStatus.classList.remove('synced');
+            }
+
+            statsNodes.textContent = nodes.toLocaleString();
+            statsEdges.textContent = edges.toLocaleString();
         }
     } catch (e) {
-        document.getElementById('stats').textContent = 'Local graph: not synced';
+        statsStatus.textContent = 'Not synced';
+        statsStatus.classList.remove('synced');
+        statsNodes.textContent = '-';
+        statsEdges.textContent = '-';
     }
 }
 
 // Update UI based on mode
 function updateUI(mode) {
-    const oracleSection = document.getElementById('oracleSection');
     const localSection = document.getElementById('localSection');
 
     if (mode === 'remote') {
-        oracleSection.style.display = 'block';
-        localSection.style.display = 'none';
-    } else if (mode === 'local') {
-        oracleSection.style.display = 'none';
-        localSection.style.display = 'block';
+        localSection.classList.add('hidden');
     } else {
-        // hybrid
-        oracleSection.style.display = 'block';
-        localSection.style.display = 'block';
+        localSection.classList.remove('hidden');
     }
 }
 
@@ -156,6 +202,24 @@ function setStatus(message, type = 'info') {
     if (type === 'success') {
         setTimeout(() => {
             status.textContent = '';
+            status.className = 'status';
         }, 3000);
     }
+}
+
+// Show test result
+function showTestResult(message, type) {
+    const testResult = document.getElementById('testResult');
+    testResult.textContent = message;
+    testResult.className = `test-result show ${type}`;
+}
+
+// Format time ago
+function formatTimeAgo(timestamp) {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+
+    if (seconds < 60) return 'just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
 }

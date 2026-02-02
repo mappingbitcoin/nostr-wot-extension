@@ -21,3 +21,6 @@ icons/*.svg
 
 # Local settings
 .claude/
+
+#
+*.zip

@@ -1,6 +1,6 @@
-# Nostr WoT Extension
+# Nostr WOT Extension
 
-Browser extension that exposes Web of Trust queries to Nostr web apps.
+Query Nostr Web of Trust distance between pubkeys. Know how many hops separate you from anyone on Nostr.
 
 ## What It Does
 

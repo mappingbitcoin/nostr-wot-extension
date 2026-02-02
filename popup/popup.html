@@ -4,41 +4,130 @@
     <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-<h3>🔗 Nostr WoT</h3>
-
-<label>My Pubkey (hex)</label>
-<input id="myPubkey" placeholder="abc123... (64 hex characters)">
-
-<label>Mode</label>
-<select id="mode">
-    <option value="remote">Remote Oracle</option>
-    <option value="local">Local Graph</option>
-    <option value="hybrid">Hybrid (local + remote fallback)</option>
-</select>
-
-<div id="oracleSection">
-    <label>Oracle URL</label>
-    <input id="oracleUrl" placeholder="https://wot-oracle.mappingbitcoin.com">
-</div>
-
-<div id="localSection">
-    <label>Relays (comma-separated)</label>
-    <textarea id="relays" placeholder="wss://relay.damus.io,wss://nos.lol"></textarea>
-
-    <button id="sync" class="secondary">Sync Local Graph (2 hops)</button>
-    <button id="clear" class="danger">Clear Local Data</button>
-
-    <div id="stats" class="stats">Local graph: not synced</div>
-</div>
-
-<button id="save" class="primary">Save Settings</button>
-
-<div class="section">
-    <div class="section-title">Test Query</div>
-    <div class="test-section">
-        <input id="testTarget" placeholder="Target pubkey (hex)">
-        <button id="test" class="secondary">Check</button>
+<div class="header">
+    <div class="logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+            <circle cx="6" cy="6" r="3"/>
+            <circle cx="18" cy="6" r="3"/>
+            <circle cx="6" cy="18" r="3"/>
+            <circle cx="18" cy="18" r="3"/>
+            <path d="M6 9v6M18 9v6M9 6h6M9 18h6"/>
+        </svg>
     </div>
+    <div class="title">
+        <h1>Nostr WOT</h1>
+        <span class="subtitle">Web of Trust</span>
+    </div>
+</div>
+
+<div class="card">
+    <label>Your Pubkey</label>
+    <input id="myPubkey" placeholder="npub or hex (64 characters)" class="mono">
+    <span class="hint">Your Nostr public key in hex format</span>
+</div>
+
+<div class="card">
+    <label>Mode</label>
+    <div class="mode-selector">
+        <input type="radio" name="mode" id="mode-remote" value="remote">
+        <label for="mode-remote" class="mode-option">
+            <span class="mode-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+                </svg>
+            </span>
+            <span class="mode-label">Remote</span>
+            <span class="mode-desc">Query oracle API</span>
+        </label>
+
+        <input type="radio" name="mode" id="mode-local" value="local">
+        <label for="mode-local" class="mode-option">
+            <span class="mode-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                </svg>
+            </span>
+            <span class="mode-label">Local</span>
+            <span class="mode-desc">Use indexed graph</span>
+        </label>
+
+        <input type="radio" name="mode" id="mode-hybrid" value="hybrid">
+        <label for="mode-hybrid" class="mode-option">
+            <span class="mode-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                </svg>
+            </span>
+            <span class="mode-label">Hybrid</span>
+            <span class="mode-desc">Local + fallback</span>
+        </label>
+    </div>
+</div>
+
+<div id="localSection" class="card">
+    <label>Local Graph</label>
+    <div id="stats" class="stats-box">
+        <div class="stats-row">
+            <span class="stats-label">Status</span>
+            <span class="stats-value" id="statsStatus">Not synced</span>
+        </div>
+        <div class="stats-row">
+            <span class="stats-label">Nodes</span>
+            <span class="stats-value" id="statsNodes">-</span>
+        </div>
+        <div class="stats-row">
+            <span class="stats-label">Edges</span>
+            <span class="stats-value" id="statsEdges">-</span>
+        </div>
+    </div>
+
+    <div class="sync-controls">
+        <div class="depth-selector">
+            <label for="syncDepth">Sync depth</label>
+            <select id="syncDepth">
+                <option value="1">1 hop (fast)</option>
+                <option value="2" selected>2 hops (recommended)</option>
+                <option value="3">3 hops (slow)</option>
+            </select>
+        </div>
+        <button id="sync" class="btn btn-primary">
+            <svg class="btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M23 4v6h-6M1 20v-6h6"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+            Sync Graph
+        </button>
+    </div>
+
+    <button id="clear" class="btn btn-danger btn-small">Clear Local Data</button>
+</div>
+
+<div class="card">
+    <label>Test Distance</label>
+    <div class="test-section">
+        <input id="testTarget" placeholder="Target pubkey (hex)" class="mono">
+        <button id="test" class="btn btn-secondary">Check</button>
+    </div>
+    <div id="testResult" class="test-result"></div>
+</div>
+
+<details class="advanced-section">
+    <summary>Advanced Options</summary>
+    <div class="advanced-content">
+        <label>Oracle URL</label>
+        <input id="oracleUrl" placeholder="https://wot-oracle.mappingbitcoin.com" class="mono">
+        <span class="hint">WOT Oracle API endpoint for remote queries</span>
+
+        <label>Relays</label>
+        <textarea id="relays" placeholder="wss://relay.damus.io&#10;wss://nos.lol&#10;wss://relay.nostr.band" class="mono"></textarea>
+        <span class="hint">Nostr relays for fetching contact lists (one per line or comma-separated)</span>
+    </div>
+</details>
+
+<div class="actions">
+    <button id="save" class="btn btn-primary btn-large">Save Settings</button>
 </div>
 
 <div id="status" class="status"></div>

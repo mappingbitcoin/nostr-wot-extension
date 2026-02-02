@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Nostr WoT",
+  "name": "Nostr WOT Extension",
   "version": "0.1.0",
-  "description": "Web of Trust distance queries for Nostr",
+  "description": "Query Nostr Web of Trust distance between pubkeys. Know how many hops separate you from anyone on Nostr.",
   "permissions": [
     "storage"
   ],
