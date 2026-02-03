@@ -4,11 +4,11 @@
   "version": "0.1.0",
   "description": "Query Nostr Web of Trust distance between pubkeys. Know how many hops separate you from anyone on Nostr.",
   "permissions": [
-    "storage"
+    "storage",
+    "activeTab"
   ],
   "host_permissions": [
-    "https://*/*",
-    "wss://*/*"
+    "https://mappingbitcoin.com/*"
   ],
   "background": {
     "service_worker": "background.js",
