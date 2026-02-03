@@ -1,5 +1,9 @@
 // Allowed methods that can be called from page context
-const ALLOWED_METHODS = ['getDistance', 'isInMyWoT', 'getDistanceBetween', 'getTrustScore', 'getDetails', 'getConfig'];
+const ALLOWED_METHODS = [
+    'getDistance', 'isInMyWoT', 'getDistanceBetween', 'getTrustScore', 'getDetails', 'getConfig',
+    'getMyPubkey', 'isConfigured', 'getDistanceBatch', 'getTrustScoreBatch', 'filterByWoT',
+    'getFollows', 'getCommonFollows', 'getPath', 'getStats'
+];
 
 // Rate limiting: 1000 requests per second
 const RATE_LIMIT = 1000;

@@ -97,6 +97,38 @@ async function handleRequest({ method, params }) {
                 scoring: config.scoring
             };
 
+        // === New API methods ===
+
+        case 'getMyPubkey':
+            return config.myPubkey;
+
+        case 'isConfigured':
+            return {
+                configured: !!config.myPubkey,
+                mode: config.mode,
+                hasLocalGraph: (await storage.getStats()).nodes > 0
+            };
+
+        case 'getDistanceBatch':
+            return getDistanceBatch(params.targets);
+
+        case 'getTrustScoreBatch':
+            return getTrustScoreBatch(params.targets);
+
+        case 'filterByWoT':
+            return filterByWoT(params.pubkeys, params.maxHops);
+
+        case 'getFollows':
+            return getFollowsForPubkey(params.pubkey);
+
+        case 'getCommonFollows':
+            return getCommonFollows(params.pubkey);
+
+        case 'getPath':
+            return getPathTo(params.target);
+
+        // === End new API methods ===
+
         case 'getNostrPubkey':
             return getNostrPubkeyFromActiveTab();
 
@@ -196,6 +228,158 @@ async function syncGraph(depth) {
 async function clearGraph() {
     await storage.clearAll();
     return { ok: true };
+}
+
+// === New API implementations ===
+
+// Get distances for multiple targets at once
+async function getDistanceBatch(targets) {
+    if (!config.myPubkey) throw new Error('My pubkey not configured');
+    if (!Array.isArray(targets)) throw new Error('targets must be an array');
+
+    if (config.mode === 'local') {
+        await localGraph.ensureReady();
+        const results = await localGraph.getDistancesBatch(config.myPubkey, targets, config.maxHops);
+
+        // Convert Map to object for JSON serialization
+        const obj = {};
+        for (const [pubkey, info] of results) {
+            obj[pubkey] = info ? info.hops : null;
+        }
+        return obj;
+    }
+
+    if (config.mode === 'remote') {
+        return oracle.getDistanceBatch(config.myPubkey, targets);
+    }
+
+    // Hybrid: try local first, then remote for missing
+    await localGraph.ensureReady();
+    const localResults = await localGraph.getDistancesBatch(config.myPubkey, targets, config.maxHops);
+
+    const obj = {};
+    const missing = [];
+
+    for (const [pubkey, info] of localResults) {
+        if (info !== null) {
+            obj[pubkey] = info.hops;
+        } else {
+            missing.push(pubkey);
+        }
+    }
+
+    // Fetch missing from remote
+    if (missing.length > 0) {
+        try {
+            const remoteResults = await oracle.getDistanceBatch(config.myPubkey, missing);
+            for (const [pubkey, hops] of Object.entries(remoteResults)) {
+                obj[pubkey] = hops;
+            }
+        } catch {
+            // Mark missing as null
+            for (const pubkey of missing) {
+                obj[pubkey] = null;
+            }
+        }
+    }
+
+    return obj;
+}
+
+// Get trust scores for multiple targets at once
+async function getTrustScoreBatch(targets) {
+    if (!config.myPubkey) throw new Error('My pubkey not configured');
+    if (!Array.isArray(targets)) throw new Error('targets must be an array');
+
+    const distances = await getDistanceBatch(targets);
+    const scores = {};
+
+    for (const [pubkey, hops] of Object.entries(distances)) {
+        if (hops === null) {
+            scores[pubkey] = null;
+        } else {
+            scores[pubkey] = calculateScore(hops, null, config.scoring);
+        }
+    }
+
+    return scores;
+}
+
+// Filter pubkeys to only those within WoT
+async function filterByWoT(pubkeys, maxHops) {
+    if (!config.myPubkey) throw new Error('My pubkey not configured');
+    if (!Array.isArray(pubkeys)) throw new Error('pubkeys must be an array');
+
+    const hops = maxHops ?? config.maxHops;
+    const distances = await getDistanceBatch(pubkeys);
+
+    return pubkeys.filter(pubkey => {
+        const dist = distances[pubkey];
+        return dist !== null && dist <= hops;
+    });
+}
+
+// Get follows for a specific pubkey
+async function getFollowsForPubkey(pubkey) {
+    const targetPubkey = pubkey || config.myPubkey;
+    if (!targetPubkey) throw new Error('No pubkey specified');
+
+    if (config.mode === 'remote') {
+        return oracle.getFollows(targetPubkey);
+    }
+
+    if (config.mode === 'hybrid') {
+        // Try local first, fall back to remote
+        await localGraph.ensureReady();
+        const local = await localGraph.getFollows(targetPubkey);
+        if (local && local.length > 0) return local;
+        return oracle.getFollows(targetPubkey);
+    }
+
+    await localGraph.ensureReady();
+    return localGraph.getFollows(targetPubkey);
+}
+
+// Get common follows between user and target
+async function getCommonFollows(targetPubkey) {
+    if (!config.myPubkey) throw new Error('My pubkey not configured');
+    if (!targetPubkey) throw new Error('No target pubkey specified');
+
+    if (config.mode === 'remote') {
+        return oracle.getCommonFollows(config.myPubkey, targetPubkey);
+    }
+
+    if (config.mode === 'hybrid') {
+        // Try local first, fall back to remote
+        await localGraph.ensureReady();
+        const local = await localGraph.getCommonFollows(config.myPubkey, targetPubkey);
+        if (local && local.length > 0) return local;
+        return oracle.getCommonFollows(config.myPubkey, targetPubkey);
+    }
+
+    await localGraph.ensureReady();
+    return localGraph.getCommonFollows(config.myPubkey, targetPubkey);
+}
+
+// Get path to a target
+async function getPathTo(target) {
+    if (!config.myPubkey) throw new Error('My pubkey not configured');
+    if (!target) throw new Error('No target specified');
+
+    if (config.mode === 'remote') {
+        return oracle.getPath(config.myPubkey, target);
+    }
+
+    if (config.mode === 'hybrid') {
+        // Try local first, fall back to remote
+        await localGraph.ensureReady();
+        const local = await localGraph.getPath(config.myPubkey, target, config.maxHops);
+        if (local) return local;
+        return oracle.getPath(config.myPubkey, target);
+    }
+
+    await localGraph.ensureReady();
+    return localGraph.getPath(config.myPubkey, target, config.maxHops);
 }
 
 // Get pubkey from window.nostr on the active tab
