@@ -27,7 +27,7 @@
                 type: 'WOT_NOSTR_PUBKEY_RESULT',
                 pubkey,
                 error
-            }, '*');
+            }, window.location.origin);
         }
     });
 
@@ -35,7 +35,7 @@
         return new Promise((resolve, reject) => {
             const id = ++requestId;
             pending.set(id, { resolve, reject });
-            window.postMessage({ type: 'WOT_REQUEST', id, method, params }, '*');
+            window.postMessage({ type: 'WOT_REQUEST', id, method, params }, window.location.origin);
         });
     }
 
