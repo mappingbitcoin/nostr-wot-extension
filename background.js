@@ -100,6 +100,9 @@ async function handleRequest({ method, params }) {
         case 'getNostrPubkey':
             return getNostrPubkeyFromActiveTab();
 
+        case 'injectWotApi':
+            return injectWotApi();
+
         case 'configUpdated':
             await loadConfig();
             return { ok: true };
@@ -221,5 +224,35 @@ async function getNostrPubkeyFromActiveTab() {
     } catch (e) {
         // Permission denied or scripting not available on this tab
         return null;
+    }
+}
+
+// Inject window.nostr.wot API into the active tab
+async function injectWotApi() {
+    try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab?.id) return { ok: false, error: 'No active tab' };
+
+        // Skip chrome:// and other restricted URLs
+        if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || tab.url.startsWith('about:')) {
+            return { ok: false, error: 'Cannot inject on this page' };
+        }
+
+        // Inject content script (handles messaging bridge)
+        await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['content.js']
+        });
+
+        // Inject page script (exposes window.nostr.wot)
+        await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            world: 'MAIN',
+            files: ['inject.js']
+        });
+
+        return { ok: true, url: tab.url };
+    } catch (e) {
+        return { ok: false, error: e.message };
     }
 }
