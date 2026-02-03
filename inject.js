@@ -2,13 +2,33 @@
     let requestId = 0;
     const pending = new Map();
 
-    window.addEventListener('message', (event) => {
-        if (event.data?.type !== 'WOT_RESPONSE') return;
-        const { id, result, error } = event.data;
-        const { resolve, reject } = pending.get(id) || {};
-        pending.delete(id);
-        if (error) reject(new Error(error));
-        else resolve(result);
+    window.addEventListener('message', async (event) => {
+        if (event.data?.type === 'WOT_RESPONSE') {
+            const { id, result, error } = event.data;
+            const { resolve, reject } = pending.get(id) || {};
+            pending.delete(id);
+            if (error) reject(new Error(error));
+            else resolve(result);
+            return;
+        }
+
+        // Handle requests from content script to get nostr pubkey
+        if (event.data?.type === 'WOT_GET_NOSTR_PUBKEY') {
+            let pubkey = null;
+            let error = null;
+            try {
+                if (window.nostr && typeof window.nostr.getPublicKey === 'function') {
+                    pubkey = await window.nostr.getPublicKey();
+                }
+            } catch (e) {
+                error = e.message;
+            }
+            window.postMessage({
+                type: 'WOT_NOSTR_PUBKEY_RESULT',
+                pubkey,
+                error
+            }, '*');
+        }
     });
 
     function call(method, params) {
@@ -23,7 +43,10 @@
     window.nostr = window.nostr || {};
     window.nostr.wot = {
         getDistance: (target) => call('getDistance', { target }),
-        isInMyWoT: (target, maxHops = 3) => call('isInMyWoT', { target, maxHops }),
+        isInMyWoT: (target, maxHops) => call('isInMyWoT', { target, maxHops }),
         getDistanceBetween: (from, to) => call('getDistanceBetween', { from, to }),
+        getTrustScore: (target) => call('getTrustScore', { target }),
+        getDetails: (target) => call('getDetails', { target }),
+        getConfig: () => call('getConfig', {}),
     };
 })();

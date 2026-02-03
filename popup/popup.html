@@ -1,6 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <title>Nostr WoT Settings</title>
     <link rel="stylesheet" href="popup.css">
 </head>
 <body>
@@ -50,10 +52,36 @@
         <h1>Nostr WOT</h1>
         <span class="subtitle">Web of Trust</span>
     </div>
+    <div class="menu-container">
+        <button id="menuBtn" class="menu-btn" title="Settings">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+        </button>
+        <div id="menuDropdown" class="menu-dropdown hidden">
+            <button class="menu-item" data-modal="scoringModal">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 20V10"/>
+                    <path d="M18 20V4"/>
+                    <path d="M6 20v-4"/>
+                </svg>
+                Scoring & Weights
+            </button>
+            <button class="menu-item" data-modal="advancedModal">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M12 1v6m0 6v6"/>
+                    <path d="M1 12h6m6 0h6"/>
+                </svg>
+                Advanced Options
+            </button>
+        </div>
+    </div>
 </div>
 
 <div class="card">
-    <label>Your Pubkey</label>
+    <label for="myPubkey">Your Pubkey</label>
     <input id="myPubkey" placeholder="npub or hex (64 characters)" class="mono">
     <span class="hint">Your Nostr public key in hex format</span>
 </div>
@@ -106,12 +134,17 @@
             <span class="stats-value" id="statsStatus">Not synced</span>
         </div>
         <div class="stats-row">
-            <span class="stats-label">Nodes</span>
+            <span class="stats-label">Total Nodes</span>
             <span class="stats-value" id="statsNodes">-</span>
         </div>
+        <div id="depthStats" class="depth-stats hidden"></div>
         <div class="stats-row">
             <span class="stats-label">Edges</span>
             <span class="stats-value" id="statsEdges">-</span>
+        </div>
+        <div class="stats-row">
+            <span class="stats-label">Storage</span>
+            <span class="stats-value" id="statsSize">-</span>
         </div>
     </div>
 
@@ -134,10 +167,21 @@
     </div>
 
     <button id="clear" class="btn btn-danger btn-small">Clear Local Data</button>
+
+    <div id="syncStatus" class="sync-status hidden">
+        <div class="sync-status-content">
+            <div class="sync-status-text">
+                <span class="sync-spinner"></span>
+                <span id="syncStatusText">Syncing...</span>
+            </div>
+            <button id="stopSync" class="btn btn-danger btn-small">Stop</button>
+        </div>
+        <div id="syncProgress" class="sync-progress"></div>
+    </div>
 </div>
 
 <div class="card">
-    <label>Test Distance</label>
+    <label for="testTarget">Test Distance</label>
     <div class="test-section">
         <input id="testTarget" placeholder="Target pubkey (hex)" class="mono">
         <button id="test" class="btn btn-secondary">Check</button>
@@ -145,25 +189,113 @@
     <div id="testResult" class="test-result"></div>
 </div>
 
-<details class="advanced-section">
-    <summary>Advanced Options</summary>
-    <div class="advanced-content">
-        <label>Oracle URL</label>
-        <input id="oracleUrl" placeholder="https://wot-oracle.mappingbitcoin.com" class="mono">
-        <span class="hint">WOT Oracle API endpoint for remote queries</span>
-
-        <label>Relays</label>
-        <textarea id="relays" placeholder="wss://relay.damus.io&#10;wss://nos.lol&#10;wss://relay.nostr.band" class="mono"></textarea>
-        <span class="hint">Nostr relays for fetching contact lists (one per line or comma-separated)</span>
-    </div>
-</details>
-
 <div class="actions">
     <button id="save" class="btn btn-primary btn-large">Save Settings</button>
 </div>
 
+<!-- Scoring Modal -->
+<div id="scoringModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Scoring & Weights</h2>
+            <button class="modal-close" data-modal="scoringModal">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="scoring-info">
+                <span class="hint">score = base * weight * (1 + bonus)</span>
+            </div>
+
+            <label>Distance Weights</label>
+            <span class="hint">Score multiplier per hop distance</span>
+            <div class="weight-grid">
+                <div class="weight-item">
+                    <label for="weight1">1 hop</label>
+                    <input type="number" id="weight1" min="0" max="1" step="0.1" value="1.0">
+                </div>
+                <div class="weight-item">
+                    <label for="weight2">2 hops</label>
+                    <input type="number" id="weight2" min="0" max="1" step="0.1" value="0.5">
+                </div>
+                <div class="weight-item">
+                    <label for="weight3">3 hops</label>
+                    <input type="number" id="weight3" min="0" max="1" step="0.1" value="0.25">
+                </div>
+                <div class="weight-item">
+                    <label for="weight4">4+ hops</label>
+                    <input type="number" id="weight4" min="0" max="1" step="0.1" value="0.1">
+                </div>
+            </div>
+
+            <label>Path Bonus (per hop level)</label>
+            <span class="hint">Bonus per additional shortest path to target</span>
+            <div class="weight-grid weight-grid-3">
+                <div class="weight-item">
+                    <label for="pathBonus2">2 hops</label>
+                    <input type="number" id="pathBonus2" min="0" max="1" step="0.05" value="0.15">
+                </div>
+                <div class="weight-item">
+                    <label for="pathBonus3">3 hops</label>
+                    <input type="number" id="pathBonus3" min="0" max="1" step="0.05" value="0.1">
+                </div>
+                <div class="weight-item">
+                    <label for="pathBonus4">4+ hops</label>
+                    <input type="number" id="pathBonus4" min="0" max="1" step="0.05" value="0.05">
+                </div>
+            </div>
+
+            <label for="maxPathBonus">Max Path Bonus</label>
+            <input type="number" id="maxPathBonus" min="0" max="2" step="0.1" value="0.5">
+            <span class="hint">Cap on total path bonus (e.g., 0.5 = +50% max)</span>
+        </div>
+        <div class="modal-footer">
+            <button id="resetScoring" class="btn btn-secondary btn-small">Reset to Defaults</button>
+            <button class="btn btn-primary modal-save" data-modal="scoringModal">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Advanced Options Modal -->
+<div id="advancedModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Advanced Options</h2>
+            <button class="modal-close" data-modal="advancedModal">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        <div class="modal-body">
+            <label for="oracleUrl">Oracle URL</label>
+            <input id="oracleUrl" placeholder="https://wot-oracle.mappingbitcoin.com" class="mono">
+            <span class="hint">WOT Oracle API endpoint for remote queries</span>
+
+            <label for="relays">Relays</label>
+            <textarea id="relays" placeholder="wss://relay.damus.io&#10;wss://nos.lol&#10;wss://relay.nostr.band&#10;wss://relay.mappingbitcoin.com" class="mono"></textarea>
+            <span class="hint">Nostr relays for fetching contact lists (one per line or comma-separated)</span>
+
+            <label for="maxHops">Max Hops</label>
+            <input type="number" id="maxHops" min="1" max="6" value="3">
+            <span class="hint">Maximum search depth for trust queries (default: 3)</span>
+
+            <label for="timeout">Timeout (ms)</label>
+            <input type="number" id="timeout" min="1000" max="30000" step="1000" value="5000">
+            <span class="hint">Request timeout in milliseconds (default: 5000)</span>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary modal-save" data-modal="advancedModal">Save</button>
+        </div>
+    </div>
+</div>
+
 <div id="status" class="status"></div>
 
-<script src="popup.js"></script>
+<script type="module" src="popup.js"></script>
 </body>
 </html>

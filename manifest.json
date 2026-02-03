@@ -5,7 +5,8 @@
   "description": "Query Nostr Web of Trust distance between pubkeys. Know how many hops separate you from anyone on Nostr.",
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "scripting"
   ],
   "host_permissions": [
     "https://mappingbitcoin.com/*"
@@ -15,13 +16,13 @@
     "type": "module"
   },
   "content_scripts": [{
-    "matches": ["<all_urls>"],
+    "matches": ["https://mappingbitcoin.com/*"],
     "js": ["content.js"],
     "run_at": "document_start"
   }],
   "web_accessible_resources": [{
     "resources": ["inject.js"],
-    "matches": ["<all_urls>"]
+    "matches": ["https://mappingbitcoin.com/*"]
   }],
   "action": {
     "default_popup": "popup/popup.html",
