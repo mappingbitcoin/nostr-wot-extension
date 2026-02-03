@@ -1,9 +1,3 @@
-// Inject into page context
-const script = document.createElement('script');
-script.src = chrome.runtime.getURL('inject.js');
-script.onload = () => script.remove();
-document.documentElement.appendChild(script);
-
 // Bridge between page and extension
 window.addEventListener('message', async (event) => {
     if (event.source !== window) return;

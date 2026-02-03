@@ -145,7 +145,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!data.myPubkey) {
         tryDetectNostrPubkey();
     }
+
+    // Inject WoT API into active tab
+    injectWotApi();
 });
+
+// Inject window.nostr.wot API into the active tab
+async function injectWotApi() {
+    try {
+        const response = await chrome.runtime.sendMessage({ method: 'injectWotApi' });
+        if (response?.result?.ok) {
+            console.log('WoT API injected into:', response.result.url);
+        }
+    } catch (e) {
+        // Silently fail - not all pages can have scripts injected
+    }
+}
 
 // Load scoring values into UI
 function loadScoringUI(scoring) {
