@@ -290,6 +290,25 @@ document.querySelectorAll('.modal-save').forEach(btn => {
     });
 });
 
+// URL validation helpers
+function isValidHttpsUrl(url) {
+    try {
+        const parsed = new URL(url);
+        return parsed.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
+function isValidWssUrl(url) {
+    try {
+        const parsed = new URL(url);
+        return parsed.protocol === 'wss:';
+    } catch {
+        return false;
+    }
+}
+
 // Save settings function (reusable)
 // silent: if true, don't show success message
 async function saveSettings(silent = false) {
@@ -303,11 +322,26 @@ async function saveSettings(silent = false) {
 
     // Parse relays (support both newline and comma separated)
     const relaysText = document.getElementById('relays').value.trim();
-    const relays = relaysText
+    const relaysList = relaysText
         .split(/[\n,]+/)
         .map(r => r.trim())
-        .filter(Boolean)
-        .join(',');
+        .filter(Boolean);
+
+    // Validate oracle URL (must be https://)
+    if (oracleUrl && !isValidHttpsUrl(oracleUrl)) {
+        setStatus('Oracle URL must use https://', 'error');
+        return false;
+    }
+
+    // Validate relay URLs (must be wss://)
+    for (const relay of relaysList) {
+        if (!isValidWssUrl(relay)) {
+            setStatus(`Invalid relay URL: ${relay} (must use wss://)`, 'error');
+            return false;
+        }
+    }
+
+    const relays = relaysList.join(',');
 
     // Validate pubkey
     if (myPubkey && (myPubkey.length !== 64 || !/^[a-f0-9]+$/i.test(myPubkey))) {

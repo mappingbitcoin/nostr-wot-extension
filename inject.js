@@ -1,14 +1,18 @@
 (() => {
     let requestId = 0;
     const pending = new Map();
+    const REQUEST_TIMEOUT_MS = 30000; // 30 second timeout for pending requests
 
     window.addEventListener('message', async (event) => {
         if (event.data?.type === 'WOT_RESPONSE') {
             const { id, result, error } = event.data;
-            const { resolve, reject } = pending.get(id) || {};
-            pending.delete(id);
-            if (error) reject(new Error(error));
-            else resolve(result);
+            const entry = pending.get(id);
+            if (entry) {
+                clearTimeout(entry.timeoutId);
+                pending.delete(id);
+                if (error) entry.reject(new Error(error));
+                else entry.resolve(result);
+            }
             return;
         }
 
@@ -34,7 +38,13 @@
     function call(method, params) {
         return new Promise((resolve, reject) => {
             const id = ++requestId;
-            pending.set(id, { resolve, reject });
+            const timeoutId = setTimeout(() => {
+                if (pending.has(id)) {
+                    pending.delete(id);
+                    reject(new Error(`Request timeout after ${REQUEST_TIMEOUT_MS}ms`));
+                }
+            }, REQUEST_TIMEOUT_MS);
+            pending.set(id, { resolve, reject, timeoutId });
             window.postMessage({ type: 'WOT_REQUEST', id, method, params }, window.location.origin);
         });
     }

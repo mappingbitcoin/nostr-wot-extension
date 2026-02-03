@@ -7,6 +7,42 @@ import * as storage from './lib/storage.js';
 const DEFAULT_ORACLE_URL = 'https://wot-oracle.mappingbitcoin.com';
 const DEFAULT_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.nostr.band', 'wss://relay.mappingbitcoin.com'];
 
+// Rate limiting for API methods (10 requests per second per method)
+const RATE_LIMIT_PER_SECOND = 10;
+const RATE_LIMIT_WINDOW_MS = 1000;
+const rateLimitState = new Map(); // method -> { count, windowStart }
+
+// Methods that should be rate limited (external-facing API methods)
+const RATE_LIMITED_METHODS = new Set([
+    'getDistance', 'isInMyWoT', 'getDistanceBetween', 'getTrustScore',
+    'getDetails', 'getDistanceBatch', 'getTrustScoreBatch', 'filterByWoT',
+    'getFollows', 'getCommonFollows', 'getPath', 'getMyPubkey', 'isConfigured',
+    'getConfig', 'getStats'
+]);
+
+function checkRateLimit(method) {
+    if (!RATE_LIMITED_METHODS.has(method)) {
+        return true; // Not rate limited
+    }
+
+    const now = Date.now();
+    let state = rateLimitState.get(method);
+
+    if (!state || now - state.windowStart >= RATE_LIMIT_WINDOW_MS) {
+        // Start a new window
+        state = { count: 1, windowStart: now };
+        rateLimitState.set(method, state);
+        return true;
+    }
+
+    if (state.count >= RATE_LIMIT_PER_SECOND) {
+        return false; // Rate limit exceeded
+    }
+
+    state.count++;
+    return true;
+}
+
 let config = {
     mode: 'remote',  // 'remote' | 'local' | 'hybrid'
     oracleUrl: DEFAULT_ORACLE_URL,
@@ -53,6 +89,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 async function handleRequest({ method, params }) {
+    // Check rate limit for external API methods
+    if (!checkRateLimit(method)) {
+        throw new Error(`Rate limit exceeded for ${method}. Max ${RATE_LIMIT_PER_SECOND} requests per second.`);
+    }
+
     switch (method) {
         case 'getDistance':
             return getDistance(config.myPubkey, params.target);
