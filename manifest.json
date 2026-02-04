@@ -12,11 +12,6 @@
     "service_worker": "background.js",
     "type": "module"
   },
-  "content_scripts": [{
-    "matches": ["<all_urls>"],
-    "js": ["connect-listener.js"],
-    "run_at": "document_start"
-  }],
   "web_accessible_resources": [{
     "resources": ["inject.js"],
     "matches": ["<all_urls>"]
