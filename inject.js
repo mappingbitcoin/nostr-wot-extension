@@ -77,4 +77,7 @@
         // Path info
         getPath: (target) => call('getPath', { target }),
     };
+
+    // Notify page that WoT API is ready
+    window.dispatchEvent(new CustomEvent('nostr-wot-ready'));
 })();
