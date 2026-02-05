@@ -148,6 +148,51 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Inject WoT API into active tab
     injectWotApi();
+
+    // Check and display permission state
+    checkPermissionState();
+});
+
+// Check and update permission UI
+async function checkPermissionState() {
+    const permissionCard = document.getElementById('permissionCard');
+    const enableBtn = document.getElementById('enableAutoInject');
+    const grantedDiv = document.getElementById('permissionGranted');
+    const permissionRow = permissionCard.querySelector('.permission-row');
+
+    try {
+        const hasPermission = await chrome.runtime.sendMessage({ method: 'hasHostPermission' });
+
+        permissionCard.classList.remove('hidden');
+
+        if (hasPermission.result) {
+            // Permission granted
+            permissionRow.classList.add('hidden');
+            grantedDiv.classList.remove('hidden');
+        } else {
+            // Permission not granted
+            permissionRow.classList.remove('hidden');
+            grantedDiv.classList.add('hidden');
+        }
+    } catch (e) {
+        // Hide card if there's an error
+        permissionCard.classList.add('hidden');
+    }
+}
+
+// Enable auto-inject button handler
+document.getElementById('enableAutoInject').addEventListener('click', async () => {
+    try {
+        const response = await chrome.runtime.sendMessage({ method: 'requestHostPermission' });
+        if (response.result) {
+            setStatus('Auto-inject enabled for all sites', 'success');
+            checkPermissionState();
+        } else {
+            setStatus('Permission denied', 'error');
+        }
+    } catch (e) {
+        setStatus('Failed to request permission', 'error');
+    }
 });
 
 // Inject window.nostr.wot API into the active tab

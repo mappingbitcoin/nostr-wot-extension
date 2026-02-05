@@ -135,6 +135,43 @@ body {
     border: 1px solid rgba(139, 92, 246, 0.1);
 }
 
+/* Permission card */
+.permission-card {
+    padding: 12px 14px;
+}
+
+.permission-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.permission-info {
+    flex: 1;
+}
+
+.permission-info label {
+    margin-bottom: 2px;
+}
+
+.permission-info .hint {
+    margin-top: 2px;
+}
+
+.permission-granted {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #10b981;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.permission-granted svg {
+    stroke: #10b981;
+}
+
 /* Labels */
 label {
     display: block;

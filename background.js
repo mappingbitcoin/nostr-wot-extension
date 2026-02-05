@@ -59,6 +59,69 @@ let localGraph = null;
 // Load config on startup
 loadConfig();
 
+// === Auto-injection on tab navigation ===
+
+// Check if we have host permissions for auto-injection
+async function hasHostPermission() {
+    return chrome.permissions.contains({ origins: ['<all_urls>'] });
+}
+
+// Request host permission for auto-injection
+async function requestHostPermission() {
+    return chrome.permissions.request({ origins: ['<all_urls>'] });
+}
+
+// Inject WoT API into a specific tab
+async function injectIntoTab(tabId, url) {
+    // Skip restricted URLs
+    if (!url || url.startsWith('chrome://') || url.startsWith('edge://') ||
+        url.startsWith('about:') || url.startsWith('chrome-extension://')) {
+        return false;
+    }
+
+    try {
+        // Inject content script (handles messaging bridge)
+        await chrome.scripting.executeScript({
+            target: { tabId },
+            files: ['content.js']
+        });
+
+        // Inject page script (exposes window.nostr.wot)
+        await chrome.scripting.executeScript({
+            target: { tabId },
+            world: 'MAIN',
+            files: ['inject.js']
+        });
+
+        return true;
+    } catch (e) {
+        // Permission denied or tab closed
+        return false;
+    }
+}
+
+// Listen for tab updates to auto-inject
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+    // Only inject when page has completed loading
+    if (changeInfo.status !== 'complete') return;
+
+    // Check if we have permission to inject on all sites
+    const hasPermission = await hasHostPermission();
+    if (!hasPermission) return;
+
+    await injectIntoTab(tabId, tab.url);
+});
+
+// Also inject when a new tab is created with a URL
+chrome.tabs.onCreated.addListener(async (tab) => {
+    if (!tab.url || tab.status !== 'complete') return;
+
+    const hasPermission = await hasHostPermission();
+    if (!hasPermission) return;
+
+    await injectIntoTab(tab.id, tab.url);
+});
+
 async function loadConfig() {
     const data = await chrome.storage.sync.get([
         'mode', 'oracleUrl', 'myPubkey', 'relays', 'maxHops', 'timeout', 'scoring'
@@ -182,6 +245,12 @@ async function handleRequest({ method, params }) {
         case 'configUpdated':
             await loadConfig();
             return { ok: true };
+
+        case 'hasHostPermission':
+            return hasHostPermission();
+
+        case 'requestHostPermission':
+            return requestHostPermission();
 
         default:
             throw new Error(`Unknown method: ${method}`);
