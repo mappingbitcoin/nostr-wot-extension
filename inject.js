@@ -61,7 +61,8 @@
         getConfig: () => call('getConfig', {}),
 
         // Batch operations
-        getDistanceBatch: (targets) => call('getDistanceBatch', { targets }),
+        // includePaths: if true, returns { pubkey: { hops, paths } }, otherwise { pubkey: hops }
+        getDistanceBatch: (targets, includePaths) => call('getDistanceBatch', { targets, includePaths }),
         getTrustScoreBatch: (targets) => call('getTrustScoreBatch', { targets }),
         filterByWoT: (pubkeys, maxHops) => call('filterByWoT', { pubkeys, maxHops }),
 

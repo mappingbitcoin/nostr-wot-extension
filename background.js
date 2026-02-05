@@ -151,7 +151,7 @@ async function handleRequest({ method, params }) {
             };
 
         case 'getDistanceBatch':
-            return getDistanceBatch(params.targets);
+            return getDistanceBatch(params.targets, params.includePaths);
 
         case 'getTrustScoreBatch':
             return getTrustScoreBatch(params.targets);
@@ -274,36 +274,49 @@ async function clearGraph() {
 // === New API implementations ===
 
 // Get distances for multiple targets at once
-async function getDistanceBatch(targets) {
+// includePaths: if true, returns { pubkey: { hops, paths } }, otherwise { pubkey: hops }
+async function getDistanceBatch(targets, includePaths = false) {
     if (!config.myPubkey) throw new Error('My pubkey not configured');
     if (!Array.isArray(targets)) throw new Error('targets must be an array');
 
     if (config.mode === 'local') {
         await localGraph.ensureReady();
-        const results = await localGraph.getDistancesBatch(config.myPubkey, targets, config.maxHops);
+        const results = await localGraph.getDistancesBatch(config.myPubkey, targets, config.maxHops, includePaths);
 
         // Convert Map to object for JSON serialization
         const obj = {};
         for (const [pubkey, info] of results) {
-            obj[pubkey] = info ? info.hops : null;
+            if (includePaths) {
+                obj[pubkey] = info ? { hops: info.hops, paths: info.paths } : null;
+            } else {
+                obj[pubkey] = info ? info.hops : null;
+            }
         }
         return obj;
     }
 
     if (config.mode === 'remote') {
+        // Remote oracle doesn't support batch with paths, fetch individually if needed
+        if (includePaths) {
+            return getDetailsBatchRemote(targets);
+        }
         return oracle.getDistanceBatch(config.myPubkey, targets);
     }
 
     // Hybrid: try local first, then remote for missing
     await localGraph.ensureReady();
-    const localResults = await localGraph.getDistancesBatch(config.myPubkey, targets, config.maxHops);
+    const localResults = await localGraph.getDistancesBatch(config.myPubkey, targets, config.maxHops, includePaths);
 
     const obj = {};
     const missing = [];
 
     for (const [pubkey, info] of localResults) {
         if (info !== null) {
-            obj[pubkey] = info.hops;
+            if (includePaths) {
+                obj[pubkey] = { hops: info.hops, paths: info.paths };
+            } else {
+                obj[pubkey] = info.hops;
+            }
         } else {
             missing.push(pubkey);
         }
@@ -312,9 +325,16 @@ async function getDistanceBatch(targets) {
     // Fetch missing from remote
     if (missing.length > 0) {
         try {
-            const remoteResults = await oracle.getDistanceBatch(config.myPubkey, missing);
-            for (const [pubkey, hops] of Object.entries(remoteResults)) {
-                obj[pubkey] = hops;
+            if (includePaths) {
+                const remoteResults = await getDetailsBatchRemote(missing);
+                for (const [pubkey, details] of Object.entries(remoteResults)) {
+                    obj[pubkey] = details;
+                }
+            } else {
+                const remoteResults = await oracle.getDistanceBatch(config.myPubkey, missing);
+                for (const [pubkey, hops] of Object.entries(remoteResults)) {
+                    obj[pubkey] = hops;
+                }
             }
         } catch {
             // Mark missing as null
@@ -327,19 +347,43 @@ async function getDistanceBatch(targets) {
     return obj;
 }
 
+// Helper: fetch details for multiple targets from remote oracle (sequential)
+async function getDetailsBatchRemote(targets) {
+    const results = {};
+    // Fetch in parallel with concurrency limit
+    const CONCURRENCY = 5;
+    for (let i = 0; i < targets.length; i += CONCURRENCY) {
+        const batch = targets.slice(i, i + CONCURRENCY);
+        const promises = batch.map(async (target) => {
+            try {
+                const info = await oracle.getDistanceInfo(config.myPubkey, target);
+                return [target, info ? { hops: info.hops, paths: info.paths ?? null } : null];
+            } catch {
+                return [target, null];
+            }
+        });
+        const batchResults = await Promise.all(promises);
+        for (const [pubkey, details] of batchResults) {
+            results[pubkey] = details;
+        }
+    }
+    return results;
+}
+
 // Get trust scores for multiple targets at once
 async function getTrustScoreBatch(targets) {
     if (!config.myPubkey) throw new Error('My pubkey not configured');
     if (!Array.isArray(targets)) throw new Error('targets must be an array');
 
-    const distances = await getDistanceBatch(targets);
+    // Get distances with paths for accurate scoring
+    const details = await getDistanceBatch(targets, true);
     const scores = {};
 
-    for (const [pubkey, hops] of Object.entries(distances)) {
-        if (hops === null) {
+    for (const [pubkey, info] of Object.entries(details)) {
+        if (info === null) {
             scores[pubkey] = null;
         } else {
-            scores[pubkey] = calculateScore(hops, null, config.scoring);
+            scores[pubkey] = calculateScore(info.hops, info.paths, config.scoring);
         }
     }
 
