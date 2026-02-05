@@ -156,23 +156,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Check and update permission UI
 async function checkPermissionState() {
     const permissionCard = document.getElementById('permissionCard');
-    const enableBtn = document.getElementById('enableAutoInject');
-    const grantedDiv = document.getElementById('permissionGranted');
-    const permissionRow = permissionCard.querySelector('.permission-row');
+    const permissionNeeded = document.getElementById('permissionNeeded');
+    const permissionActiveTab = document.getElementById('permissionActiveTab');
+    const permissionAllSites = document.getElementById('permissionAllSites');
 
     try {
-        const hasPermission = await chrome.runtime.sendMessage({ method: 'hasHostPermission' });
+        const [hasHost, hasActiveTab] = await Promise.all([
+            chrome.runtime.sendMessage({ method: 'hasHostPermission' }),
+            chrome.runtime.sendMessage({ method: 'hasActiveTabPermission' })
+        ]);
 
         permissionCard.classList.remove('hidden');
 
-        if (hasPermission.result) {
-            // Permission granted
-            permissionRow.classList.add('hidden');
-            grantedDiv.classList.remove('hidden');
+        // Hide all sections first
+        permissionNeeded.classList.add('hidden');
+        permissionActiveTab.classList.add('hidden');
+        permissionAllSites.classList.add('hidden');
+
+        if (hasHost.result) {
+            // Full host permission granted
+            permissionAllSites.classList.remove('hidden');
+        } else if (hasActiveTab.result) {
+            // Only activeTab permission
+            permissionActiveTab.classList.remove('hidden');
         } else {
-            // Permission not granted
-            permissionRow.classList.remove('hidden');
-            grantedDiv.classList.add('hidden');
+            // No permissions yet
+            permissionNeeded.classList.remove('hidden');
         }
     } catch (e) {
         // Hide card if there's an error
@@ -180,13 +189,14 @@ async function checkPermissionState() {
     }
 }
 
-// Enable auto-inject button handler
-document.getElementById('enableAutoInject').addEventListener('click', async () => {
+// Enable for this tab button handler
+document.getElementById('enableActiveTab').addEventListener('click', async () => {
     try {
-        const response = await chrome.runtime.sendMessage({ method: 'requestHostPermission' });
+        const response = await chrome.runtime.sendMessage({ method: 'requestActiveTabPermission' });
         if (response.result) {
-            setStatus('Auto-inject enabled for all sites', 'success');
+            setStatus('Enabled for this tab', 'success');
             checkPermissionState();
+            injectWotApi();
         } else {
             setStatus('Permission denied', 'error');
         }
@@ -194,6 +204,25 @@ document.getElementById('enableAutoInject').addEventListener('click', async () =
         setStatus('Failed to request permission', 'error');
     }
 });
+
+// Enable for all sites button handlers
+document.getElementById('enableAllSites').addEventListener('click', requestAllSitesPermission);
+document.getElementById('upgradeToAllSites').addEventListener('click', requestAllSitesPermission);
+
+async function requestAllSitesPermission() {
+    try {
+        const response = await chrome.runtime.sendMessage({ method: 'requestHostPermission' });
+        if (response.result) {
+            setStatus('Auto-inject enabled for all sites', 'success');
+            checkPermissionState();
+            injectWotApi();
+        } else {
+            setStatus('Permission denied', 'error');
+        }
+    } catch (e) {
+        setStatus('Failed to request permission', 'error');
+    }
+}
 
 // Inject window.nostr.wot API into the active tab
 async function injectWotApi() {

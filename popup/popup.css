@@ -140,23 +140,24 @@ body {
     padding: 12px 14px;
 }
 
-.permission-row {
+.permission-section {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    flex-direction: column;
+    gap: 8px;
 }
 
-.permission-info {
-    flex: 1;
+.permission-section label {
+    margin-bottom: 0;
 }
 
-.permission-info label {
-    margin-bottom: 2px;
+.permission-section .hint {
+    margin-top: 0;
+    margin-bottom: 4px;
 }
 
-.permission-info .hint {
-    margin-top: 2px;
+.permission-buttons {
+    display: flex;
+    gap: 8px;
 }
 
 .permission-granted {
@@ -166,10 +167,19 @@ body {
     color: #10b981;
     font-size: 12px;
     font-weight: 500;
+    margin-bottom: 8px;
 }
 
 .permission-granted svg {
     stroke: #10b981;
+}
+
+#permissionActiveTab .permission-granted {
+    margin-bottom: 8px;
+}
+
+#permissionAllSites .permission-granted {
+    margin-bottom: 0;
 }
 
 /* Labels */

@@ -87,18 +87,30 @@
 </div>
 
 <div id="permissionCard" class="card permission-card hidden">
-    <div class="permission-row">
-        <div class="permission-info">
-            <label>Auto-inject on all sites</label>
-            <span class="hint">Enable to use WoT API without clicking the extension each time</span>
+    <div id="permissionNeeded" class="permission-section">
+        <label>Permission Required</label>
+        <span class="hint">Choose how you want to use the extension</span>
+        <div class="permission-buttons">
+            <button id="enableActiveTab" class="btn btn-primary btn-small">Enable for this tab</button>
+            <button id="enableAllSites" class="btn btn-secondary btn-small">Enable for all sites</button>
         </div>
-        <button id="enableAutoInject" class="btn btn-secondary btn-small">Enable</button>
     </div>
-    <div id="permissionGranted" class="permission-granted hidden">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M20 6L9 17l-5-5"/>
-        </svg>
-        <span>Auto-inject enabled</span>
+    <div id="permissionActiveTab" class="permission-section hidden">
+        <div class="permission-granted">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 6L9 17l-5-5"/>
+            </svg>
+            <span>Enabled for current tab</span>
+        </div>
+        <button id="upgradeToAllSites" class="btn btn-secondary btn-small">Enable for all sites</button>
+    </div>
+    <div id="permissionAllSites" class="permission-section hidden">
+        <div class="permission-granted">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 6L9 17l-5-5"/>
+            </svg>
+            <span>Auto-inject enabled for all sites</span>
+        </div>
     </div>
 </div>
 

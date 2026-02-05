@@ -5,8 +5,10 @@
   "description": "Query Nostr Web of Trust distance between pubkeys. Know how many hops separate you from anyone on Nostr.",
   "permissions": [
     "storage",
-    "activeTab",
     "scripting"
+  ],
+  "optional_permissions": [
+    "activeTab"
   ],
   "optional_host_permissions": [
     "<all_urls>"

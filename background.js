@@ -71,6 +71,16 @@ async function requestHostPermission() {
     return chrome.permissions.request({ origins: ['<all_urls>'] });
 }
 
+// Check if we have activeTab permission
+async function hasActiveTabPermission() {
+    return chrome.permissions.contains({ permissions: ['activeTab'] });
+}
+
+// Request activeTab permission
+async function requestActiveTabPermission() {
+    return chrome.permissions.request({ permissions: ['activeTab'] });
+}
+
 // Inject WoT API into a specific tab
 async function injectIntoTab(tabId, url) {
     // Skip restricted URLs
@@ -251,6 +261,12 @@ async function handleRequest({ method, params }) {
 
         case 'requestHostPermission':
             return requestHostPermission();
+
+        case 'hasActiveTabPermission':
+            return hasActiveTabPermission();
+
+        case 'requestActiveTabPermission':
+            return requestActiveTabPermission();
 
         default:
             throw new Error(`Unknown method: ${method}`);
