@@ -1,4 +1,9 @@
 (() => {
+    // Guard against double injection
+    if (window.nostr?.wot) {
+        return; // Already injected
+    }
+
     let requestId = 0;
     const pending = new Map();
     const REQUEST_TIMEOUT_MS = 30000; // 30 second timeout for pending requests

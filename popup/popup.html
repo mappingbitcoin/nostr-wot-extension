@@ -91,16 +91,16 @@
         <label>Permission Required</label>
         <span class="hint">Choose how you want to use the extension</span>
         <div class="permission-buttons">
-            <button id="enableActiveTab" class="btn btn-primary btn-small">Enable for this tab</button>
+            <button id="enableThisDomain" class="btn btn-primary btn-small">Enable for this domain</button>
             <button id="enableAllSites" class="btn btn-secondary btn-small">Enable for all sites</button>
         </div>
     </div>
-    <div id="permissionActiveTab" class="permission-section hidden">
+    <div id="permissionDomainEnabled" class="permission-section hidden">
         <div class="permission-granted">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M20 6L9 17l-5-5"/>
             </svg>
-            <span>Enabled for current tab</span>
+            <span>Enabled for <strong id="currentDomainName"></strong></span>
         </div>
         <button id="upgradeToAllSites" class="btn btn-secondary btn-small">Enable for all sites</button>
     </div>
@@ -111,6 +111,10 @@
             </svg>
             <span>Auto-inject enabled for all sites</span>
         </div>
+    </div>
+    <div id="allowedDomainsSection" class="permission-section hidden">
+        <label>Enabled Domains</label>
+        <div id="allowedDomainsList" class="allowed-domains-list"></div>
     </div>
 </div>
 

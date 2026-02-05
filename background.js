@@ -71,14 +71,76 @@ async function requestHostPermission() {
     return chrome.permissions.request({ origins: ['<all_urls>'] });
 }
 
-// Check if we have activeTab permission
-async function hasActiveTabPermission() {
-    return chrome.permissions.contains({ permissions: ['activeTab'] });
+// === Per-domain permission system ===
+
+// Get list of allowed domains
+async function getAllowedDomains() {
+    const data = await chrome.storage.local.get('allowedDomains');
+    return data.allowedDomains || [];
 }
 
-// Request activeTab permission
-async function requestActiveTabPermission() {
-    return chrome.permissions.request({ permissions: ['activeTab'] });
+// Check if a domain is in the allowed list
+async function isDomainAllowed(domain) {
+    const domains = await getAllowedDomains();
+    return domains.includes(domain);
+}
+
+// Add a domain to the allowed list
+async function addAllowedDomain(domain) {
+    const domains = await getAllowedDomains();
+    if (!domains.includes(domain)) {
+        domains.push(domain);
+        await chrome.storage.local.set({ allowedDomains: domains });
+    }
+    return true;
+}
+
+// Remove a domain from the allowed list
+async function removeAllowedDomain(domain) {
+    const domains = await getAllowedDomains();
+    const filtered = domains.filter(d => d !== domain);
+    await chrome.storage.local.set({ allowedDomains: filtered });
+    return true;
+}
+
+// Get domain from URL
+function getDomainFromUrl(url) {
+    try {
+        return new URL(url).hostname;
+    } catch {
+        return null;
+    }
+}
+
+// Enable WoT API for the current tab's domain and inject immediately
+async function enableForCurrentDomain() {
+    try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab?.url) {
+            return { ok: false, error: 'No active tab' };
+        }
+
+        const domain = getDomainFromUrl(tab.url);
+        if (!domain) {
+            return { ok: false, error: 'Could not get domain from URL' };
+        }
+
+        // Skip restricted URLs
+        if (tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') ||
+            tab.url.startsWith('about:') || tab.url.startsWith('chrome-extension://')) {
+            return { ok: false, error: 'Cannot enable on this page' };
+        }
+
+        // Add domain to allowed list
+        await addAllowedDomain(domain);
+
+        // Inject immediately into current tab
+        const injected = await injectIntoTab(tab.id, tab.url);
+
+        return { ok: injected, domain, error: injected ? null : 'Injection failed' };
+    } catch (e) {
+        return { ok: false, error: e.message };
+    }
 }
 
 // Inject WoT API into a specific tab
@@ -114,22 +176,38 @@ async function injectIntoTab(tabId, url) {
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     // Only inject when page has completed loading
     if (changeInfo.status !== 'complete') return;
+    if (!tab.url) return;
 
     // Check if we have permission to inject on all sites
-    const hasPermission = await hasHostPermission();
-    if (!hasPermission) return;
+    const hasAllSites = await hasHostPermission();
+    if (hasAllSites) {
+        await injectIntoTab(tabId, tab.url);
+        return;
+    }
 
-    await injectIntoTab(tabId, tab.url);
+    // Check per-domain permission
+    const domain = getDomainFromUrl(tab.url);
+    if (domain && await isDomainAllowed(domain)) {
+        await injectIntoTab(tabId, tab.url);
+    }
 });
 
 // Also inject when a new tab is created with a URL
 chrome.tabs.onCreated.addListener(async (tab) => {
     if (!tab.url || tab.status !== 'complete') return;
 
-    const hasPermission = await hasHostPermission();
-    if (!hasPermission) return;
+    // Check if we have permission to inject on all sites
+    const hasAllSites = await hasHostPermission();
+    if (hasAllSites) {
+        await injectIntoTab(tab.id, tab.url);
+        return;
+    }
 
-    await injectIntoTab(tab.id, tab.url);
+    // Check per-domain permission
+    const domain = getDomainFromUrl(tab.url);
+    if (domain && await isDomainAllowed(domain)) {
+        await injectIntoTab(tab.id, tab.url);
+    }
 });
 
 async function loadConfig() {
@@ -262,11 +340,21 @@ async function handleRequest({ method, params }) {
         case 'requestHostPermission':
             return requestHostPermission();
 
-        case 'hasActiveTabPermission':
-            return hasActiveTabPermission();
+        // Per-domain permissions
+        case 'getAllowedDomains':
+            return getAllowedDomains();
 
-        case 'requestActiveTabPermission':
-            return requestActiveTabPermission();
+        case 'isDomainAllowed':
+            return isDomainAllowed(params.domain);
+
+        case 'addAllowedDomain':
+            return addAllowedDomain(params.domain);
+
+        case 'removeAllowedDomain':
+            return removeAllowedDomain(params.domain);
+
+        case 'enableForCurrentDomain':
+            return enableForCurrentDomain();
 
         default:
             throw new Error(`Unknown method: ${method}`);
@@ -296,7 +384,7 @@ async function getDistance(from, to) {
 async function getDetails(from, to) {
     if (!from) throw new Error('My pubkey not configured');
 
-    let info = null;
+    let info;
 
     if (config.mode === 'local') {
         await localGraph.ensureReady();

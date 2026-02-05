@@ -157,31 +157,47 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function checkPermissionState() {
     const permissionCard = document.getElementById('permissionCard');
     const permissionNeeded = document.getElementById('permissionNeeded');
-    const permissionActiveTab = document.getElementById('permissionActiveTab');
+    const permissionDomainEnabled = document.getElementById('permissionDomainEnabled');
     const permissionAllSites = document.getElementById('permissionAllSites');
+    const allowedDomainsSection = document.getElementById('allowedDomainsSection');
+    const currentDomainName = document.getElementById('currentDomainName');
 
     try {
-        const [hasHost, hasActiveTab] = await Promise.all([
+        const [hasHost, allowedDomainsResponse, currentTab] = await Promise.all([
             chrome.runtime.sendMessage({ method: 'hasHostPermission' }),
-            chrome.runtime.sendMessage({ method: 'hasActiveTabPermission' })
+            chrome.runtime.sendMessage({ method: 'getAllowedDomains' }),
+            chrome.tabs.query({ active: true, currentWindow: true })
         ]);
+
+        const allowedDomains = allowedDomainsResponse.result || [];
+        const currentUrl = currentTab[0]?.url;
+        const currentDomain = currentUrl ? getDomainFromUrl(currentUrl) : null;
+        const isCurrentDomainAllowed = currentDomain && allowedDomains.includes(currentDomain);
 
         permissionCard.classList.remove('hidden');
 
         // Hide all sections first
         permissionNeeded.classList.add('hidden');
-        permissionActiveTab.classList.add('hidden');
+        permissionDomainEnabled.classList.add('hidden');
         permissionAllSites.classList.add('hidden');
+        allowedDomainsSection.classList.add('hidden');
 
         if (hasHost.result) {
             // Full host permission granted
             permissionAllSites.classList.remove('hidden');
-        } else if (hasActiveTab.result) {
-            // Only activeTab permission
-            permissionActiveTab.classList.remove('hidden');
+        } else if (isCurrentDomainAllowed) {
+            // Current domain is in allowed list
+            permissionDomainEnabled.classList.remove('hidden');
+            currentDomainName.textContent = currentDomain;
         } else {
-            // No permissions yet
+            // No permissions yet for this domain
             permissionNeeded.classList.remove('hidden');
+        }
+
+        // Show allowed domains list if there are any
+        if (allowedDomains.length > 0 && !hasHost.result) {
+            allowedDomainsSection.classList.remove('hidden');
+            renderAllowedDomains(allowedDomains);
         }
     } catch (e) {
         // Hide card if there's an error
@@ -189,19 +205,61 @@ async function checkPermissionState() {
     }
 }
 
-// Enable for this tab button handler
-document.getElementById('enableActiveTab').addEventListener('click', async () => {
+// Get domain from URL
+function getDomainFromUrl(url) {
     try {
-        const response = await chrome.runtime.sendMessage({ method: 'requestActiveTabPermission' });
-        if (response.result) {
-            setStatus('Enabled for this tab', 'success');
+        return new URL(url).hostname;
+    } catch {
+        return null;
+    }
+}
+
+// Render allowed domains list
+function renderAllowedDomains(domains) {
+    const list = document.getElementById('allowedDomainsList');
+    list.innerHTML = '';
+
+    for (const domain of domains) {
+        const item = document.createElement('div');
+        item.className = 'allowed-domain-item';
+        item.innerHTML = `
+            <span class="allowed-domain-name">${domain}</span>
+            <button class="allowed-domain-remove" data-domain="${domain}" title="Remove">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+            </button>
+        `;
+        list.appendChild(item);
+    }
+
+    // Add click handlers for remove buttons
+    list.querySelectorAll('.allowed-domain-remove').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const domain = btn.dataset.domain;
+            try {
+                await chrome.runtime.sendMessage({ method: 'removeAllowedDomain', params: { domain } });
+                setStatus(`Removed ${domain}`, 'info');
+                checkPermissionState();
+            } catch (e) {
+                setStatus('Failed to remove domain', 'error');
+            }
+        });
+    });
+}
+
+// Enable for this domain button handler
+document.getElementById('enableThisDomain').addEventListener('click', async () => {
+    try {
+        const response = await chrome.runtime.sendMessage({ method: 'enableForCurrentDomain' });
+        if (response.result?.ok) {
+            setStatus(`Enabled for ${response.result.domain}`, 'success');
             checkPermissionState();
-            injectWotApi();
         } else {
-            setStatus('Permission denied', 'error');
+            setStatus(response.result?.error || 'Failed to enable', 'error');
         }
     } catch (e) {
-        setStatus('Failed to request permission', 'error');
+        setStatus('Failed to enable for domain', 'error');
     }
 });
 

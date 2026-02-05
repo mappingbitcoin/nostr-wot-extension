@@ -174,12 +174,81 @@ body {
     stroke: #10b981;
 }
 
-#permissionActiveTab .permission-granted {
+#permissionDomainEnabled .permission-granted {
     margin-bottom: 8px;
 }
 
 #permissionAllSites .permission-granted {
     margin-bottom: 0;
+}
+
+/* Allowed domains list */
+.allowed-domains-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.allowed-domain-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f9fafb;
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 12px;
+}
+
+.allowed-domain-name {
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+    color: #374151;
+    word-break: break-all;
+}
+
+.allowed-domain-remove {
+    background: transparent;
+    border: none;
+    padding: 2px;
+    cursor: pointer;
+    color: #9ca3af;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.allowed-domain-remove:hover {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+#allowedDomainsSection label {
+    margin-top: 12px;
+    margin-bottom: 0;
+}
+
+/* Dark mode for allowed domains */
+@media (prefers-color-scheme: dark) {
+    .allowed-domain-item {
+        background: #374151;
+    }
+
+    .allowed-domain-name {
+        color: #e5e5e5;
+    }
+
+    .allowed-domain-remove {
+        color: #6b7280;
+    }
+
+    .allowed-domain-remove:hover {
+        background: rgba(220, 38, 38, 0.2);
+        color: #f87171;
+    }
 }
 
 /* Labels */
