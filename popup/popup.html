@@ -207,50 +207,46 @@
         </div>
         <div class="modal-body">
             <div class="scoring-info">
-                <span class="hint">score = base * weight * (1 + bonus)</span>
+                <span class="hint">score = base + pathBonus (capped)</span>
             </div>
 
-            <label>Distance Weights</label>
-            <span class="hint">Score multiplier per hop distance</span>
-            <div class="weight-grid">
-                <div class="weight-item">
-                    <label for="weight1">1 hop</label>
-                    <input type="number" id="weight1" min="0" max="1" step="0.1" value="1.0">
-                </div>
+            <label>Base Score (%)</label>
+            <span class="hint">Base score per hop distance (1 hop = 100%)</span>
+            <div class="weight-grid weight-grid-3">
                 <div class="weight-item">
                     <label for="weight2">2 hops</label>
-                    <input type="number" id="weight2" min="0" max="1" step="0.1" value="0.5">
+                    <input type="number" id="weight2" min="0" max="100" step="5" value="50">
                 </div>
                 <div class="weight-item">
                     <label for="weight3">3 hops</label>
-                    <input type="number" id="weight3" min="0" max="1" step="0.1" value="0.25">
+                    <input type="number" id="weight3" min="0" max="100" step="5" value="25">
                 </div>
                 <div class="weight-item">
                     <label for="weight4">4+ hops</label>
-                    <input type="number" id="weight4" min="0" max="1" step="0.1" value="0.1">
+                    <input type="number" id="weight4" min="0" max="100" step="5" value="10">
                 </div>
             </div>
 
-            <label>Path Bonus (per hop level)</label>
+            <label>Path Bonus % (per hop level)</label>
             <span class="hint">Bonus per additional shortest path to target</span>
             <div class="weight-grid weight-grid-3">
                 <div class="weight-item">
                     <label for="pathBonus2">2 hops</label>
-                    <input type="number" id="pathBonus2" min="0" max="1" step="0.05" value="0.15">
+                    <input type="number" id="pathBonus2" min="0" max="100" step="1" value="15">
                 </div>
                 <div class="weight-item">
                     <label for="pathBonus3">3 hops</label>
-                    <input type="number" id="pathBonus3" min="0" max="1" step="0.05" value="0.1">
+                    <input type="number" id="pathBonus3" min="0" max="100" step="1" value="10">
                 </div>
                 <div class="weight-item">
                     <label for="pathBonus4">4+ hops</label>
-                    <input type="number" id="pathBonus4" min="0" max="1" step="0.05" value="0.05">
+                    <input type="number" id="pathBonus4" min="0" max="100" step="1" value="5">
                 </div>
             </div>
 
-            <label for="maxPathBonus">Max Path Bonus</label>
-            <input type="number" id="maxPathBonus" min="0" max="2" step="0.1" value="0.5">
-            <span class="hint">Cap on total path bonus (e.g., 0.5 = +50% max)</span>
+            <label for="maxPathBonus">Max Path Bonus (%)</label>
+            <input type="number" id="maxPathBonus" min="0" max="200" step="5" value="50">
+            <span class="hint">Cap on total path bonus (e.g., 50 = +50% max)</span>
         </div>
         <div class="modal-footer">
             <button id="resetScoring" class="btn btn-secondary btn-small">Reset to Defaults</button>
