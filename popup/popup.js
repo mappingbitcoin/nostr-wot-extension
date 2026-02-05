@@ -162,45 +162,57 @@ async function injectWotApi() {
     }
 }
 
-// Load scoring values into UI
+// Convert fraction to percentage for display
+function toPercent(value, defaultValue) {
+    return Math.round((value ?? defaultValue) * 100);
+}
+
+// Convert percentage to fraction for storage
+function toFraction(value, defaultValue) {
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? defaultValue : parsed / 100;
+}
+
+// Load scoring values into UI (fractions -> percentages)
 function loadScoringUI(scoring) {
     const weights = scoring.distanceWeights || DEFAULT_SCORING.distanceWeights;
-    document.getElementById('weight1').value = weights[1] ?? 1.0;
-    document.getElementById('weight2').value = weights[2] ?? 0.5;
-    document.getElementById('weight3').value = weights[3] ?? 0.25;
-    document.getElementById('weight4').value = weights[4] ?? 0.1;
+    // 1 hop is always 100% (1.0), not shown in UI
+    document.getElementById('weight2').value = toPercent(weights[2], 0.5);
+    document.getElementById('weight3').value = toPercent(weights[3], 0.25);
+    document.getElementById('weight4').value = toPercent(weights[4], 0.1);
 
     // Handle both old (single value) and new (per-level) pathBonus format
     const pathBonus = scoring.pathBonus || DEFAULT_SCORING.pathBonus;
     if (typeof pathBonus === 'object') {
-        document.getElementById('pathBonus2').value = pathBonus[2] ?? 0.15;
-        document.getElementById('pathBonus3').value = pathBonus[3] ?? 0.1;
-        document.getElementById('pathBonus4').value = pathBonus[4] ?? 0.05;
+        document.getElementById('pathBonus2').value = toPercent(pathBonus[2], 0.15);
+        document.getElementById('pathBonus3').value = toPercent(pathBonus[3], 0.1);
+        document.getElementById('pathBonus4').value = toPercent(pathBonus[4], 0.05);
     } else {
         // Legacy single value - distribute across levels
-        document.getElementById('pathBonus2').value = pathBonus;
-        document.getElementById('pathBonus3').value = pathBonus;
-        document.getElementById('pathBonus4').value = pathBonus;
+        const pct = toPercent(pathBonus, 0.1);
+        document.getElementById('pathBonus2').value = pct;
+        document.getElementById('pathBonus3').value = pct;
+        document.getElementById('pathBonus4').value = pct;
     }
 
-    document.getElementById('maxPathBonus').value = scoring.maxPathBonus ?? 0.5;
+    document.getElementById('maxPathBonus').value = toPercent(scoring.maxPathBonus, 0.5);
 }
 
-// Get scoring values from UI
+// Get scoring values from UI (percentages -> fractions)
 function getScoringFromUI() {
     return {
         distanceWeights: {
-            1: parseFloat(document.getElementById('weight1').value) || 1.0,
-            2: parseFloat(document.getElementById('weight2').value) || 0.5,
-            3: parseFloat(document.getElementById('weight3').value) || 0.25,
-            4: parseFloat(document.getElementById('weight4').value) || 0.1
+            1: 1.0, // 1 hop is always 100%
+            2: toFraction(document.getElementById('weight2').value, 0.5),
+            3: toFraction(document.getElementById('weight3').value, 0.25),
+            4: toFraction(document.getElementById('weight4').value, 0.1)
         },
         pathBonus: {
-            2: parseFloat(document.getElementById('pathBonus2').value) || 0.15,
-            3: parseFloat(document.getElementById('pathBonus3').value) || 0.1,
-            4: parseFloat(document.getElementById('pathBonus4').value) || 0.05
+            2: toFraction(document.getElementById('pathBonus2').value, 0.15),
+            3: toFraction(document.getElementById('pathBonus3').value, 0.1),
+            4: toFraction(document.getElementById('pathBonus4').value, 0.05)
         },
-        maxPathBonus: parseFloat(document.getElementById('maxPathBonus').value) || 0.5
+        maxPathBonus: toFraction(document.getElementById('maxPathBonus').value, 0.5)
     };
 }
 
