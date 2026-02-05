@@ -15,10 +15,6 @@
     "service_worker": "background.js",
     "type": "module"
   },
-  "web_accessible_resources": [{
-    "resources": ["inject.js"],
-    "matches": ["<all_urls>"]
-  }],
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": "icons/icon48.png"
