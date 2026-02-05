@@ -61,8 +61,15 @@
         getConfig: () => call('getConfig', {}),
 
         // Batch operations
-        // includePaths: if true, returns { pubkey: { hops, paths } }, otherwise { pubkey: hops }
-        getDistanceBatch: (targets, includePaths) => call('getDistanceBatch', { targets, includePaths }),
+        // options: { includePaths?: boolean, includeScores?: boolean }
+        // Returns: { pubkey: hops } or { pubkey: { hops, paths?, score? } } based on options
+        getDistanceBatch: (targets, options) => {
+            // Support legacy boolean parameter for backwards compatibility
+            const opts = typeof options === 'boolean'
+                ? { includePaths: options }
+                : options || {};
+            return call('getDistanceBatch', { targets, ...opts });
+        },
         getTrustScoreBatch: (targets) => call('getTrustScoreBatch', { targets }),
         filterByWoT: (pubkeys, maxHops) => call('filterByWoT', { pubkeys, maxHops }),
 
