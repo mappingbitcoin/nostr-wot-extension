@@ -26,7 +26,7 @@ await window.nostr.wot.getConfig()                      // { maxHops, timeout, s
 
 ## Install
 
-**Chrome Web Store:** (coming soon)
+**Chrome Web Store:** [Install from Chrome Web Store](https://chromewebstore.google.com/detail/nostr-wot-extension/gfmefgdkmjpjinecjchlangpamhclhdo)
 
 **Manual:**
 1. Clone this repo
@@ -163,6 +163,10 @@ When using **Local** or **Hybrid** mode, the extension indexes your social graph
 - wss://nos.lol
 - wss://relay.nostr.band
 - wss://relay.mappingbitcoin.com
+
+## Try It Out
+
+Visit the [Nostr WoT Playground](https://nostr-wot.com/playground) to test the extension's API in your browser.
 
 ## Related
 
