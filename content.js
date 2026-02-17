@@ -1,3 +1,6 @@
+// Cross-browser compatibility
+const browser = typeof globalThis.browser !== 'undefined' ? globalThis.browser : chrome;
+
 // Guard against double injection
 if (window.__nostrWotContentInjected) {
     // Already injected, skip
@@ -54,7 +57,7 @@ if (window.__nostrWotContentInjected) {
             return;
         }
 
-        const response = await chrome.runtime.sendMessage({ method, params });
+        const response = await browser.runtime.sendMessage({ method, params });
 
         window.postMessage({
             type: 'WOT_RESPONSE',
@@ -65,7 +68,7 @@ if (window.__nostrWotContentInjected) {
     });
 
     // Listen for messages from extension (popup/background)
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (request.method === 'getNostrPubkey') {
             // Set up one-time listener for the response from inject.js
             const handler = (event) => {

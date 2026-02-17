@@ -170,8 +170,8 @@ Visit the [Nostr WoT Playground](https://nostr-wot.com/playground) to test the e
 
 ## Related
 
-- [nostr-wot-sdk](https://github.com/mappingbitcoin/nostr-wot-sdk) - JavaScript SDK
-- [WoT Oracle](https://github.com/mappingbitcoin/wot-oracle) - Backend service
+- [nostr-wot-sdk](https://github.com/nostr-wot/nostr-wot-sdk) - JavaScript SDK
+- [WoT Oracle](https://github.com/nostr-wot/nostr-wot-oracle) - Backend service
 - [Nostr Wot website](https://nostr-wot.com) - Nostr Wot website
 
 ## License

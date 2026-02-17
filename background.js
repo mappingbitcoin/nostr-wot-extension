@@ -1,3 +1,4 @@
+import browser from './lib/browser.js';
 import { RemoteOracle } from './lib/api.js';
 import { LocalGraph } from './lib/graph.js';
 import { GraphSync, isSyncInProgress, stopSync } from './lib/sync.js';
@@ -63,19 +64,19 @@ loadConfig();
 
 // Check if we have host permissions for auto-injection
 async function hasHostPermission() {
-    return chrome.permissions.contains({ origins: ['<all_urls>'] });
+    return browser.permissions.contains({ origins: ['<all_urls>'] });
 }
 
 // Request host permission for auto-injection
 async function requestHostPermission() {
-    return chrome.permissions.request({ origins: ['<all_urls>'] });
+    return browser.permissions.request({ origins: ['<all_urls>'] });
 }
 
 // === Per-domain permission system ===
 
 // Get list of allowed domains
 async function getAllowedDomains() {
-    const data = await chrome.storage.local.get('allowedDomains');
+    const data = await browser.storage.local.get('allowedDomains');
     return data.allowedDomains || [];
 }
 
@@ -90,7 +91,7 @@ async function addAllowedDomain(domain) {
     const domains = await getAllowedDomains();
     if (!domains.includes(domain)) {
         domains.push(domain);
-        await chrome.storage.local.set({ allowedDomains: domains });
+        await browser.storage.local.set({ allowedDomains: domains });
     }
     return true;
 }
@@ -99,7 +100,7 @@ async function addAllowedDomain(domain) {
 async function removeAllowedDomain(domain) {
     const domains = await getAllowedDomains();
     const filtered = domains.filter(d => d !== domain);
-    await chrome.storage.local.set({ allowedDomains: filtered });
+    await browser.storage.local.set({ allowedDomains: filtered });
     return true;
 }
 
@@ -115,7 +116,7 @@ function getDomainFromUrl(url) {
 // Enable WoT API for the current tab's domain and inject immediately
 async function enableForCurrentDomain() {
     try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
         if (!tab?.url) {
             return { ok: false, error: 'No active tab' };
         }
@@ -127,7 +128,7 @@ async function enableForCurrentDomain() {
 
         // Skip restricted URLs
         if (tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') ||
-            tab.url.startsWith('about:') || tab.url.startsWith('chrome-extension://')) {
+            tab.url.startsWith('about:') || tab.url.startsWith('chrome-extension://') || tab.url.startsWith('moz-extension://')) {
             return { ok: false, error: 'Cannot enable on this page' };
         }
 
@@ -153,13 +154,13 @@ async function injectIntoTab(tabId, url) {
 
     try {
         // Inject content script (handles messaging bridge)
-        await chrome.scripting.executeScript({
+        await browser.scripting.executeScript({
             target: { tabId },
             files: ['content.js']
         });
 
         // Inject page script (exposes window.nostr.wot)
-        await chrome.scripting.executeScript({
+        await browser.scripting.executeScript({
             target: { tabId },
             world: 'MAIN',
             files: ['inject.js']
@@ -173,7 +174,7 @@ async function injectIntoTab(tabId, url) {
 }
 
 // Listen for tab updates to auto-inject
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     // Only inject when page has completed loading
     if (changeInfo.status !== 'complete') return;
     if (!tab.url) return;
@@ -193,7 +194,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 });
 
 // Also inject when a new tab is created with a URL
-chrome.tabs.onCreated.addListener(async (tab) => {
+browser.tabs.onCreated.addListener(async (tab) => {
     if (!tab.url || tab.status !== 'complete') return;
 
     // Check if we have permission to inject on all sites
@@ -211,7 +212,7 @@ chrome.tabs.onCreated.addListener(async (tab) => {
 });
 
 async function loadConfig() {
-    const data = await chrome.storage.sync.get([
+    const data = await browser.storage.sync.get([
         'mode', 'oracleUrl', 'myPubkey', 'relays', 'maxHops', 'timeout', 'scoring'
     ]);
 
@@ -232,7 +233,7 @@ async function loadConfig() {
 }
 
 // Handle messages from content script and popup
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
     handleRequest(request)
         .then(result => sendResponse({ result }))
         .catch(error => sendResponse({ error: error.message }));
@@ -435,7 +436,7 @@ async function syncGraph(depth) {
     // Set up progress callback to broadcast updates
     sync.onProgress = (progress) => {
         // Broadcast progress to popup
-        chrome.runtime.sendMessage({
+        browser.runtime.sendMessage({
             type: 'syncProgress',
             progress
         }).catch(() => {
@@ -682,11 +683,11 @@ async function getPathTo(target) {
 // Get pubkey from window.nostr on the active tab
 async function getNostrPubkeyFromActiveTab() {
     try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
         if (!tab?.id) return null;
 
         // Use scripting API to inject and execute in page context
-        const results = await chrome.scripting.executeScript({
+        const results = await browser.scripting.executeScript({
             target: { tabId: tab.id },
             world: 'MAIN', // Execute in page context to access window.nostr
             func: async () => {
@@ -711,7 +712,7 @@ async function getNostrPubkeyFromActiveTab() {
 // Inject window.nostr.wot API into the active tab
 async function injectWotApi() {
     try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
         if (!tab?.id) return { ok: false, error: 'No active tab' };
 
         // Skip chrome:// and other restricted URLs
@@ -720,13 +721,13 @@ async function injectWotApi() {
         }
 
         // Inject content script (handles messaging bridge)
-        await chrome.scripting.executeScript({
+        await browser.scripting.executeScript({
             target: { tabId: tab.id },
             files: ['content.js']
         });
 
         // Inject page script (exposes window.nostr.wot)
-        await chrome.scripting.executeScript({
+        await browser.scripting.executeScript({
             target: { tabId: tab.id },
             world: 'MAIN',
             files: ['inject.js']

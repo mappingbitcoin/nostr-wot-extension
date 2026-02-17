@@ -1,7 +1,10 @@
 import { DEFAULT_SCORING } from '../lib/scoring.js';
 
+// Cross-browser compatibility
+const browser = typeof globalThis.browser !== 'undefined' ? globalThis.browser : chrome;
+
 // Listen for sync progress updates from background
-chrome.runtime.onMessage.addListener((message) => {
+browser.runtime.onMessage.addListener((message) => {
     if (message.type === 'syncProgress') {
         updateSyncProgress(message.progress);
     }
@@ -60,7 +63,11 @@ function updateSyncProgress(progress) {
 
     // Update nodes per depth
     if (progress.nodesPerDepth && Object.keys(progress.nodesPerDepth).length > 0) {
-        depthStats.innerHTML = '<div class="depth-header">Nodes per depth</div>';
+        depthStats.textContent = '';
+        const header = document.createElement('div');
+        header.className = 'depth-header';
+        header.textContent = 'Nodes per depth';
+        depthStats.appendChild(header);
         depthStats.classList.remove('hidden');
 
         const depths = Object.keys(progress.nodesPerDepth).map(Number).sort((a, b) => a - b);
@@ -68,10 +75,17 @@ function updateSyncProgress(progress) {
             const label = depth === 0 ? 'You' : `Hop ${depth}`;
             const row = document.createElement('div');
             row.className = 'stats-row';
-            row.innerHTML = `
-                <span class="stats-label">${label}</span>
-                <span class="stats-value">${progress.nodesPerDepth[depth].toLocaleString()}</span>
-            `;
+
+            const labelSpan = document.createElement('span');
+            labelSpan.className = 'stats-label';
+            labelSpan.textContent = label;
+
+            const valueSpan = document.createElement('span');
+            valueSpan.className = 'stats-value';
+            valueSpan.textContent = progress.nodesPerDepth[depth].toLocaleString();
+
+            row.appendChild(labelSpan);
+            row.appendChild(valueSpan);
             depthStats.appendChild(row);
         }
     }
@@ -80,7 +94,7 @@ function updateSyncProgress(progress) {
 // Check if sync is in progress (for when popup opens)
 async function checkSyncState() {
     try {
-        const response = await chrome.runtime.sendMessage({ method: 'getSyncState' });
+        const response = await browser.runtime.sendMessage({ method: 'getSyncState' });
         if (response?.result?.inProgress) {
             showSyncStatus(true);
             document.getElementById('syncStatusText').textContent = 'Sync in progress...';
@@ -94,7 +108,7 @@ async function checkSyncState() {
 // Stop sync button
 document.getElementById('stopSync').addEventListener('click', async () => {
     try {
-        await chrome.runtime.sendMessage({ method: 'stopSync' });
+        await browser.runtime.sendMessage({ method: 'stopSync' });
         setStatus('Sync stopped', 'info');
         showSyncStatus(false);
         loadStats();
@@ -105,7 +119,7 @@ document.getElementById('stopSync').addEventListener('click', async () => {
 
 // Load saved settings
 document.addEventListener('DOMContentLoaded', async () => {
-    const data = await chrome.storage.sync.get([
+    const data = await browser.storage.sync.get([
         'mode',
         'oracleUrl',
         'myPubkey',
@@ -164,9 +178,9 @@ async function checkPermissionState() {
 
     try {
         const [hasHost, allowedDomainsResponse, currentTab] = await Promise.all([
-            chrome.runtime.sendMessage({ method: 'hasHostPermission' }),
-            chrome.runtime.sendMessage({ method: 'getAllowedDomains' }),
-            chrome.tabs.query({ active: true, currentWindow: true })
+            browser.runtime.sendMessage({ method: 'hasHostPermission' }),
+            browser.runtime.sendMessage({ method: 'getAllowedDomains' }),
+            browser.tabs.query({ active: true, currentWindow: true })
         ]);
 
         const allowedDomains = allowedDomainsResponse.result || [];
@@ -217,19 +231,36 @@ function getDomainFromUrl(url) {
 // Render allowed domains list
 function renderAllowedDomains(domains) {
     const list = document.getElementById('allowedDomainsList');
-    list.innerHTML = '';
+    list.textContent = '';
 
     for (const domain of domains) {
         const item = document.createElement('div');
         item.className = 'allowed-domain-item';
-        item.innerHTML = `
-            <span class="allowed-domain-name">${domain}</span>
-            <button class="allowed-domain-remove" data-domain="${domain}" title="Remove">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M18 6L6 18M6 6l12 12"/>
-                </svg>
-            </button>
-        `;
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'allowed-domain-name';
+        nameSpan.textContent = domain;
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'allowed-domain-remove';
+        removeBtn.dataset.domain = domain;
+        removeBtn.title = 'Remove';
+
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('width', '14');
+        svg.setAttribute('height', '14');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('fill', 'none');
+        svg.setAttribute('stroke', 'currentColor');
+        svg.setAttribute('stroke-width', '2');
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', 'M18 6L6 18M6 6l12 12');
+        svg.appendChild(path);
+
+        removeBtn.appendChild(svg);
+        item.appendChild(nameSpan);
+        item.appendChild(removeBtn);
         list.appendChild(item);
     }
 
@@ -238,7 +269,7 @@ function renderAllowedDomains(domains) {
         btn.addEventListener('click', async () => {
             const domain = btn.dataset.domain;
             try {
-                await chrome.runtime.sendMessage({ method: 'removeAllowedDomain', params: { domain } });
+                await browser.runtime.sendMessage({ method: 'removeAllowedDomain', params: { domain } });
                 setStatus(`Removed ${domain}`, 'info');
                 checkPermissionState();
             } catch (e) {
@@ -251,7 +282,7 @@ function renderAllowedDomains(domains) {
 // Enable for this domain button handler
 document.getElementById('enableThisDomain').addEventListener('click', async () => {
     try {
-        const response = await chrome.runtime.sendMessage({ method: 'enableForCurrentDomain' });
+        const response = await browser.runtime.sendMessage({ method: 'enableForCurrentDomain' });
         if (response.result?.ok) {
             setStatus(`Enabled for ${response.result.domain}`, 'success');
             checkPermissionState();
@@ -269,7 +300,7 @@ document.getElementById('upgradeToAllSites').addEventListener('click', requestAl
 
 async function requestAllSitesPermission() {
     try {
-        const response = await chrome.runtime.sendMessage({ method: 'requestHostPermission' });
+        const response = await browser.runtime.sendMessage({ method: 'requestHostPermission' });
         if (response.result) {
             setStatus('Auto-inject enabled for all sites', 'success');
             checkPermissionState();
@@ -285,7 +316,7 @@ async function requestAllSitesPermission() {
 // Inject window.nostr.wot API into the active tab
 async function injectWotApi() {
     try {
-        const response = await chrome.runtime.sendMessage({ method: 'injectWotApi' });
+        const response = await browser.runtime.sendMessage({ method: 'injectWotApi' });
         if (response?.result?.ok) {
             console.log('WoT API injected into:', response.result.url);
         }
@@ -351,7 +382,7 @@ function getScoringFromUI() {
 // Try to detect pubkey from window.nostr on the active tab
 async function tryDetectNostrPubkey() {
     try {
-        const response = await chrome.runtime.sendMessage({ method: 'getNostrPubkey' });
+        const response = await browser.runtime.sendMessage({ method: 'getNostrPubkey' });
         if (response?.result && typeof response.result === 'string' && response.result.length === 64) {
             document.getElementById('myPubkey').value = response.result;
             setStatus('Detected pubkey from Nostr extension', 'info');
@@ -494,13 +525,13 @@ async function saveSettings(silent = false) {
     }
 
     // Check if pubkey changed and there's local data
-    const savedData = await chrome.storage.sync.get(['myPubkey']);
+    const savedData = await browser.storage.sync.get(['myPubkey']);
     const previousPubkey = savedData.myPubkey || '';
 
     if (previousPubkey && myPubkey !== previousPubkey) {
         // Check if there's local graph data
         try {
-            const statsResponse = await chrome.runtime.sendMessage({ method: 'getStats' });
+            const statsResponse = await browser.runtime.sendMessage({ method: 'getStats' });
             const nodes = statsResponse?.result?.nodes || 0;
 
             if (nodes > 0) {
@@ -514,17 +545,17 @@ async function saveSettings(silent = false) {
                 }
 
                 // Clear local graph data
-                await chrome.runtime.sendMessage({ method: 'clearGraph' });
+                await browser.runtime.sendMessage({ method: 'clearGraph' });
             }
         } catch (e) {
             // Ignore errors checking stats
         }
     }
 
-    await chrome.storage.sync.set({ mode, oracleUrl, myPubkey, relays, syncDepth, maxHops, timeout, scoring });
+    await browser.storage.sync.set({ mode, oracleUrl, myPubkey, relays, syncDepth, maxHops, timeout, scoring });
 
     // Notify background script
-    chrome.runtime.sendMessage({ method: 'configUpdated' });
+    browser.runtime.sendMessage({ method: 'configUpdated' });
 
     if (!silent) {
         setStatus('Settings saved', 'success');
@@ -576,11 +607,15 @@ document.getElementById('sync').addEventListener('click', async () => {
 
     // Show depth stats container with loading state
     const depthStats = document.getElementById('depthStats');
-    depthStats.innerHTML = '<div class="depth-loading">Connecting to relays...</div>';
+    depthStats.textContent = '';
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'depth-loading';
+    loadingDiv.textContent = 'Connecting to relays...';
+    depthStats.appendChild(loadingDiv);
     depthStats.classList.remove('hidden');
 
     try {
-        const response = await chrome.runtime.sendMessage({
+        const response = await browser.runtime.sendMessage({
             method: 'syncGraph',
             params: { depth }
         });
@@ -613,7 +648,7 @@ document.getElementById('clear').addEventListener('click', async () => {
     if (!confirm('Clear all local graph data?')) return;
 
     try {
-        await chrome.runtime.sendMessage({ method: 'clearGraph' });
+        await browser.runtime.sendMessage({ method: 'clearGraph' });
         setStatus('Local data cleared', 'success');
         loadStats();
     } catch (e) {
@@ -639,8 +674,8 @@ document.getElementById('test').addEventListener('click', async () => {
     try {
         // Get details (hops + paths) and trust score
         const [detailsResponse, scoreResponse] = await Promise.all([
-            chrome.runtime.sendMessage({ method: 'getDetails', params: { target } }),
-            chrome.runtime.sendMessage({ method: 'getTrustScore', params: { target } })
+            browser.runtime.sendMessage({ method: 'getDetails', params: { target } }),
+            browser.runtime.sendMessage({ method: 'getTrustScore', params: { target } })
         ]);
 
         if (detailsResponse.error) {
@@ -671,7 +706,7 @@ async function loadStats() {
     const depthStats = document.getElementById('depthStats');
 
     try {
-        const response = await chrome.runtime.sendMessage({ method: 'getStats' });
+        const response = await browser.runtime.sendMessage({ method: 'getStats' });
         if (response.result) {
             const { nodes, edges, lastSync, nodesPerDepth, dbSizeBytes } = response.result;
 
@@ -691,7 +726,11 @@ async function loadStats() {
 
             // Display nodes per depth
             if (nodesPerDepth && Object.keys(nodesPerDepth).length > 0) {
-                depthStats.innerHTML = '<div class="depth-header">Nodes per depth</div>';
+                depthStats.textContent = '';
+                const header = document.createElement('div');
+                header.className = 'depth-header';
+                header.textContent = 'Nodes per depth';
+                depthStats.appendChild(header);
                 depthStats.classList.remove('hidden');
 
                 // Sort depths and display
@@ -700,15 +739,26 @@ async function loadStats() {
                     const label = depth === 0 ? 'You' : `Hop ${depth}`;
                     const row = document.createElement('div');
                     row.className = 'stats-row';
-                    row.innerHTML = `
-                        <span class="stats-label">${label}</span>
-                        <span class="stats-value">${nodesPerDepth[depth].toLocaleString()}</span>
-                    `;
+
+                    const labelSpan = document.createElement('span');
+                    labelSpan.className = 'stats-label';
+                    labelSpan.textContent = label;
+
+                    const valueSpan = document.createElement('span');
+                    valueSpan.className = 'stats-value';
+                    valueSpan.textContent = nodesPerDepth[depth].toLocaleString();
+
+                    row.appendChild(labelSpan);
+                    row.appendChild(valueSpan);
                     depthStats.appendChild(row);
                 }
             } else if (nodes > 0) {
                 // Has data but no depth breakdown - needs re-sync
-                depthStats.innerHTML = '<div class="depth-hint">Re-sync to see depth breakdown</div>';
+                depthStats.textContent = '';
+                const hint = document.createElement('div');
+                hint.className = 'depth-hint';
+                hint.textContent = 'Re-sync to see depth breakdown';
+                depthStats.appendChild(hint);
                 depthStats.classList.remove('hidden');
             } else {
                 depthStats.classList.add('hidden');
