@@ -1,11 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Nostr WOT Extension",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "browser_specific_settings": {
     "gecko": {
       "id": "nostr-wot@dandelionlabs.io",
-      "strict_min_version": "128.0"
+      "strict_min_version": "128.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
     }
   },
   "description": "Query Nostr Web of Trust distance between pubkeys. Know how many hops separate you from anyone on Nostr.",

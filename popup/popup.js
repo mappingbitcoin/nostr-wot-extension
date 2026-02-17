@@ -3,6 +3,68 @@ import { DEFAULT_SCORING } from '../lib/scoring.js';
 // Cross-browser compatibility
 const browser = typeof globalThis.browser !== 'undefined' ? globalThis.browser : chrome;
 
+// Bech32 decoding for npub support
+const BECH32_ALPHABET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+
+function bech32Decode(str) {
+    const lower = str.toLowerCase();
+    const sepIndex = lower.lastIndexOf('1');
+    if (sepIndex < 1) return null;
+
+    const hrp = lower.slice(0, sepIndex);
+    const data = lower.slice(sepIndex + 1);
+
+    const values = [];
+    for (const char of data) {
+        const idx = BECH32_ALPHABET.indexOf(char);
+        if (idx === -1) return null;
+        values.push(idx);
+    }
+
+    // Remove checksum (last 6 characters)
+    const payload = values.slice(0, -6);
+
+    // Convert 5-bit groups to 8-bit bytes
+    let bits = 0;
+    let acc = 0;
+    const bytes = [];
+    for (const v of payload) {
+        acc = (acc << 5) | v;
+        bits += 5;
+        while (bits >= 8) {
+            bits -= 8;
+            bytes.push((acc >> bits) & 0xff);
+        }
+    }
+
+    return { hrp, bytes };
+}
+
+function npubToHex(npub) {
+    if (!npub.startsWith('npub1')) return null;
+    const decoded = bech32Decode(npub);
+    if (!decoded || decoded.hrp !== 'npub' || decoded.bytes.length !== 32) return null;
+    return decoded.bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Convert input to hex (accepts hex or npub)
+function normalizeToHex(input) {
+    if (!input) return null;
+    input = input.trim();
+
+    // Already hex
+    if (input.length === 64 && /^[a-f0-9]+$/i.test(input)) {
+        return input.toLowerCase();
+    }
+
+    // npub format
+    if (input.startsWith('npub1')) {
+        return npubToHex(input);
+    }
+
+    return null;
+}
+
 // Listen for sync progress updates from background
 browser.runtime.onMessage.addListener((message) => {
     if (message.type === 'syncProgress') {
@@ -518,17 +580,23 @@ async function saveSettings(silent = false) {
 
     const relays = relaysList.join(',');
 
-    // Validate pubkey
-    if (myPubkey && (myPubkey.length !== 64 || !/^[a-f0-9]+$/i.test(myPubkey))) {
-        setStatus('Invalid pubkey format (need 64 hex chars)', 'error');
-        return false;
+    // Validate and normalize pubkey (accepts hex or npub)
+    let normalizedPubkey = '';
+    if (myPubkey) {
+        normalizedPubkey = normalizeToHex(myPubkey);
+        if (!normalizedPubkey) {
+            setStatus('Invalid pubkey format (use hex or npub)', 'error');
+            return false;
+        }
+        // Update the input field to show the normalized hex
+        document.getElementById('myPubkey').value = normalizedPubkey;
     }
 
     // Check if pubkey changed and there's local data
     const savedData = await browser.storage.sync.get(['myPubkey']);
     const previousPubkey = savedData.myPubkey || '';
 
-    if (previousPubkey && myPubkey !== previousPubkey) {
+    if (previousPubkey && normalizedPubkey !== previousPubkey) {
         // Check if there's local graph data
         try {
             const statsResponse = await browser.runtime.sendMessage({ method: 'getStats' });
@@ -552,7 +620,7 @@ async function saveSettings(silent = false) {
         }
     }
 
-    await browser.storage.sync.set({ mode, oracleUrl, myPubkey, relays, syncDepth, maxHops, timeout, scoring });
+    await browser.storage.sync.set({ mode, oracleUrl, myPubkey: normalizedPubkey, relays, syncDepth, maxHops, timeout, scoring });
 
     // Notify background script
     browser.runtime.sendMessage({ method: 'configUpdated' });
@@ -562,7 +630,7 @@ async function saveSettings(silent = false) {
     }
 
     // Reload stats if pubkey changed
-    if (myPubkey !== previousPubkey) {
+    if (normalizedPubkey !== previousPubkey) {
         loadStats();
     }
 
@@ -580,17 +648,18 @@ document.getElementById('resetScoring').addEventListener('click', () => {
 
 // Sync local graph
 document.getElementById('sync').addEventListener('click', async () => {
-    const myPubkey = document.getElementById('myPubkey').value.trim();
+    const pubkeyInput = document.getElementById('myPubkey').value.trim();
     const depth = parseInt(document.getElementById('syncDepth').value, 10);
 
-    if (!myPubkey) {
+    if (!pubkeyInput) {
         setStatus('Set your pubkey first', 'error');
         return;
     }
 
-    // Validate pubkey format
-    if (myPubkey.length !== 64 || !/^[a-f0-9]+$/i.test(myPubkey)) {
-        setStatus('Invalid pubkey format (need 64 hex chars)', 'error');
+    // Validate and normalize pubkey (accepts hex or npub)
+    const normalizedPubkey = normalizeToHex(pubkeyInput);
+    if (!normalizedPubkey) {
+        setStatus('Invalid pubkey format (use hex or npub)', 'error');
         return;
     }
 
@@ -658,16 +727,17 @@ document.getElementById('clear').addEventListener('click', async () => {
 
 // Test query
 document.getElementById('test').addEventListener('click', async () => {
-    const target = document.getElementById('testTarget').value.trim();
+    const targetInput = document.getElementById('testTarget').value.trim();
 
-    if (!target) {
+    if (!targetInput) {
         showTestResult('Enter a target pubkey', 'error');
         return;
     }
 
-    // Validate target pubkey
-    if (target.length !== 64 || !/^[a-f0-9]+$/i.test(target)) {
-        showTestResult('Invalid pubkey format (need 64 hex chars)', 'error');
+    // Validate and normalize target pubkey (accepts hex or npub)
+    const target = normalizeToHex(targetInput);
+    if (!target) {
+        showTestResult('Invalid pubkey format (use hex or npub)', 'error');
         return;
     }
 
