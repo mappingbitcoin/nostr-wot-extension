@@ -652,14 +652,14 @@ document.getElementById('sync').addEventListener('click', async () => {
     const depth = parseInt(document.getElementById('syncDepth').value, 10);
 
     if (!pubkeyInput) {
-        setStatus('Set your pubkey first', 'error');
+        alert('Please set your pubkey first (hex or npub format)');
         return;
     }
 
     // Validate and normalize pubkey (accepts hex or npub)
     const normalizedPubkey = normalizeToHex(pubkeyInput);
     if (!normalizedPubkey) {
-        setStatus('Invalid pubkey format (use hex or npub)', 'error');
+        alert('Invalid pubkey format. Please use hex (64 characters) or npub format.');
         return;
     }
 
