@@ -1,11 +1,11 @@
-// Cross-browser compatibility
-const browser = typeof globalThis.browser !== 'undefined' ? globalThis.browser : chrome;
-
 // Guard against double injection
 if (window.__nostrWotContentInjected) {
     // Already injected, skip
 } else {
     window.__nostrWotContentInjected = true;
+
+    // Cross-browser compatibility
+    const browser = typeof globalThis.browser !== 'undefined' ? globalThis.browser : chrome;
 
     // Allowed methods that can be called from page context
     const ALLOWED_METHODS = [

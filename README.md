@@ -28,6 +28,8 @@ await window.nostr.wot.getConfig()                      // { maxHops, timeout, s
 
 **Chrome Web Store:** [Install from Chrome Web Store](https://chromewebstore.google.com/detail/nostr-wot-extension/gfmefgdkmjpjinecjchlangpamhclhdo)
 
+**Firefox Add-ons:** [Install from Firefox Add-ons](https://addons.mozilla.org/addon/nostr-wot-extension/)
+
 **Manual:**
 1. Clone this repo
 2. Go to `chrome://extensions`
