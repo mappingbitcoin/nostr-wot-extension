@@ -695,12 +695,11 @@ document.getElementById('sync').addEventListener('click', async () => {
         if (response.error) {
             setStatus(`Sync failed: ${response.error}`, 'error');
         } else {
-            const { nodes, reused, failed, aborted } = response.result;
+            const { nodes, failed, aborted } = response.result;
             if (aborted) {
                 setStatus('Sync stopped', 'info');
             } else {
                 let msg = `Synced ${nodes.toLocaleString()} nodes`;
-                if (reused > 0) msg += ` (${reused.toLocaleString()} cached)`;
                 if (failed > 0) msg += ` (${failed.toLocaleString()} failed)`;
                 setStatus(msg, 'success');
             }
