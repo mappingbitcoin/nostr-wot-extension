@@ -11,10 +11,12 @@ Answers: **"How many hops separate me from this pubkey?"** and **"What's their t
 await window.nostr.wot.getDistance(targetPubkey)        // 2
 await window.nostr.wot.getTrustScore(targetPubkey)      // 0.72
 await window.nostr.wot.isInMyWoT(targetPubkey, 3)       // true
-await window.nostr.wot.getDistanceBetween(pubA, pubB)   // 3
 await window.nostr.wot.getDetails(targetPubkey)         // { hops: 2, paths: 5 }
+await window.nostr.wot.getStatus()                      // { configured, mode, hasLocalGraph }
 await window.nostr.wot.getConfig()                      // { maxHops, timeout, scoring }
 ```
+
+Implements the [`window.nostr.wot` NIP proposal](https://github.com/nostr-protocol/nips/issues/2236) — Web of Trust Capability for Web Browsers.
 
 ## Modes
 
@@ -125,14 +127,38 @@ Returns computed trust score (0-1) based on distance and configured weights.
 ### `window.nostr.wot.isInMyWoT(targetPubkey, maxHops?)`
 Returns `true` if target is within `maxHops` of your pubkey. Uses configured maxHops if not specified.
 
-### `window.nostr.wot.getDistanceBetween(fromPubkey, toPubkey)`
-Returns hops between any two pubkeys.
-
 ### `window.nostr.wot.getDetails(targetPubkey)`
-Returns `{ hops, paths }` with distance and path count (paths available in remote mode only).
+Returns `{ hops, paths }` with distance and path count.
+
+### `window.nostr.wot.getStatus()`
+Returns `{ configured, mode, hasLocalGraph }` — whether the extension is set up and operational.
 
 ### `window.nostr.wot.getConfig()`
 Returns current configuration: `{ maxHops, timeout, scoring }`.
+
+### `window.nostr.wot.getDistanceBatch(targets, options?)`
+Returns distances for multiple targets in a single call. Options: `{ includePaths, includeScores }`.
+
+### `window.nostr.wot.getTrustScoreBatch(targets)`
+Returns trust scores for multiple targets in a single call.
+
+### `window.nostr.wot.filterByWoT(pubkeys, maxHops?)`
+Filters a list of pubkeys to only those within your Web of Trust.
+
+### `window.nostr.wot.getFollows(pubkey)`
+Returns the follow list for a pubkey from the local graph.
+
+### `window.nostr.wot.getCommonFollows(pubkey)`
+Returns pubkeys followed by both you and the target.
+
+### `window.nostr.wot.getPath(targetPubkey)`
+Returns an array of pubkeys representing the shortest path from you to the target. Requires user permission.
+
+### `window.nostr.wot.getMyPubkey()`
+Returns the configured pubkey of the extension user.
+
+### `window.nostr.wot.getStats()`
+Returns graph statistics (node count, edge count, etc.).
 
 ## Privacy
 
@@ -172,6 +198,7 @@ Visit the [Nostr WoT Playground](https://nostr-wot.com/playground) to test the e
 
 ## Related
 
+- [NIP proposal: `window.nostr.wot`](https://github.com/nostr-protocol/nips/issues/2236) - Web of Trust Capability for Web Browsers
 - [nostr-wot-sdk](https://github.com/nostr-wot/nostr-wot-sdk) - JavaScript SDK
 - [WoT Oracle](https://github.com/nostr-wot/nostr-wot-oracle) - Backend service
 - [Nostr Wot website](https://nostr-wot.com) - Nostr Wot website

@@ -60,7 +60,6 @@
         // Core methods
         getDistance: (target) => call('getDistance', { target }),
         isInMyWoT: (target, maxHops) => call('isInMyWoT', { target, maxHops }),
-        getDistanceBetween: (from, to) => call('getDistanceBetween', { from, to }),
         getTrustScore: (target) => call('getTrustScore', { target }),
         getDetails: (target) => call('getDetails', { target }),
         getConfig: () => call('getConfig', {}),
@@ -80,7 +79,7 @@
 
         // User info
         getMyPubkey: () => call('getMyPubkey', {}),
-        isConfigured: () => call('isConfigured', {}),
+        getStatus: () => call('getStatus', {}),
 
         // Graph queries
         getFollows: (pubkey) => call('getFollows', { pubkey }),

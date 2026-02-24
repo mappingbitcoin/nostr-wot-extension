@@ -15,9 +15,9 @@ const rateLimitState = new Map(); // method -> { count, windowStart }
 
 // Methods that should be rate limited (external-facing API methods)
 const RATE_LIMITED_METHODS = new Set([
-    'getDistance', 'isInMyWoT', 'getDistanceBetween', 'getTrustScore',
+    'getDistance', 'isInMyWoT', 'getTrustScore',
     'getDetails', 'getDistanceBatch', 'getTrustScoreBatch', 'filterByWoT',
-    'getFollows', 'getCommonFollows', 'getPath', 'getMyPubkey', 'isConfigured',
+    'getFollows', 'getCommonFollows', 'getPath', 'getMyPubkey', 'getStatus',
     'getConfig', 'getStats'
 ]);
 
@@ -255,9 +255,6 @@ async function handleRequest({ method, params }) {
             const maxHops = params.maxHops ?? config.maxHops;
             return dist !== null && dist <= maxHops;
 
-        case 'getDistanceBetween':
-            return getDistance(params.from, params.to);
-
         case 'getTrustScore':
             return getTrustScore(config.myPubkey, params.target);
 
@@ -295,7 +292,7 @@ async function handleRequest({ method, params }) {
         case 'getMyPubkey':
             return config.myPubkey;
 
-        case 'isConfigured':
+        case 'getStatus':
             return {
                 configured: !!config.myPubkey,
                 mode: config.mode,

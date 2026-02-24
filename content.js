@@ -9,8 +9,8 @@ if (window.__nostrWotContentInjected) {
 
     // Allowed methods that can be called from page context
     const ALLOWED_METHODS = [
-        'getDistance', 'isInMyWoT', 'getDistanceBetween', 'getTrustScore', 'getDetails', 'getConfig',
-        'getMyPubkey', 'isConfigured', 'getDistanceBatch', 'getTrustScoreBatch', 'filterByWoT',
+        'getDistance', 'isInMyWoT', 'getTrustScore', 'getDetails', 'getConfig',
+        'getMyPubkey', 'getStatus', 'getDistanceBatch', 'getTrustScoreBatch', 'filterByWoT',
         'getFollows', 'getCommonFollows', 'getPath', 'getStats'
     ];
 
