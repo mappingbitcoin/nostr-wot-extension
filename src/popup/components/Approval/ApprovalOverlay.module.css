@@ -1,17 +1,24 @@
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 500;
+  background: rgba(0, 0, 0, 0.25);
+  animation: scrimFadeIn 0.2s ease-out;
+}
+
 .overlay {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  z-index: 250;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(12px);
-  border-top: 1px solid var(--card-border);
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
-  max-height: 60vh;
+  z-index: 501;
+  max-height: 85vh;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(16px);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
   display: flex;
   flex-direction: column;
-  border-radius: 16px 16px 0 0;
   padding: 16px;
   animation: sheetSlideIn 0.25s ease-out;
 }
@@ -21,6 +28,50 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.headerActions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toggleBtn {
+  background: none;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.toggleBtn:hover {
+  border-color: var(--brand-light);
+  color: var(--brand);
+}
+
+.rejectAllBtn {
+  background: none;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--danger, #ef4444);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.rejectAllBtn:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.5);
 }
 
 .title {
@@ -30,12 +81,14 @@
 }
 
 .count {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   background: var(--brand);
   color: #fff;
-  padding: 2px 8px;
-  border-radius: 10px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  min-width: 24px;
+  text-align: center;
 }
 
 .list {
@@ -131,6 +184,7 @@
   text-align: center;
 }
 
+@keyframes scrimFadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes sheetSlideIn { from { transform: translateY(100%); } to { transform: translateY(0); } }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 

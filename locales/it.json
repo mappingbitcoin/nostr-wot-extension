@@ -67,7 +67,8 @@
 
   "home.setupProfile": "Configura il tuo profilo",
   "home.setupProfileHint": "Pubblica il tuo nome, la tua foto e la tua bio per farti trovare su Nostr.",
-  "home.editProfile": "Modifica profilo",
+  "home.setupProfileButton": "Configura",
+  "home.skip": "Salta",
 
   "scoring.trustSensitivity": "Sensibilita della fiducia",
   "scoring.strict": "Rigoroso",
@@ -124,7 +125,7 @@
   "settings.network": "Rete",
   "settings.language": "Lingua",
 
-  "security.keyBackup": "Chiave e backup",
+  "security.keyBackup": "Chiavi e backup",
   "security.keyBackupDesc": "Esporta o fai il backup delle tue chiavi private",
   "security.permissions": "Permessi",
   "security.permissionsDesc": "Gestisci l'accesso ai siti e i permessi di firma",
@@ -150,7 +151,9 @@
   "account.removeKeyWarning": "Assicurati di avere un backup della tua chiave privata prima di rimuovere. Perderai l'accesso a questa identita se non ne hai una copia.",
 
   "key.exportNsec": "Esporta chiave privata (nsec)",
+  "key.exportNsecDesc": "Rivela la tua chiave privata per usarla in un altro client",
   "key.exportNcryptsec": "Esporta backup crittografato (ncryptsec)",
+  "key.exportNcryptsecDesc": "Backup protetto da password sicuro per il cloud",
   "key.nsecWarningTitle": "Il tuo nsec e la tua chiave privata grezza.",
   "key.nsecWarningBody": "Chiunque la veda puo controllare la tua identita in modo permanente. Non c'e modo di revocarla. Esporta solo per passare a un altro client Nostr.",
   "key.revealBtn": "Capisco il rischio — Mostra la mia chiave",
@@ -373,6 +376,9 @@
   "approval.detail.time": "Data e ora",
   "approval.detail.alwaysAllow": "Consenti sempre",
   "approval.detail.alwaysDeny": "Nega sempre",
+  "approval.rejectAll": "Rifiuta tutto",
+  "approval.grouped": "Raggruppa",
+  "approval.expanded": "Espandi",
 
   "unlock.enterPassword": "Inserisci password",
   "unlock.vaultLocked": "La tua cassaforte e bloccata. Inserisci la password per continuare.",

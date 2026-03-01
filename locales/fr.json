@@ -67,7 +67,8 @@
 
   "home.setupProfile": "Configurez votre profil",
   "home.setupProfileHint": "Publiez votre nom, photo et bio pour que d'autres puissent vous trouver sur Nostr.",
-  "home.editProfile": "Modifier le profil",
+  "home.setupProfileButton": "Configurer",
+  "home.skip": "Passer",
 
   "scoring.trustSensitivity": "Sensibilité de la confiance",
   "scoring.strict": "Strict",
@@ -150,7 +151,9 @@
   "account.removeKeyWarning": "Assurez-vous d'avoir une sauvegarde de votre clé privée avant de supprimer. Vous perdrez l'accès à cette identité si vous n'en avez pas de copie.",
 
   "key.exportNsec": "Exporter la clé privée (nsec)",
+  "key.exportNsecDesc": "Révéler votre clé privée pour l'utiliser dans un autre client",
   "key.exportNcryptsec": "Exporter une sauvegarde chiffrée (ncryptsec)",
+  "key.exportNcryptsecDesc": "Sauvegarde protégée par mot de passe pour le stockage cloud",
   "key.nsecWarningTitle": "Votre nsec est votre clé privée brute.",
   "key.nsecWarningBody": "Toute personne qui la voit peut contrôler votre identité de façon permanente. Il n'y a aucun moyen de la révoquer. N'exportez que pour migrer vers un autre client Nostr.",
   "key.revealBtn": "Je comprends le risque — Afficher ma clé",
@@ -373,6 +376,9 @@
   "approval.detail.time": "Heure",
   "approval.detail.alwaysAllow": "Toujours autoriser",
   "approval.detail.alwaysDeny": "Toujours refuser",
+  "approval.rejectAll": "Tout rejeter",
+  "approval.grouped": "Grouper",
+  "approval.expanded": "Détailler",
 
   "unlock.enterPassword": "Entrez le mot de passe",
   "unlock.vaultLocked": "Votre coffre est verrouillé. Entrez votre mot de passe pour continuer.",

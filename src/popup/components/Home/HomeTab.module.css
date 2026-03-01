@@ -107,6 +107,28 @@
   line-height: 1.4;
 }
 
+.profileSuggestionActions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.profileDismiss {
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.profileDismiss:hover {
+  color: var(--text-secondary);
+}
+
 /* Sync reminder */
 .syncReminder {
   display: flex;

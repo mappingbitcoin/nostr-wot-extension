@@ -1350,7 +1350,7 @@ async function handleRequest({ method, params }: { method: string; params: Recor
             return { ok: true };
 
         case 'signer_resolveBatch':
-            await signer.resolveBatch(params.origin as string, params.method as string, params.decision as unknown as import('./lib/types.ts').RequestDecision);
+            await signer.resolveBatch(params.origin as string, params.method as string, params.decision as unknown as import('./lib/types.ts').RequestDecision, params.eventKind as number | undefined);
             return { ok: true };
 
         // === Onboarding methods ===
@@ -1601,9 +1601,42 @@ async function handleRequest({ method, params }: { method: string; params: Recor
             return logData.activityLog || [];
         }
 
-        case 'clearActivityLog':
-            await browser.storage.local.remove('activityLog');
+        case 'clearActivityLog': {
+            const hasFilter = params.domain || params.accountPubkey || params.typeFilter || params.pubkeyFilter;
+            if (!hasFilter) {
+                await browser.storage.local.remove('activityLog');
+            } else {
+                const allLog = ((await browser.storage.local.get(['activityLog'])) as Record<string, any[]>).activityLog || [];
+                const typeMethods: Record<string, string[]> = {
+                    signEvent: ['signEvent'], getPublicKey: ['getPublicKey'],
+                    encrypt: ['nip04Encrypt', 'nip44Encrypt'], decrypt: ['nip04Decrypt', 'nip44Decrypt'],
+                    nip04Encrypt: ['nip04Encrypt'], nip04Decrypt: ['nip04Decrypt'],
+                    nip44Encrypt: ['nip44Encrypt'], nip44Decrypt: ['nip44Decrypt'],
+                };
+                const kept = allLog.filter((e: any) => {
+                    if (params.accountPubkey && e.pubkey !== params.accountPubkey) return true;
+                    if (params.domain && e.domain !== params.domain) return true;
+                    if (params.typeFilter) {
+                        const methods = typeMethods[params.typeFilter as string];
+                        if (methods && !methods.includes(e.method)) return true;
+                    }
+                    if (params.pubkeyFilter) {
+                        const q = (params.pubkeyFilter as string).toLowerCase();
+                        let matches = false;
+                        if (e.theirPubkey && e.theirPubkey.toLowerCase().includes(q)) matches = true;
+                        if (!matches && e.event?.tags) {
+                            for (const tag of e.event.tags) {
+                                if (tag[0] === 'p' && tag[1] && tag[1].toLowerCase().includes(q)) { matches = true; break; }
+                            }
+                        }
+                        if (!matches) return true;
+                    }
+                    return false; // matched all filters — remove
+                });
+                await browser.storage.local.set({ activityLog: kept });
+            }
             return { ok: true };
+        }
 
         // === Local Blocks ===
 

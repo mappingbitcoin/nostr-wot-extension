@@ -67,7 +67,8 @@
 
   "home.setupProfile": "Set up your profile",
   "home.setupProfileHint": "Publish your name, picture, and bio so others can find you on Nostr.",
-  "home.editProfile": "Edit Profile",
+  "home.setupProfileButton": "Setup",
+  "home.skip": "Skip",
 
   "scoring.trustSensitivity": "Trust sensitivity",
   "scoring.strict": "Strict",
@@ -124,7 +125,7 @@
   "settings.network": "Network",
   "settings.language": "Language",
 
-  "security.keyBackup": "Key & Backup",
+  "security.keyBackup": "Keys & Backup",
   "security.keyBackupDesc": "Export or back up your private keys",
   "security.permissions": "Permissions",
   "security.permissionsDesc": "Manage site access and signing permissions",
@@ -150,7 +151,9 @@
   "account.removeKeyWarning": "Make sure you have a backup of your private key before removing. You will lose access to this identity if you don't have a copy.",
 
   "key.exportNsec": "Export private key (nsec)",
+  "key.exportNsecDesc": "Reveal your raw private key for use in another client",
   "key.exportNcryptsec": "Export encrypted backup (ncryptsec)",
+  "key.exportNcryptsecDesc": "Password-protected backup safe for cloud storage",
   "key.nsecWarningTitle": "Your nsec is your raw private key.",
   "key.nsecWarningBody": "Anyone who sees it can control your identity permanently. There is no way to revoke it. Only export to move to another Nostr client.",
   "key.revealBtn": "I understand the risk — Show my key",
@@ -373,6 +376,9 @@
   "approval.detail.time": "Time",
   "approval.detail.alwaysAllow": "Always Allow",
   "approval.detail.alwaysDeny": "Always Deny",
+  "approval.rejectAll": "Reject All",
+  "approval.grouped": "Group",
+  "approval.expanded": "Expand",
 
   "unlock.enterPassword": "Enter password",
   "unlock.vaultLocked": "Your vault is locked. Enter your password to continue.",

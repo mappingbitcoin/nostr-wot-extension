@@ -39,7 +39,9 @@ export default function ApprovalOverlay({ onRequestUnlock }: ApprovalOverlayProp
   const [groups, setGroups] = useState<ApprovalGroup[]>([]);
   const [nip46Groups, setNip46Groups] = useState<ApprovalGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<ApprovalGroup | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<PendingRequest | null>(null);
   const [selectedNip46, setSelectedNip46] = useState<ApprovalGroup | null>(null);
+  const [expanded, setExpanded] = useState(false);
   const vault = useVault();
   const permissions = usePermissions();
   const { active, accounts } = useAccount();
@@ -113,9 +115,12 @@ export default function ApprovalOverlay({ onRequestUnlock }: ApprovalOverlayProp
 
   const closeAndRefresh = () => {
     setSelectedGroup(null);
+    setSelectedRequest(null);
     setSelectedNip46(null);
     refresh();
   };
+
+  // --- Group actions ---
 
   const handleApprove = async (group: ApprovalGroup) => {
     for (const req of group.requests) {
@@ -127,9 +132,13 @@ export default function ApprovalOverlay({ onRequestUnlock }: ApprovalOverlayProp
   const handleAlwaysAllow = async (group: ApprovalGroup) => {
     const accountId = group.requests[0]?.accountId || active?.id || null;
     await permissions.savePermission(group.origin, group.permKey, 'allow', accountId);
-    for (const req of group.requests) {
-      await rpc('signer_resolve', { id: req.id, decision: { allow: true, remember: false } });
-    }
+    const eventKind = group.requests[0]?.eventKind as number | undefined;
+    await rpc('signer_resolveBatch', {
+      origin: group.origin,
+      method: group.method,
+      decision: { allow: true, remember: false },
+      eventKind,
+    });
     closeAndRefresh();
   };
 
@@ -143,22 +152,93 @@ export default function ApprovalOverlay({ onRequestUnlock }: ApprovalOverlayProp
   const handleAlwaysDeny = async (group: ApprovalGroup) => {
     const accountId = group.requests[0]?.accountId || active?.id || null;
     await permissions.savePermission(group.origin, group.permKey, 'deny', accountId);
-    for (const req of group.requests) {
-      await rpc('signer_resolve', { id: req.id, decision: { allow: false, remember: false } });
+    const eventKind = group.requests[0]?.eventKind as number | undefined;
+    await rpc('signer_resolveBatch', {
+      origin: group.origin,
+      method: group.method,
+      decision: { allow: false, remember: false },
+      eventKind,
+    });
+    closeAndRefresh();
+  };
+
+  // --- Single request actions (expanded mode) ---
+
+  const handleApproveSingle = async (req: PendingRequest) => {
+    await rpc('signer_resolve', { id: req.id, decision: { allow: true, remember: false } });
+    closeAndRefresh();
+  };
+
+  const handleDenySingle = async (req: PendingRequest) => {
+    await rpc('signer_resolve', { id: req.id, decision: { allow: false, remember: false } });
+    closeAndRefresh();
+  };
+
+  const handleAlwaysAllowSingle = async (req: PendingRequest) => {
+    const accountId = req.accountId || active?.id || null;
+    const permKey = req.permKey || req.type;
+    await permissions.savePermission(req.origin, permKey, 'allow', accountId);
+    const eventKind = req.eventKind as number | undefined;
+    await rpc('signer_resolveBatch', {
+      origin: req.origin,
+      method: req.type,
+      decision: { allow: true, remember: false },
+      eventKind,
+    });
+    closeAndRefresh();
+  };
+
+  const handleAlwaysDenySingle = async (req: PendingRequest) => {
+    const accountId = req.accountId || active?.id || null;
+    const permKey = req.permKey || req.type;
+    await permissions.savePermission(req.origin, permKey, 'deny', accountId);
+    const eventKind = req.eventKind as number | undefined;
+    await rpc('signer_resolveBatch', {
+      origin: req.origin,
+      method: req.type,
+      decision: { allow: false, remember: false },
+      eventKind,
+    });
+    closeAndRefresh();
+  };
+
+  // --- Reject all ---
+
+  const handleRejectAll = async () => {
+    for (const group of groups) {
+      for (const req of group.requests) {
+        await rpc('signer_resolve', { id: req.id, decision: { allow: false, remember: false } });
+      }
     }
     closeAndRefresh();
   };
 
+  // All individual requests for expanded view
+  const allRequests = groups.flatMap((g) => g.requests);
+
   if (groups.length === 0 && nip46Groups.length === 0) return null;
+
+  const totalCount = groups.reduce((n, g) => n + g.requests.length, 0) + nip46Groups.reduce((n, g) => n + g.requests.length, 0);
 
   return (
     <>
+      <div className={styles.scrim} />
       <div className={styles.overlay}>
         <div className={styles.header}>
           <span className={styles.title}>{t('approval.pendingRequests')}</span>
-          {groups.length > 0 && (
-            <span className={styles.count}>{groups.reduce((n, g) => n + g.requests.length, 0)}</span>
-          )}
+          <span className={styles.count}>{totalCount}</span>
+          <div className={styles.headerActions}>
+            {allRequests.length > 1 && (
+              <button className={styles.toggleBtn} onClick={() => setExpanded(!expanded)}>
+                {expanded ? t('approval.grouped') : t('approval.expanded')}
+              </button>
+            )}
+            {groups.length > 0 && (
+              <button className={styles.rejectAllBtn} onClick={handleRejectAll}>
+                {t('approval.rejectAll')}
+              </button>
+            )}
+          </div>
         </div>
         {groups.length > 0 && permissions.useGlobalDefaults && accounts && accounts.length > 1 && (
           <div className={styles.legend}>
@@ -166,13 +246,23 @@ export default function ApprovalOverlay({ onRequestUnlock }: ApprovalOverlayProp
           </div>
         )}
         <div className={styles.list}>
-          {groups.map((group) => (
-            <ApprovalCard
-              key={`${group.origin}::${group.permKey}`}
-              group={group}
-              onClick={() => setSelectedGroup(group)}
-            />
-          ))}
+          {expanded ? (
+            allRequests.map((req) => (
+              <ApprovalCard
+                key={req.id}
+                group={{ origin: req.origin, method: req.type, permKey: req.permKey || req.type, requests: [req] }}
+                onClick={() => setSelectedRequest(req)}
+              />
+            ))
+          ) : (
+            groups.map((group) => (
+              <ApprovalCard
+                key={`${group.origin}::${group.permKey}`}
+                group={group}
+                onClick={() => setSelectedGroup(group)}
+              />
+            ))
+          )}
           {nip46Groups.map((group) => (
             <ApprovalCard
               key={`nip46::${group.origin}::${group.method}`}
@@ -191,6 +281,19 @@ export default function ApprovalOverlay({ onRequestUnlock }: ApprovalOverlayProp
           onDeny={() => handleDeny(selectedGroup)}
           onAlwaysDeny={() => handleAlwaysDeny(selectedGroup)}
           onClose={() => setSelectedGroup(null)}
+          zIndex={510}
+        />
+      )}
+
+      {selectedRequest && (
+        <EventDetailModal
+          request={selectedRequest}
+          onApprove={() => handleApproveSingle(selectedRequest)}
+          onAlwaysAllow={() => handleAlwaysAllowSingle(selectedRequest)}
+          onDeny={() => handleDenySingle(selectedRequest)}
+          onAlwaysDeny={() => handleAlwaysDenySingle(selectedRequest)}
+          onClose={() => setSelectedRequest(null)}
+          zIndex={510}
         />
       )}
 
@@ -199,6 +302,7 @@ export default function ApprovalOverlay({ onRequestUnlock }: ApprovalOverlayProp
           request={selectedNip46.requests[0]}
           nip46InFlight
           onClose={() => setSelectedNip46(null)}
+          zIndex={510}
         />
       )}
     </>

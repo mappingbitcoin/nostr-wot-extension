@@ -1,19 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import browser from '@shared/browser.ts';
 import { rpc, rpcNotify } from '@shared/rpc.ts';
 import { getDomainFromUrl } from '@shared/url.ts';
 import { t } from '@lib/i18n.js';
-import { type ActivityEntry, type GroupedActivity } from '@shared/activity.ts';
 import { useAccount } from '../../context/AccountContext';
 import SiteControls from './SiteControls';
-import HomeActivity from './HomeActivity';
 import ProfileSuggestion from './ProfileSuggestion';
 import SyncReminder from './SyncReminder';
 import ScoringCard from './ScoringCard';
 import Card from '@components/Card/Card';
 import Button from '@components/Button/Button';
 import EmptyState from '@components/EmptyState/EmptyState';
-import EventDetailModal from '@components/EventDetailModal/EventDetailModal';
 import { IconGlobe } from '@assets';
 import styles from './HomeTab.module.css';
 
@@ -36,29 +33,18 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
   const [identityEnabled, setIdentityEnabled] = useState<boolean>(true);
   const [wotEnabled, setWotEnabled] = useState<boolean>(true);
   const [canInject, setCanInject] = useState<boolean>(false);
-  const [activity, setActivity] = useState<ActivityEntry[]>([]);
-  const [pendingActivity, setPendingActivity] = useState<ActivityEntry[]>([]);
-  const [selectedActivityGroup, setSelectedActivityGroup] = useState<GroupedActivity | null>(null);
   const [syncStale, setSyncStale] = useState<SyncStaleInfo | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [profileDismissed, setProfileDismissed] = useState<boolean>(false);
 
-  // Refresh just the activity entries for the current domain
-  const refreshActivity = useCallback(async (d: string) => {
-    if (!d) return;
-    try {
-      const [allActivity, pendingAll] = await Promise.all([
-        rpc<ActivityEntry[]>('getActivityLog'),
-        rpc<any[]>('signer_getPending').catch(() => []),
-      ]);
-      const activePk = active?.pubkey;
-      setActivity((allActivity || []).filter((e: ActivityEntry) => e.domain === d && (!e.pubkey || e.pubkey === activePk)));
-      setPendingActivity(
-        (pendingAll || [])
-          .filter((r: any) => r.origin === d)
-          .map((r: any) => ({ timestamp: r.timestamp || Date.now(), method: r.type, decision: 'pending' }))
-      );
-    } catch {}
-  }, []);
+  useEffect(() => {
+    if (!active?.id) return;
+    browser.storage.local.get('profileSuggestionDismissed').then((data) => {
+      const dismissed = (data as Record<string, unknown>).profileSuggestionDismissed;
+      const list: string[] = Array.isArray(dismissed) ? dismissed : [];
+      setProfileDismissed(list.includes(active.id));
+    });
+  }, [active?.id]);
 
   useEffect(() => {
     loadHomeState();
@@ -104,30 +90,6 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
     return () => clearInterval(interval);
   }, [active]);
 
-  // Re-fetch activity when activityLog changes in storage
-  useEffect(() => {
-    if (!domain) return;
-    function onStorageChange(changes: Record<string, any>, area: string) {
-      if (area === 'local' && changes.activityLog) {
-        refreshActivity(domain!);
-      }
-    }
-    browser.storage.onChanged.addListener(onStorageChange);
-    return () => browser.storage.onChanged.removeListener(onStorageChange);
-  }, [domain, refreshActivity]);
-
-  // Re-fetch pending when signer resolves a request
-  useEffect(() => {
-    if (!domain) return;
-    function onMessage(msg: any) {
-      if (msg.type === 'signerPendingUpdated') {
-        refreshActivity(domain!);
-      }
-    }
-    browser.runtime.onMessage.addListener(onMessage);
-    return () => browser.runtime.onMessage.removeListener(onMessage);
-  }, [domain, refreshActivity]);
-
   async function loadHomeState() {
     try {
       const tabs = await browser.tabs.query({ active: true, currentWindow: true });
@@ -146,12 +108,11 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
       }
       setDomain(d);
 
-      const [allowedDomains, badgeDisabledData, identityDisabled, perms, allActivity] = await Promise.all([
+      const [allowedDomains, badgeDisabledData, identityDisabled, perms] = await Promise.all([
         rpc<string[]>('getAllowedDomains'),
         browser.storage.local.get('badgeDisabledSites') as Promise<any>,
         rpc<string[]>('getIdentityDisabledSites'),
         rpc<Record<string, string>>('signer_getPermissionsForDomain', { domain: d }),
-        rpc<ActivityEntry[]>('getActivityLog'),
       ]);
 
       const badgeDisabled = new Set<string>(badgeDisabledData.badgeDisabledSites || []);
@@ -168,20 +129,6 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
       setCanInject(inject || hp);
       setIdentityEnabled(!identityDisabledSet.has(d));
       setWotEnabled(!badgeDisabled.has(d));
-
-      const activePk = active?.pubkey;
-      const siteActivity = (allActivity || []).filter((e: ActivityEntry) => e.domain === d && (!e.pubkey || e.pubkey === activePk));
-      setActivity(siteActivity);
-
-      // Pending signer requests
-      try {
-        const pendingAll = await rpc<any[]>('signer_getPending') || [];
-        setPendingActivity(
-          pendingAll
-            .filter((r: any) => r.origin === d)
-            .map((r: any) => ({ timestamp: r.timestamp || Date.now(), method: r.type, decision: 'pending' }))
-        );
-      } catch {}
 
       setSiteState(inject || hp ? 'connected' : 'notConnected');
     } catch {
@@ -224,7 +171,17 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
   };
 
   // Show profile suggestion if user has signing account but no kind 0
-  const showProfileSuggestion = active && !isReadOnly && !cachedProfile?.name;
+  const showProfileSuggestion = active && !isReadOnly && !cachedProfile?.name && !profileDismissed;
+
+  const handleDismissProfile = async () => {
+    if (!active?.id) return;
+    setProfileDismissed(true);
+    const data = await browser.storage.local.get('profileSuggestionDismissed');
+    const dismissed = (data as Record<string, unknown>).profileSuggestionDismissed;
+    const list: string[] = Array.isArray(dismissed) ? dismissed : [];
+    if (!list.includes(active.id)) list.push(active.id);
+    await browser.storage.local.set({ profileSuggestionDismissed: list });
+  };
 
   const handleSyncNow = () => {
     rpcNotify('syncGraph', { depth: 3 });
@@ -250,7 +207,7 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
   if (siteState === 'notConnected') {
     return (
       <div className={styles.centerWrap}>
-        {showProfileSuggestion && <ProfileSuggestion onEdit={onEditProfile} />}
+        {showProfileSuggestion && <ProfileSuggestion onEdit={onEditProfile} onDismiss={handleDismissProfile} />}
         <Card className={styles.emptyState}>
           <EmptyState
             icon={
@@ -268,7 +225,7 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
 
   return (
     <>
-      {showProfileSuggestion && <ProfileSuggestion onEdit={onEditProfile} />}
+      {showProfileSuggestion && <ProfileSuggestion onEdit={onEditProfile} onDismiss={handleDismissProfile} />}
       {isSyncing && (
         <SyncReminder syncing onDismiss={() => setIsSyncing(false)} />
       )}
@@ -287,22 +244,9 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
         onWotToggle={handleWotToggle}
         onManagePermissions={() => onManagePermissions(domain!)}
         onManageFilters={onManageFilters}
+        onRecentActivity={() => onViewAllActivity(domain)}
       />
       <ScoringCard />
-      <HomeActivity
-        pending={pendingActivity}
-        entries={activity}
-        onViewAll={() => onViewAllActivity(domain)}
-        onSelectGroup={setSelectedActivityGroup}
-      />
-
-      {selectedActivityGroup && (
-        <EventDetailModal
-          group={selectedActivityGroup}
-          onBack={() => setSelectedActivityGroup(null)}
-          onClose={() => setSelectedActivityGroup(null)}
-        />
-      )}
     </>
   );
 }

@@ -7,9 +7,10 @@ import styles from './HomeTab.module.css';
 
 interface ProfileSuggestionProps {
   onEdit: () => void;
+  onDismiss: () => void;
 }
 
-export default function ProfileSuggestion({ onEdit }: ProfileSuggestionProps) {
+export default function ProfileSuggestion({ onEdit, onDismiss }: ProfileSuggestionProps) {
   return (
     <Card className={styles.profileSuggestion}>
       <div className={styles.profileSuggestionContent}>
@@ -19,7 +20,10 @@ export default function ProfileSuggestion({ onEdit }: ProfileSuggestionProps) {
           <span>{t('home.setupProfileHint')}</span>
         </div>
       </div>
-      <Button small onClick={onEdit}>{t('home.editProfile')}</Button>
+      <div className={styles.profileSuggestionActions}>
+        <Button small onClick={onEdit}>{t('home.setupProfileButton')}</Button>
+        <button className={styles.profileDismiss} onClick={onDismiss}>{t('home.skip')}</button>
+      </div>
     </Card>
   );
 }

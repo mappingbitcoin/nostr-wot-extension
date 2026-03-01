@@ -67,7 +67,8 @@
 
   "home.setupProfile": "Configure seu perfil",
   "home.setupProfileHint": "Publique seu nome, foto e bio para que outros possam encontrá-lo no Nostr.",
-  "home.editProfile": "Editar perfil",
+  "home.setupProfileButton": "Configurar",
+  "home.skip": "Pular",
 
   "scoring.trustSensitivity": "Sensibilidade de confiança",
   "scoring.strict": "Rigoroso",
@@ -124,7 +125,7 @@
   "settings.network": "Rede",
   "settings.language": "Idioma",
 
-  "security.keyBackup": "Chave e backup",
+  "security.keyBackup": "Chaves e backup",
   "security.keyBackupDesc": "Exportar ou fazer backup das suas chaves privadas",
   "security.permissions": "Permissões",
   "security.permissionsDesc": "Gerenciar acesso a sites e permissões de assinatura",
@@ -150,7 +151,9 @@
   "account.removeKeyWarning": "Certifique-se de ter um backup da sua chave privada antes de remover. Você perderá acesso a esta identidade se não tiver uma cópia.",
 
   "key.exportNsec": "Exportar chave privada (nsec)",
+  "key.exportNsecDesc": "Revelar sua chave privada para usar em outro cliente",
   "key.exportNcryptsec": "Exportar backup criptografado (ncryptsec)",
+  "key.exportNcryptsecDesc": "Backup protegido por senha seguro para armazenamento na nuvem",
   "key.nsecWarningTitle": "Sua nsec é sua chave privada bruta.",
   "key.nsecWarningBody": "Qualquer pessoa que a veja pode controlar sua identidade permanentemente. Não há como revogá-la. Exporte apenas para migrar para outro cliente Nostr.",
   "key.revealBtn": "Entendo o risco — Mostrar minha chave",
@@ -373,6 +376,9 @@
   "approval.detail.time": "Hora",
   "approval.detail.alwaysAllow": "Permitir sempre",
   "approval.detail.alwaysDeny": "Negar sempre",
+  "approval.rejectAll": "Rejeitar tudo",
+  "approval.grouped": "Agrupar",
+  "approval.expanded": "Expandir",
 
   "unlock.enterPassword": "Insira a senha",
   "unlock.vaultLocked": "Seu cofre está bloqueado. Insira sua senha para continuar.",
