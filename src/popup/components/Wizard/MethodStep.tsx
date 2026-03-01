@@ -20,11 +20,18 @@ interface Method {
 
 interface MethodStepProps {
   onSelect: (id: string) => void;
+  hasGeneratedAccount?: boolean;
 }
 
-export default function MethodStep({ onSelect }: MethodStepProps) {
+export default function MethodStep({ onSelect, hasGeneratedAccount }: MethodStepProps) {
   const METHODS: Method[] = [
-    { id: 'create', label: t('wizard.createNew'), desc: t('wizard.createNewDesc'), primary: true, icon: METHOD_ICONS.create },
+    {
+      id: 'create',
+      label: hasGeneratedAccount ? t('wizard.createSubAccount') : t('wizard.createNew'),
+      desc: hasGeneratedAccount ? t('wizard.createSubAccountDesc') : t('wizard.createNewDesc'),
+      primary: true,
+      icon: METHOD_ICONS.create,
+    },
     { id: 'import', label: t('wizard.importKeyBackup'), desc: t('wizard.importKeyBackupDesc'), icon: METHOD_ICONS.import },
     { id: 'npub', label: t('wizard.watchOnly'), desc: t('wizard.watchOnlyDesc'), icon: METHOD_ICONS.npub },
     { id: 'nip46', label: t('wizard.nostrConnect'), desc: t('wizard.nostrConnectDesc'), icon: METHOD_ICONS.nip46 },

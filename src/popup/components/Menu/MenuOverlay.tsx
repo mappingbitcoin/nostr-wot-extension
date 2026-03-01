@@ -69,6 +69,12 @@ export default function MenuOverlay({ visible, onClose, onEditProfile }: MenuOve
       icon: <IconUser />,
     },
     {
+      id: 'key-backup',
+      label: t('security.keyBackup'),
+      desc: t('security.keyBackupDesc'),
+      icon: <IconKey />,
+    },
+    {
       id: 'security',
       label: t('settings.securityPrivacy'),
       desc: t('settings.securityPrivacyDesc'),
@@ -144,7 +150,6 @@ export default function MenuOverlay({ visible, onClose, onEditProfile }: MenuOve
       case 'security':
         return (
           <SecuritySection
-            onKeyBackup={() => pushSection('key-backup')}
             onPermissions={() => pushSection('site-permissions')}
             onChangePassword={() => setKeyAction('changePassword')}
           />
@@ -155,11 +160,13 @@ export default function MenuOverlay({ visible, onClose, onEditProfile }: MenuOve
             <NavItem
               icon={<IconKey />}
               label={t('key.exportNsec')}
+              desc={t('key.exportNsecDesc')}
               onClick={() => setKeyAction('nsec')}
             />
             <NavItem
               icon={<IconLock />}
               label={t('key.exportNcryptsec')}
+              desc={t('key.exportNcryptsecDesc')}
               onClick={() => setKeyAction('ncryptsec')}
             />
           </MenuSection>
@@ -202,6 +209,7 @@ export default function MenuOverlay({ visible, onClose, onEditProfile }: MenuOve
               {menuItems.map((item) => {
                 if (item.id === 'nip46' && !vault.isNip46) return null;
                 if (item.id === 'editProfile' && isReadOnly) return null;
+                if (item.id === 'key-backup' && isReadOnly) return null;
                 return (
                   <NavItem
                     key={item.id}

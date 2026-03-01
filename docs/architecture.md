@@ -33,7 +33,7 @@ The central coordinator. Runs as a **service worker** on Chrome and a **persiste
 Responsibilities:
 - All business logic: graph queries, sync orchestration, trust scoring, vault lifecycle, account management, NIP-07 signing coordination, profile metadata fetching, activity logging.
 - Message handler: `browser.runtime.onMessage.addListener` receives messages from content scripts and extension pages, dispatches to `handleRequest()`.
-- Auto-injection: listens to `browser.tabs.onUpdated` and `browser.tabs.onCreated` to inject `content.js` and `inject.js` into pages that have been granted permission.
+- Auto-injection: `content.ts` and `inject.ts` are declared as `content_scripts` in `manifest.json` (matching `<all_urls>`), so the browser handles injection automatically. The background additionally uses `browser.scripting.executeScript` to inject the badge engine and CSS into tabs that have WoT badges enabled.
 - On `runtime.onInstalled` (reason `install`), opens the onboarding wizard if no vault exists.
 
 ### 2.2 Content Script -- `content.ts`
@@ -107,12 +107,16 @@ From `manifest.json` (MV3):
     "optional_permissions": ["notifications"],
     "optional_host_permissions": ["<all_urls>"],
     "background": {
-        "scripts": ["background.js"],
-        "service_worker": "background.js",
+        "scripts": ["background.ts"],
+        "service_worker": "background.ts",
         "type": "module"
     },
+    "content_scripts": [
+        { "matches": ["<all_urls>"], "js": ["content.ts"], "run_at": "document_start" },
+        { "matches": ["<all_urls>"], "js": ["inject.ts"], "run_at": "document_start", "world": "MAIN" }
+    ],
     "web_accessible_resources": [{
-        "resources": ["detect.json"],
+        "resources": ["icons/icon-base.svg", "locales/*.json", "badges/engine.ts", "badges/badges.css"],
         "matches": ["<all_urls>"]
     }]
 }

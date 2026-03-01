@@ -13,6 +13,7 @@ interface SiteControlsProps {
   onWotToggle: (checked: boolean) => void;
   onManagePermissions: () => void;
   onManageFilters: () => void;
+  onRecentActivity: () => void;
 }
 
 export default function SiteControls({
@@ -23,6 +24,7 @@ export default function SiteControls({
   onWotToggle,
   onManagePermissions,
   onManageFilters,
+  onRecentActivity,
 }: SiteControlsProps) {
   return (
     <Card className={styles.siteControls}>
@@ -53,6 +55,11 @@ export default function SiteControls({
 
       <button className={styles.controlLink} onClick={onManageFilters}>
         <span>{t('home.manageFilters')}</span>
+        <IconChevronRight size={14} />
+      </button>
+
+      <button className={styles.controlLink} onClick={onRecentActivity}>
+        <span>{t('home.recentActivity')}</span>
         <IconChevronRight size={14} />
       </button>
     </Card>

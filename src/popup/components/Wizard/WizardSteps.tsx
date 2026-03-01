@@ -7,6 +7,7 @@ import ImportStep from './ImportStep';
 import NpubStep from './NpubStep';
 import Nip46Step from './Nip46Step';
 import CreateStep from './CreateStep';
+import SubAccountStep from './SubAccountStep';
 import VerifyStep from './VerifyStep';
 import PasswordStep from './PasswordStep';
 import BackupStep from './BackupStep';
@@ -36,7 +37,7 @@ function buildSteps(
   flow: WizardFlow,
   onLangSelect: ((code: string) => void) | null,
   onDone: () => void,
-  { hasAccounts }: { hasAccounts?: boolean } = {},
+  { hasAccounts, hasGeneratedAccount }: { hasAccounts?: boolean; hasGeneratedAccount?: boolean } = {},
 ): Record<string, StepConfig> {
   return {
     lang: {
@@ -49,7 +50,7 @@ function buildSteps(
     },
     method: {
       title: hasAccounts ? t('wizard.addAccount') : t('wizard.getStarted'),
-      content: <MethodStep onSelect={(m: string) => flow.send('SELECT', { method: m })} />,
+      content: <MethodStep onSelect={(m: string) => flow.send('SELECT', { method: m })} hasGeneratedAccount={hasGeneratedAccount} />,
     },
     import: {
       title: t('wizard.importKey'),
@@ -66,6 +67,10 @@ function buildSteps(
     create: {
       title: t('wizard.createIdentity'),
       content: <CreateStep onNext={(acct: any, seed: string) => flow.send('CREATED', { account: acct, mnemonic: seed })} />,
+    },
+    subaccount: {
+      title: t('wizard.subAccountTitle'),
+      content: <SubAccountStep onNext={(acct: any) => flow.send('CREATED', { account: acct })} />,
     },
     backup: {
       title: t('wizard.backUpKeys'),
@@ -107,10 +112,11 @@ interface WizardStepsProps {
   onLangSelect: (code: string) => void;
   bodyClassName?: string;
   hasAccounts?: boolean;
+  hasGeneratedAccount?: boolean;
 }
 
-export default function WizardSteps({ flow, onClose, onDone, onLangSelect, bodyClassName, hasAccounts }: WizardStepsProps) {
-  const STEPS = buildSteps(flow, onLangSelect, onDone, { hasAccounts });
+export default function WizardSteps({ flow, onClose, onDone, onLangSelect, bodyClassName, hasAccounts, hasGeneratedAccount }: WizardStepsProps) {
+  const STEPS = buildSteps(flow, onLangSelect, onDone, { hasAccounts, hasGeneratedAccount });
   const active = STEPS[flow.step];
   if (!active?.content) return null;
 

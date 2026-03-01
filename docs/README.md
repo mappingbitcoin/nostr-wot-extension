@@ -48,6 +48,8 @@ The Nostr WoT Extension is a Manifest V3 browser extension that combines an **NI
 
 **Build**: `npm run build` (Vite + @crxjs/vite-plugin)
 
+**Package**: `npm run package:chrome` / `npm run package:firefox` (builds + zips for store submission, see [DEPLOY.md](../DEPLOY.md))
+
 **Test**: `./tests/run.sh` (Node.js built-in test runner + tsx)
 
 **Key files**:

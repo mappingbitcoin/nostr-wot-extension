@@ -28,6 +28,7 @@ export interface WizardOptions {
   initialStep?: string;
   skipLang?: boolean;
   hasAccounts?: boolean;
+  hasGeneratedAccount?: boolean;
 }
 
 interface TransitionResult {
@@ -51,7 +52,10 @@ const TRANSITIONS: Record<string, Record<string, TransitionHandler>> = {
   },
 
   method: {
-    SELECT: (_ctx, { method }) => ({ step: method as string, ctx: { method: method as string } }),
+    SELECT: (_ctx, { method }, { hasGeneratedAccount }) => {
+      const step = (method === 'create' && hasGeneratedAccount) ? 'subaccount' : method as string;
+      return { step, ctx: { method: method as string } };
+    },
     BACK: (ctx, _payload, { initialStep }) =>
       ctx.visitedPreMethod ? { step: initialStep! } : null,
   },
@@ -60,6 +64,14 @@ const TRANSITIONS: Record<string, Record<string, TransitionHandler>> = {
     CREATED: (_ctx, { account, mnemonic }) => ({
       step: 'verify',
       ctx: { account: account as unknown, mnemonic: mnemonic as string },
+    }),
+    BACK: () => ({ step: 'method' }),
+  },
+
+  subaccount: {
+    CREATED: (_ctx, { account }) => ({
+      step: 'password',
+      ctx: { account: account as unknown },
     }),
     BACK: () => ({ step: 'method' }),
   },
@@ -96,7 +108,8 @@ const TRANSITIONS: Record<string, Record<string, TransitionHandler>> = {
     SET: (_ctx, { upgraded }) => ({
       step: upgraded ? 'done' : 'wotSync',
     }),
-    BACK: (ctx) => {
+    BACK: (ctx, _payload, { hasGeneratedAccount }) => {
+      if (ctx.method === 'create' && hasGeneratedAccount) return { step: 'subaccount' };
       if (ctx.method === 'create') return { step: 'verify' };
       if (ctx.method === 'import') return { step: 'import' };
       return { step: 'method' };

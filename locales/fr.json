@@ -389,6 +389,13 @@
 
   "wizard.createNew": "Créer un nouveau",
   "wizard.createNewDesc": "Générer une nouvelle paire de clés avec une phrase de récupération",
+  "wizard.createSubAccount": "Dériver un sous-compte",
+  "wizard.createSubAccountDesc": "Créer une nouvelle identité à partir de votre phrase de récupération existante",
+  "wizard.subAccountTitle": "Nouveau sous-compte",
+  "wizard.subAccountDesc": "Cette identité est dérivée de votre phrase de récupération existante en utilisant un chemin HD différent. Aucune nouvelle phrase de récupération n'est nécessaire.",
+  "wizard.subAccountType": "Sous-compte HD",
+  "wizard.derivationPath": "Chemin",
+  "wizard.subAccountHint": "Ce sous-compte partage la même phrase de récupération que votre compte principal. Sauvegardez votre phrase une fois et tous les sous-comptes seront récupérables.",
   "wizard.importKeyBackup": "Importer une clé ou sauvegarde",
   "wizard.importKeyBackupDesc": "Collez votre nsec, clé hex ou sauvegarde ncryptsec",
   "wizard.watchOnly": "Lecture seule",

@@ -389,6 +389,13 @@
 
   "wizard.createNew": "Crear nueva",
   "wizard.createNewDesc": "Generar un nuevo par de claves con frase de recuperación",
+  "wizard.createSubAccount": "Derivar subcuenta",
+  "wizard.createSubAccountDesc": "Crear una nueva identidad a partir de tu frase semilla existente",
+  "wizard.subAccountTitle": "Nueva subcuenta",
+  "wizard.subAccountDesc": "Esta identidad se deriva de tu frase de recuperación existente usando una ruta HD diferente. No se necesita una nueva frase semilla.",
+  "wizard.subAccountType": "Subcuenta HD",
+  "wizard.derivationPath": "Ruta",
+  "wizard.subAccountHint": "Esta subcuenta comparte la misma frase de recuperación que tu cuenta principal. Respalda tu semilla una vez y todas las subcuentas serán recuperables.",
   "wizard.importKeyBackup": "Importar clave o respaldo",
   "wizard.importKeyBackupDesc": "Pega tu nsec, clave hex o respaldo ncryptsec",
   "wizard.watchOnly": "Solo lectura",

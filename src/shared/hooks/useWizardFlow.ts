@@ -9,6 +9,7 @@ interface UseWizardFlowOptions {
   initialStep?: string;
   skipLang?: boolean;
   hasAccounts?: boolean;
+  hasGeneratedAccount?: boolean;
 }
 
 interface UseWizardFlowResult {
@@ -31,9 +32,10 @@ export default function useWizardFlow({
   initialStep = 'lang',
   skipLang = false,
   hasAccounts = false,
+  hasGeneratedAccount = false,
 }: UseWizardFlowOptions = {}): UseWizardFlowResult {
-  const optionsRef = useRef<WizardOptions>({ initialStep, skipLang, hasAccounts });
-  optionsRef.current = { initialStep, skipLang, hasAccounts };
+  const optionsRef = useRef<WizardOptions>({ initialStep, skipLang, hasAccounts, hasGeneratedAccount });
+  optionsRef.current = { initialStep, skipLang, hasAccounts, hasGeneratedAccount };
 
   const wrappedReducer = useCallback(
     (state: WizardState, action: WizardAction): WizardState =>

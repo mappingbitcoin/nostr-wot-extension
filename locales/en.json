@@ -389,6 +389,13 @@
 
   "wizard.createNew": "Create New",
   "wizard.createNewDesc": "Generate a new key pair with recovery phrase",
+  "wizard.createSubAccount": "Derive Sub-Account",
+  "wizard.createSubAccountDesc": "Create a new identity from your existing seed phrase",
+  "wizard.subAccountTitle": "New Sub-Account",
+  "wizard.subAccountDesc": "This identity is derived from your existing recovery phrase using a different HD path. No new seed phrase is needed.",
+  "wizard.subAccountType": "HD Sub-Account",
+  "wizard.derivationPath": "Path",
+  "wizard.subAccountHint": "This sub-account shares the same recovery phrase as your main account. Back up your seed once and all sub-accounts are recoverable.",
   "wizard.importKeyBackup": "Import Key or Backup",
   "wizard.importKeyBackupDesc": "Paste your nsec, hex key, or ncryptsec backup",
   "wizard.watchOnly": "Watch-Only",

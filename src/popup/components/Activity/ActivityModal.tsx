@@ -170,7 +170,12 @@ export default function ActivityModal({ visible, initialDomain, initialPubkey, o
   const activeFilterCount = (typeFilter ? 1 : 0) + (pubkeyFilter ? 1 : 0);
 
   const handleClear = async () => {
-    await rpc('clearActivityLog');
+    await rpc('clearActivityLog', {
+      domain: filter || undefined,
+      accountPubkey: accountFilter || undefined,
+      typeFilter: typeFilter || undefined,
+      pubkeyFilter: pubkeyFilter || undefined,
+    });
     loadActivity();
   };
 

@@ -96,18 +96,28 @@ The `nostrconnect://` QR code flow includes a `connectSecret` parameter:
 
 The `PRIVILEGED_METHODS` set in `background.ts` contains all sensitive operations:
 
-- Vault lifecycle: `vault_unlock`, `vault_lock`, `vault_create`, `vault_isLocked`, `vault_exists`, `vault_listAccounts`, `vault_addAccount`, `vault_removeAccount`, `vault_setActiveAccount`, `vault_getActivePubkey`, `vault_setAutoLock`, `vault_getAutoLock`, `vault_exportNsec`, `vault_exportNcryptsec`, `vault_importNcryptsec`, `vault_changePassword`, `vault_getActiveAccountType`
-- Signer permissions: `signer_getPermissions`, `signer_getPermissionsForDomain`, `signer_clearPermissions`, `signer_savePermission`, `signer_getPermissionsRaw`, `signer_getPermissionsForDomainRaw`, `signer_copyPermissions`, `signer_getUseGlobalDefaults`, `signer_setUseGlobalDefaults`
-- Pending requests: `signer_getPending`, `signer_resolve`, `signer_resolveBatch`
-- Account switching: `switchAccount`
+- **Vault lifecycle**: `vault_unlock`, `vault_lock`, `vault_create`, `vault_isLocked`, `vault_exists`, `vault_listAccounts`, `vault_addAccount`, `vault_removeAccount`, `vault_setActiveAccount`, `vault_getActivePubkey`, `vault_setAutoLock`, `vault_getAutoLock`, `vault_exportNsec`, `vault_exportNcryptsec`, `vault_importNcryptsec`, `vault_changePassword`, `vault_getActiveAccountType`
+- **Signer permissions**: `signer_getPermissions`, `signer_getPermissionsForDomain`, `signer_clearPermissions`, `signer_savePermission`, `signer_getPermissionsRaw`, `signer_getPermissionsForDomainRaw`, `signer_copyPermissions`, `signer_getUseGlobalDefaults`, `signer_setUseGlobalDefaults`
+- **Pending requests**: `signer_getPending`, `signer_resolve`, `signer_resolveBatch`
+- **Account switching**: `switchAccount`
+- **Onboarding**: `onboarding_validateNsec`, `onboarding_validateNcryptsec`, `onboarding_validateNpub`, `onboarding_connectNip46`, `onboarding_generateAccount`, `onboarding_exportNcryptsec`, `onboarding_saveReadOnly`, `onboarding_createVault`, `onboarding_addToVault`, `onboarding_initNostrConnect`, `onboarding_pollNostrConnect`, `onboarding_cancelNostrConnect`
+- **Graph & sync**: `configUpdated`, `syncGraph`, `stopSync`, `clearGraph`, `getSyncState`
+- **Domain management**: `requestHostPermission`, `enableForCurrentDomain`, `addAllowedDomain`, `removeAllowedDomain`, `getAllowedDomains`, `isDomainAllowed`, `hasHostPermission`
+- **Badge injection**: `setBadgeDisabled`, `removeBadgesFromTab`, `getCustomAdapters`, `saveCustomAdapter`, `deleteCustomAdapter`, `previewBadgeConfig`, `setIdentityDisabled`, `getIdentityDisabledSites`, `injectWotApi`, `getNostrPubkey`
+- **Database management**: `listDatabases`, `getDatabaseStats`, `deleteAccountDatabase`, `deleteAllDatabases`
+- **Activity log**: `getActivityLog`, `clearActivityLog`
+- **Filters**: `getLocalBlocks`, `addLocalBlock`, `removeLocalBlock`, `fetchMuteList`, `getMuteLists`, `removeMuteList`, `toggleMuteList`, `saveMuteList`
+- **Publishing**: `publishRelayList`, `signAndPublishEvent`, `signEvent`, `updateProfileCache`, `getProfileMetadata`
+- **NIP-46 sessions**: `nip46_getSessionInfo`, `nip46_revokeSession`
+- **Health checks**: `checkRelayHealth`, `checkOracleHealth`
 
 All gated by: `sender.id === browser.runtime.id && sender.url.startsWith(extensionBaseUrl)`.
 
 ---
 
-## 9. Rate Limiting on vault_unlock
+## 9. Rate Limiting
 
-`vault_unlock` is included in `RATE_LIMITED_METHODS` (10 req/sec), providing brute-force protection against password guessing via the messaging API.
+`RATE_LIMITED_METHODS` covers WoT computation methods only (50 req/sec per method). `vault_unlock` is protected by the privilege gate (only callable from extension pages) and PBKDF2's 210,000 iterations which make brute-force impractical (~200ms per attempt).
 
 ---
 

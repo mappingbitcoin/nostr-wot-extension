@@ -389,6 +389,13 @@
 
   "wizard.createNew": "Criar nova",
   "wizard.createNewDesc": "Gerar um novo par de chaves com frase de recuperação",
+  "wizard.createSubAccount": "Derivar subconta",
+  "wizard.createSubAccountDesc": "Criar uma nova identidade a partir da sua frase semente existente",
+  "wizard.subAccountTitle": "Nova subconta",
+  "wizard.subAccountDesc": "Esta identidade é derivada da sua frase de recuperação existente usando um caminho HD diferente. Nenhuma nova frase semente é necessária.",
+  "wizard.subAccountType": "Subconta HD",
+  "wizard.derivationPath": "Caminho",
+  "wizard.subAccountHint": "Esta subconta compartilha a mesma frase de recuperação da sua conta principal. Faça backup da sua semente uma vez e todas as subcontas serão recuperáveis.",
   "wizard.importKeyBackup": "Importar chave ou backup",
   "wizard.importKeyBackupDesc": "Cole sua nsec, chave hex ou backup ncryptsec",
   "wizard.watchOnly": "Somente leitura",

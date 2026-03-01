@@ -68,16 +68,17 @@ Each domain can have multiple **strategies** -- independent rules for finding an
 ## Option A: Configure via Popup UI (End Users)
 
 1. Open the extension popup
-2. Go to **Settings** > **WoT Badges**
-3. Click the site you want to configure (must already be a connected site)
-4. Click **+ Add Strategy** and choose a template or "Custom"
-5. Configure:
+2. Open the **Settings** menu (gear icon in the top bar)
+3. Go to **Web of Trust** > **Badges**
+4. Click the site you want to configure (must already be a connected site)
+5. Click **+ Add Strategy** and choose a template or "Custom"
+6. Configure:
    - **CSS Selectors**: inspect the site with DevTools to find profile elements
    - **Extract From**: where the pubkey appears (href, data attribute, text)
    - **Badge Placement**: where to insert the badge relative to the element
    - **Custom CSS**: optional styling overrides
-6. Click **Save** -- badges refresh immediately on the page
-7. Use **Preview** to test changes without leaving the editor
+7. Click **Save** -- badges refresh immediately on the page
+8. Use **Preview** to test changes without leaving the editor
 
 The UI provides common selector presets (npub links, data-npub, data-pubkey, data-user) and a CSS skeleton template.
 
@@ -133,7 +134,7 @@ const BUILTIN_ADAPTER_DEFAULTS: Record<string, AdapterStrategy[]> = {
    - Tooltips show on hover
    - New elements get badges when scrolling / navigating (MutationObserver)
    - No visual glitches or layout shifts
-5. Test with the UI: open Settings > WoT Badges > click the site > verify strategies appear
+5. Test with the UI: open Settings > Web of Trust > Badges > click the site > verify strategies appear
 
 ### Step 4: Submit a Pull Request
 

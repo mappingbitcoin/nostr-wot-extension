@@ -10,6 +10,19 @@ Visual trust badges injected into Nostr web client pages.
 - Controlled by the `wotInjectionEnabled` flag in `browser.storage.sync` (default: on)
 - Per-domain disable via `badgeDisabledSites` in `browser.storage.local`
 
+### Build pipeline
+
+The badge engine is listed in `web_accessible_resources` (so the background can inject it via `browser.scripting.executeScript`) but **not** as a Vite entry point. The `@crxjs/vite-plugin` copies it as-is, leaving raw TypeScript in `dist/`.
+
+A custom Vite plugin `compileBadgeEngine()` in `vite.config.ts` runs after the main build:
+
+1. Reads `dist/badges/engine.ts`
+2. Transforms it with esbuild (`loader: 'ts'`, `format: 'iife'`, `target: 'es2022'`)
+3. Writes `dist/badges/engine.js` and deletes the `.ts` source
+4. Patches `dist/manifest.json` to reference `badges/engine.js`
+
+This is necessary because `scripting.executeScript({ files: [...] })` loads classic scripts -- TypeScript syntax and `export` statements would cause runtime errors.
+
 ---
 
 ## 2. Config-Driven Adapters

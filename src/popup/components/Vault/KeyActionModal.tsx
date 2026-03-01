@@ -53,9 +53,19 @@ export default function KeyActionModal({ action, onClose }: KeyActionModalProps)
   });
 
   useEffect(() => {
-    rpc<boolean>('vault_isLocked').then((locked) => {
-      setNeedsUnlock(!!locked);
-    }).catch(() => {});
+    (async () => {
+      try {
+        const locked = await rpc<boolean>('vault_isLocked');
+        if (!locked) { setNeedsUnlock(false); return; }
+        // In never-lock mode (autoLockMs === 0), auto-unlock with empty password
+        const autoLockMs = await rpc<number>('vault_getAutoLock');
+        if (autoLockMs === 0) {
+          const ok = await rpc<boolean>('vault_unlock', { password: '' });
+          if (ok) { setNeedsUnlock(false); vault.checkState?.(); return; }
+        }
+        setNeedsUnlock(true);
+      } catch { /* ignore */ }
+    })();
     return () => {
       if (autoHideRef.current) clearTimeout(autoHideRef.current);
     };

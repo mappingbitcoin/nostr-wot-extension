@@ -126,7 +126,7 @@ function PopupInner() {
             onBack={() => setPermsDomain(null)}
             zIndex={300}
           >
-            <PermissionsSection initialDomain={permsDomain} />
+            <PermissionsSection />
           </OverlayPanel>
         )}
 

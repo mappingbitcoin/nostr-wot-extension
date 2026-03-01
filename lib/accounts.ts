@@ -53,7 +53,39 @@ export async function createFromMnemonic(mnemonic: string, name: string = 'Main'
     mnemonic,
     nip46Config: null,
     readOnly: false,
-    createdAt: Math.floor(Date.now() / 1000)
+    createdAt: Math.floor(Date.now() / 1000),
+    derivationIndex: 0
+  };
+}
+
+/**
+ * Create a sub-account from an existing mnemonic at a specific HD derivation index.
+ * Derives from m/44'/1237'/0'/0/{index} per NIP-06.
+ * @param mnemonic - existing 12 or 24 word mnemonic
+ * @param index - derivation index (0 = first account, 1 = second, etc.)
+ * @param name - Account display name
+ * @returns Account object with derivationIndex set
+ */
+export async function createFromMnemonicAtIndex(mnemonic: string, index: number, name?: string): Promise<Account> {
+  const valid = await validateMnemonic(mnemonic);
+  if (!valid) throw new Error('Invalid mnemonic');
+
+  const seed = await mnemonicToSeed(mnemonic);
+  const path = `m/44'/1237'/0'/0/${index}`;
+  const privkey = await derivePath(seed, path);
+  const pubkey = getPublicKey(privkey);
+
+  return {
+    id: generateId(),
+    name: name || `Account ${index + 1}`,
+    type: 'generated',
+    pubkey: bytesToHex(pubkey),
+    privkey: bytesToHex(privkey),
+    mnemonic,
+    nip46Config: null,
+    readOnly: false,
+    createdAt: Math.floor(Date.now() / 1000),
+    derivationIndex: index
   };
 }
 

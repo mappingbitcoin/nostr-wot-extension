@@ -43,9 +43,9 @@ Two layers:
 | Layer | Location | Limit |
 |-------|----------|-------|
 | Content script | `content.ts` | 100 WoT req/sec (sliding window) |
-| Background | `background.ts` | 10 req/sec per method (sliding window) |
+| Background | `background.ts` | 50 req/sec per method (sliding window) |
 
-The background rate limiter covers all methods in `RATE_LIMITED_METHODS`, which includes external API methods and `vault_unlock` (to prevent brute-force attacks).
+The background rate limiter covers WoT computation methods only (`getDistance`, `getTrustScore`, `getDistanceBatch`, etc.). NIP-07 methods are not rate-limited at this layer -- they are gated by the user-facing permission system instead.
 
 ---
 

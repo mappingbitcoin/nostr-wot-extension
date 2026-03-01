@@ -67,15 +67,23 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
           // Don't show stale banner while syncing
           setSyncStale(null);
         } else {
-          const lastSync = stats?.lastSync;
-          if (!lastSync && (stats?.nodes ?? 0) === 0) {
-            // Never synced for this account
-            setSyncStale({ lastSync: null });
-          } else if (lastSync && Date.now() - lastSync > 24 * 60 * 60 * 1000) {
-            // Synced but more than 24h ago
-            setSyncStale({ lastSync });
-          } else {
+          // Check if user dismissed the stale banner within the last 24h
+          const dismissData = await browser.storage.local.get('syncStaleDismissed');
+          const dismissed = (dismissData as Record<string, unknown>).syncStaleDismissed as Record<string, number> | undefined;
+          const dismissedAt = dismissed?.[active!.id];
+          const recentlyDismissed = dismissedAt && (Date.now() - dismissedAt < 24 * 60 * 60 * 1000);
+
+          if (recentlyDismissed) {
             setSyncStale(null);
+          } else {
+            const lastSync = stats?.lastSync;
+            if (!lastSync && (stats?.nodes ?? 0) === 0) {
+              setSyncStale({ lastSync: null });
+            } else if (lastSync && Date.now() - lastSync > 24 * 60 * 60 * 1000) {
+              setSyncStale({ lastSync });
+            } else {
+              setSyncStale(null);
+            }
           }
         }
       } catch {
@@ -233,7 +241,14 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
         <SyncReminder
           lastSync={syncStale.lastSync}
           onSync={handleSyncNow}
-          onDismiss={() => setSyncStale(null)}
+          onDismiss={async () => {
+            setSyncStale(null);
+            if (!active?.id) return;
+            const data = await browser.storage.local.get('syncStaleDismissed');
+            const dismissed = ((data as Record<string, unknown>).syncStaleDismissed as Record<string, number> | undefined) || {};
+            dismissed[active.id] = Date.now();
+            await browser.storage.local.set({ syncStaleDismissed: dismissed });
+          }}
         />
       )}
       <SiteControls

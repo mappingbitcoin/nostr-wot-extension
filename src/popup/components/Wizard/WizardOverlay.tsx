@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { isLanguageChosen } from '@lib/i18n.js';
+import { rpc } from '@shared/rpc.ts';
 import OverlayPanel from '@components/OverlayPanel/OverlayPanel';
 import TopoBg from '@components/TopoBg/TopoBg';
 import useWizardFlow from '@shared/hooks/useWizardFlow';
@@ -15,10 +16,21 @@ interface WizardOverlayProps {
 }
 
 export default function WizardOverlay({ visible, canClose, onClose, onComplete }: WizardOverlayProps) {
+  const [hasGeneratedAccount, setHasGeneratedAccount] = useState(false);
+
+  useEffect(() => {
+    if (visible && canClose) {
+      rpc<{ hasSeed: boolean }>('onboarding_checkExistingSeed')
+        .then(r => setHasGeneratedAccount(!!r?.hasSeed))
+        .catch(() => setHasGeneratedAccount(false));
+    }
+  }, [visible, canClose]);
+
   const flow = useWizardFlow({
     initialStep: 'lang',
     skipLang: isLanguageChosen(),
     hasAccounts: canClose,
+    hasGeneratedAccount,
   });
 
   const { shouldRender, animating } = useAnimatedVisible(visible);
@@ -37,6 +49,7 @@ export default function WizardOverlay({ visible, canClose, onClose, onComplete }
           onDone={handleDone}
           onLangSelect={() => flow.send('NEXT')}
           hasAccounts={canClose}
+          hasGeneratedAccount={hasGeneratedAccount}
         />
       </TopoBg>
     </OverlayPanel>

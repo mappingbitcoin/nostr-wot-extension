@@ -1481,6 +1481,39 @@ async function handleRequest({ method, params }: { method: string; params: Recor
             return { account: safeAcct, mnemonic };
         }
 
+        case 'onboarding_checkExistingSeed': {
+            if (vault.isLocked()) return { hasSeed: false };
+            try {
+                const payload = vault.getDecryptedPayload();
+                const generated = payload.accounts.find(a => a.type === 'generated' && a.mnemonic);
+                return { hasSeed: !!generated };
+            } catch {
+                return { hasSeed: false };
+            }
+        }
+
+        case 'onboarding_generateSubAccount': {
+            if (vault.isLocked()) throw new Error('Vault is locked');
+            const payload = vault.getDecryptedPayload();
+            const seedAccount = payload.accounts.find(a => a.type === 'generated' && a.mnemonic);
+            if (!seedAccount || !seedAccount.mnemonic) {
+                throw new Error('No existing seed account found');
+            }
+            // Determine next derivation index: max existing index + 1
+            const maxIndex = payload.accounts
+                .filter(a => a.type === 'generated' && a.mnemonic === seedAccount.mnemonic)
+                .reduce((max, a) => Math.max(max, a.derivationIndex ?? 0), 0);
+            const nextIndex = maxIndex + 1;
+            const subAcct = await accounts.createFromMnemonicAtIndex(
+                seedAccount.mnemonic,
+                nextIndex,
+                (params.name as string) || undefined
+            );
+            const { privkey: _pk, ...safeSubAcct } = subAcct;
+            await setPendingOnboardingAccount(subAcct);
+            return { account: safeSubAcct, derivationIndex: nextIndex };
+        }
+
         case 'onboarding_exportNcryptsec': {
             const pendingAcctEnc = await getPendingOnboardingAccount();
             if (!pendingAcctEnc?.privkey) throw new Error('No pending account');

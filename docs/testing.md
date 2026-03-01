@@ -13,6 +13,9 @@ node --import tsx --test tests/crypto/*.test.ts
 
 # Module tests (need browser mock)
 node --import tsx --import ./tests/helpers/register-mocks.ts --test tests/vault.test.ts tests/permissions.test.ts tests/accounts.test.ts tests/signer.test.ts tests/security-hardening.test.ts tests/communication.test.ts
+
+# Badge engine tests (pure functions, no browser mock needed)
+node --import tsx --test tests/badges/engine.test.ts
 ```
 
 ---
@@ -37,6 +40,7 @@ node --import tsx --import ./tests/helpers/register-mocks.ts --test tests/vault.
 | `tests/signer.test.ts` | NIP-07 signing flow, permission checks, pending request lifecycle |
 | `tests/security-hardening.test.ts` | NIP-49 zeroing, NIP-04 error normalization, vault reEncrypt, lock zeroing, batch 1-2 regression |
 | `tests/communication.test.ts` | Full communication test suite (see below) |
+| `tests/badges/engine.test.ts` | Badge engine pure functions: bech32 validation, hexToNpub, normalizePubkey, normalizeConfig, scoreToColor, buildCustomAdapters, build output validation |
 
 ---
 

@@ -389,6 +389,13 @@
 
   "wizard.createNew": "Crea nuovo",
   "wizard.createNewDesc": "Genera una nuova coppia di chiavi con frase di recupero",
+  "wizard.createSubAccount": "Deriva sotto-account",
+  "wizard.createSubAccountDesc": "Crea una nuova identità dalla tua frase seed esistente",
+  "wizard.subAccountTitle": "Nuovo sotto-account",
+  "wizard.subAccountDesc": "Questa identità è derivata dalla tua frase di recupero esistente utilizzando un percorso HD diverso. Non è necessaria una nuova frase seed.",
+  "wizard.subAccountType": "Sotto-account HD",
+  "wizard.derivationPath": "Percorso",
+  "wizard.subAccountHint": "Questo sotto-account condivide la stessa frase di recupero del tuo account principale. Esegui il backup del seed una volta e tutti i sotto-account saranno recuperabili.",
   "wizard.importKeyBackup": "Importa chiave o backup",
   "wizard.importKeyBackupDesc": "Incolla il tuo nsec, chiave hex o backup ncryptsec",
   "wizard.watchOnly": "Solo lettura",

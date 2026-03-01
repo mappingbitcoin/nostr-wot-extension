@@ -20,6 +20,14 @@
   to { opacity: 1; transform: translateX(0); }
 }
 
+/* Generic section wrapper used by MenuSection */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 2px;
+}
+
 /* Menu items list — no overflow so shadows & hover transforms aren't clipped */
 .items {
   display: flex;

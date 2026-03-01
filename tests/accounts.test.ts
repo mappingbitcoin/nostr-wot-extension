@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-  createFromMnemonic, generateNewAccount, importNsec, importNpub, connectNip46
+  createFromMnemonic, createFromMnemonicAtIndex, generateNewAccount, importNsec, importNpub, connectNip46
 } from '../lib/accounts.js';
 import { nsecEncode, npubEncode } from '../lib/crypto/bech32.js';
 
@@ -45,6 +45,51 @@ describe('createFromMnemonic', () => {
   it('rejects mnemonic with wrong checksum', async () => {
     await assert.rejects(
       () => createFromMnemonic('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon zoo'),
+      /Invalid mnemonic/
+    );
+  });
+});
+
+describe('createFromMnemonicAtIndex', () => {
+  it('creates sub-account at specified index', async () => {
+    const acct: any = await createFromMnemonicAtIndex(VALID_MNEMONIC, 1);
+    assert.strictEqual(acct.type, 'generated');
+    assert.strictEqual(acct.derivationIndex, 1);
+    assert.match(acct.pubkey, /^[0-9a-f]{64}$/);
+    assert.match(acct.privkey, /^[0-9a-f]{64}$/);
+    assert.strictEqual(acct.mnemonic, VALID_MNEMONIC);
+    assert.strictEqual(acct.readOnly, false);
+  });
+
+  it('index 0 produces same keys as createFromMnemonic', async () => {
+    const base: any = await createFromMnemonic(VALID_MNEMONIC);
+    const atZero: any = await createFromMnemonicAtIndex(VALID_MNEMONIC, 0);
+    assert.strictEqual(base.pubkey, atZero.pubkey);
+    assert.strictEqual(base.privkey, atZero.privkey);
+  });
+
+  it('different indices produce different keys', async () => {
+    const a0: any = await createFromMnemonicAtIndex(VALID_MNEMONIC, 0);
+    const a1: any = await createFromMnemonicAtIndex(VALID_MNEMONIC, 1);
+    const a2: any = await createFromMnemonicAtIndex(VALID_MNEMONIC, 2);
+    assert.notStrictEqual(a0.pubkey, a1.pubkey);
+    assert.notStrictEqual(a1.pubkey, a2.pubkey);
+    assert.notStrictEqual(a0.pubkey, a2.pubkey);
+  });
+
+  it('uses default name with index', async () => {
+    const acct: any = await createFromMnemonicAtIndex(VALID_MNEMONIC, 3);
+    assert.strictEqual(acct.name, 'Account 4');
+  });
+
+  it('accepts custom name', async () => {
+    const acct: any = await createFromMnemonicAtIndex(VALID_MNEMONIC, 1, 'My Sub');
+    assert.strictEqual(acct.name, 'My Sub');
+  });
+
+  it('rejects invalid mnemonic', async () => {
+    await assert.rejects(
+      () => createFromMnemonicAtIndex('invalid words here', 1),
       /Invalid mnemonic/
     );
   });
@@ -157,6 +202,7 @@ describe('account type coverage', () => {
     assert.strictEqual(account.nip46Config, null);
     assert.strictEqual(account.readOnly, false);
     assert.ok(typeof account.createdAt === 'number');
+    assert.strictEqual(account.derivationIndex, 0);
   });
 
   it('nsec account has correct field pattern', async () => {

@@ -2,7 +2,7 @@ import React, { useState, useEffect, ChangeEvent, KeyboardEvent } from 'react';
 import { rpc } from '@shared/rpc.ts';
 import { AUTO_LOCK_OPTIONS } from '@shared/constants.ts';
 import { t } from '@lib/i18n.js';
-import { IconKey, IconShield, IconLock } from '@assets';
+import { IconShield, IconLock } from '@assets';
 import Card from '@components/Card/Card';
 import Input from '@components/Input/Input';
 import Button from '@components/Button/Button';
@@ -10,16 +10,15 @@ import ChipGroup from '@components/ChipGroup/ChipGroup';
 import NavItem from '@components/NavItem/NavItem';
 import { SectionLabel, SectionHint } from '@components/SectionLabel/SectionLabel';
 import { useVault } from '../../context/VaultContext';
-import { useAccount } from '../../context/AccountContext';
+
 import styles from './SecuritySection.module.css';
 
 interface SecuritySectionProps {
-  onKeyBackup: () => void;
   onPermissions: () => void;
   onChangePassword: () => void;
 }
 
-export default function SecuritySection({ onKeyBackup, onPermissions, onChangePassword }: SecuritySectionProps) {
+export default function SecuritySection({ onPermissions, onChangePassword }: SecuritySectionProps) {
   const [autoLockMs, setAutoLockMs] = useState<number>(900000);
   const [pendingMs, setPendingMs] = useState<number | null>(null);
   const [password, setPassword] = useState<string>('');
@@ -27,7 +26,6 @@ export default function SecuritySection({ onKeyBackup, onPermissions, onChangePa
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const vault = useVault();
-  const { isReadOnly } = useAccount();
 
   useEffect(() => {
     rpc<number>('vault_getAutoLock').then((ms) => {
@@ -174,17 +172,6 @@ export default function SecuritySection({ onKeyBackup, onPermissions, onChangePa
             </div>
           )}
         </Card>
-      )}
-
-      {!isReadOnly && (
-        <NavItem
-          icon={
-            <IconKey />
-          }
-          label={t('security.keyBackup')}
-          desc={t('security.keyBackupDesc')}
-          onClick={onKeyBackup}
-        />
       )}
 
       <NavItem

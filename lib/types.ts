@@ -41,6 +41,7 @@ export interface Account {
   nip46Config: Nip46Config | null;
   readOnly: boolean;
   createdAt: number;
+  derivationIndex?: number;
 }
 
 /** Account without private key — safe to expose */
