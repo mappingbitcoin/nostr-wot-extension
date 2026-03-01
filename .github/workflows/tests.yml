@@ -1,0 +1,29 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20, 22]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Run crypto tests
+        run: node --test tests/crypto/*.test.js
+
+      - name: Run module tests (vault, permissions, accounts)
+        run: node --import ./tests/helpers/register-mocks.js --test tests/vault.test.js tests/permissions.test.js tests/accounts.test.js

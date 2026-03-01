@@ -1,0 +1,191 @@
+.container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 12px;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Header */
+.header {
+  text-align: center;
+}
+
+.accountBar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: rgba(99, 102, 241, 0.06);
+  border: 1px solid rgba(99, 102, 241, 0.1);
+  border-radius: 8px;
+}
+
+.accountName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brand);
+}
+
+.accountPubkey {
+  font-size: 12px;
+  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  color: var(--text-muted);
+}
+
+/* Origin */
+.originBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(99, 102, 241, 0.04);
+  border: 1px solid rgba(99, 102, 241, 0.08);
+  border-radius: 8px;
+}
+
+.originLabel {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.originDomain {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+/* Request type */
+.requestType {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--brand);
+}
+
+/* Event preview (layout override — content styles in shared EventPreview) */
+.eventPreview {
+  flex: 1;
+}
+
+/* Unlock section */
+.unlockSection {
+  padding: 10px;
+  background: rgba(217, 119, 6, 0.1);
+  border: 1px solid rgba(217, 119, 6, 0.15);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.unlockLabel {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--warning);
+}
+
+.unlockInput {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  border-radius: 6px;
+  background: rgba(99, 102, 241, 0.04);
+  color: var(--text-heading);
+  font-size: 14px;
+  outline: none;
+}
+
+.unlockInput:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+}
+
+.unlockError {
+  font-size: 12px;
+  color: var(--error);
+}
+
+/* Decision row */
+.decisionRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.decisionBtn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.decisionBtn:hover {
+  transform: translateY(-1px);
+}
+
+.decisionBtn:active {
+  transform: translateY(0);
+}
+
+.decisionBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.deny {
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.15);
+  color: var(--error);
+}
+
+.allowOnce {
+  background: rgba(37, 99, 235, 0.1);
+  border: 1px solid rgba(37, 99, 235, 0.15);
+  color: var(--info);
+}
+
+.allowSession {
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--brand);
+  border-radius: 6px 0 0 6px;
+  border: 1px solid rgba(99, 102, 241, 0.15);
+}
+
+.durationSelect {
+  font-size: 11px;
+  padding: 10px 4px;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  color: var(--brand);
+  cursor: pointer;
+}
+
+.always {
+  background: rgba(5, 150, 105, 0.1);
+  border: 1px solid rgba(5, 150, 105, 0.15);
+  color: var(--success);
+}
+
+.loading {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-muted);
+}
+
+.error {
+  text-align: center;
+  padding: 20px;
+  color: var(--error);
+}

@@ -1,0 +1,119 @@
+.wrapper {
+  position: relative;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  background: rgba(99, 102, 241, 0.04);
+  color: var(--text-heading);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.trigger:hover {
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.triggerOpen {
+  border-color: var(--brand);
+  background: rgba(99, 102, 241, 0.06);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+.triggerSmall {
+  font-size: 12px;
+  padding: 8px 10px;
+  background: var(--card-bg);
+  border-color: var(--card-border);
+}
+
+.triggerSmall:hover {
+  border-color: rgba(99, 102, 241, 0.3);
+  background: var(--card-bg);
+}
+
+.triggerLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.triggerPlaceholder {
+  color: var(--text-muted);
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--brand);
+  transition: transform 0.2s;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 400;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 4px;
+  animation: dropdownIn 0.15s ease-out;
+}
+
+.menuExiting {
+  animation: dropdownOut 0.15s ease-in forwards;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-body);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.12s;
+  text-align: left;
+}
+
+.option:hover {
+  background: rgba(99, 102, 241, 0.06);
+}
+
+.optionActive {
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.optionSmall {
+  font-size: 11px;
+  padding: 6px 8px;
+}
+
+@keyframes dropdownIn  { from { opacity: 0; transform: translateY(-4px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes dropdownOut { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(-4px) scale(0.97); } }

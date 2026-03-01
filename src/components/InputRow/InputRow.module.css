@@ -1,0 +1,11 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.error {
+  color: var(--error);
+  font-size: 11px;
+  margin-top: 4px;
+}

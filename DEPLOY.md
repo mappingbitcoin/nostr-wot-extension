@@ -7,31 +7,25 @@ This extension is compatible with both Chrome and Firefox.
 Create a zip file for submission to browser extension stores:
 
 ```bash
-zip -r nostr-wot-extension.zip . -x "*.git*" -x "node_modules/*" -x "*.DS_Store" -x "*.zip" -x ".idea/*" -x ".claude/*"
+zip -r nostr-wot-extension.zip . -x "*.git*" -x "node_modules/*" -x "*.DS_Store" -x "*.zip" -x ".idea/*" -x ".claude/*" -x "tests/*" -x "docs/*" -x "CONTRIBUTING.md" -x "SECURITY.md"
 ```
-
-### Excluded Files
-
-| Pattern | Reason |
-|---------|--------|
-| `*.git*` | Git version control files (history, config) |
-| `node_modules/*` | NPM dependencies (not needed, extension has no build step) |
-| `*.DS_Store` | macOS system files |
-| `*.zip` | Previously built packages |
-| `.idea/*` | JetBrains IDE configuration |
-| `.claude/*` | Claude Code configuration |
 
 ### Files That ARE Included
 
 - `manifest.json` - Extension manifest
 - `background.js` - Service worker
 - `content.js` - Content script (messaging bridge)
-- `inject.js` - Page script (exposes window.nostr.wot)
+- `inject.js` - Page script (exposes window.nostr and window.nostr.wot)
 - `popup/` - Popup UI (HTML, CSS, JS)
-- `lib/` - Shared libraries (API, storage, graph, etc.)
+- `onboarding/` - First-run setup wizard
+- `prompt/` - NIP-07 signing request approval popup
+- `badges/` - WoT trust badge injection engine and site adapters
+- `lib/` - Shared libraries (crypto, storage, graph, vault, signer, etc.)
+- `locales/` - i18n translation files (en, es)
 - `icons/` - Extension icons
 - `detect.json` - Web-accessible resource for detection
 - `README.md` - Documentation
+- `CHANGELOG.md` - Version history
 - `DEPLOY.md` - This file
 
 ## Chrome Web Store
@@ -86,7 +80,7 @@ Before each release, update the version in `manifest.json`:
 
 ```json
 {
-  "version": "0.1.1"
+  "version": "0.2.0"
 }
 ```
 

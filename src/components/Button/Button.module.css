@@ -1,0 +1,61 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.primary {
+  background: var(--brand);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.primary:hover {
+  background: var(--brand-hover);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.secondary {
+  background: var(--brand-light);
+  color: var(--brand-hover);
+}
+
+.secondary:hover {
+  background: rgba(99, 102, 241, 0.18);
+}
+
+.danger {
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--error);
+}
+
+.danger:hover {
+  background: rgba(220, 38, 38, 0.18);
+}
+
+.small {
+  font-size: 11px;
+  padding: 6px 12px;
+}

@@ -1,0 +1,507 @@
+.topBar {
+  position: relative;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.menuBtn {
+  background: none;
+  border: none;
+  color: var(--brand);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.menuBtn:hover {
+  background: rgba(99, 102, 241, 0.06);
+  color: var(--text-body);
+}
+
+.accountWrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Account Bar */
+.accountBar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border-radius: 12px;
+  padding: 8px 10px;
+  transition: background 0.15s;
+}
+
+.accountBar:hover {
+  background: rgba(99, 102, 241, 0.06);
+}
+
+.accountBarToggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  cursor: pointer;
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+}
+
+.avatarWrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatarFallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(99, 102, 241, 0.15);
+  color: #4f46e5;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.barInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.barNameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.barName {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.readOnlyBadge {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  background: rgba(99, 102, 241, 0.08);
+  padding: 1px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+
+.barSub {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chevron {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.lockBtn {
+  background: none;
+  border: none;
+  color: var(--brand);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.lockBtn:hover {
+  background: rgba(99, 102, 241, 0.06);
+  color: var(--text-body);
+}
+
+.lockLocked {
+  color: var(--warning);
+}
+
+.lockLocked:hover {
+  background: rgba(217, 119, 6, 0.1);
+  color: var(--warning);
+}
+
+.lockUnlocked {
+  color: var(--success);
+}
+
+.lockUnlocked:hover {
+  background: rgba(5, 150, 105, 0.1);
+  color: var(--success);
+}
+
+/* Dropdown */
+.dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.12);
+  border: 1px solid var(--card-border);
+  z-index: 200;
+  animation: dropdownIn 0.15s ease-out;
+}
+
+.accountList {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.1s;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+
+.dropdownItem:hover {
+  background: rgba(99, 102, 241, 0.06);
+}
+
+.dropdownItemActive {
+  background: rgba(99, 102, 241, 0.06);
+}
+
+.dropdownAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.15);
+  color: #4f46e5;
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.dropdownInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dropdownName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdownSub {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdownCheck {
+  color: var(--text-body);
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.dropdownActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.copyWrap {
+  position: relative;
+}
+
+.dropdownCopyBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: all 0.15s;
+}
+
+.dropdownItem:hover .dropdownCopyBtn {
+  opacity: 1;
+}
+
+.dropdownCopyBtn:hover {
+  color: var(--brand);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.copiedLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--success);
+  padding: 2px 4px;
+  white-space: nowrap;
+}
+
+.copyMenu {
+  position: fixed;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 400;
+  overflow: hidden;
+  min-width: 64px;
+}
+
+.copyMenuItem {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-heading);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-mono);
+  transition: background 0.1s;
+}
+
+.copyMenuItem:hover {
+  background: rgba(99, 102, 241, 0.06);
+}
+
+.copyMenuItem + .copyMenuItem {
+  border-top: 1px solid var(--card-border);
+}
+
+.dropdownRemoveBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: all 0.15s;
+}
+
+.dropdownItem:hover .dropdownRemoveBtn {
+  opacity: 1;
+}
+
+.dropdownRemoveBtn:hover {
+  color: var(--error);
+  background: rgba(220, 38, 38, 0.08);
+}
+
+/* Remove confirmation */
+.removeConfirm {
+  padding: 14px;
+  border-top: 1px solid var(--card-border);
+}
+
+.removeConfirmTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-heading);
+  margin-bottom: 6px;
+}
+
+.removeConfirmWarning {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.removeConfirmKeyWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--warning);
+  background: rgba(217, 119, 6, 0.06);
+  padding: 8px 10px;
+  border-radius: 8px;
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
+
+.removeConfirmKeyWarning svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.removeConfirmActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.dropdownAdd {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  border-top: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.dropdownAdd:hover {
+  background: rgba(99, 102, 241, 0.04);
+}
+
+/* Globe */
+.globeBtn {
+  position: relative;
+  background: none;
+  border: none;
+  color: var(--brand);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.globeBtn:hover {
+  background: rgba(99, 102, 241, 0.06);
+  color: var(--text-body);
+}
+
+.globeDot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.8);
+}
+
+.globeConnected {
+  background: #4ade80;
+}
+
+.globeDisconnected {
+  background: #ef4444;
+}
+
+.clientIconLarge {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: contain;
+  margin-bottom: 6px;
+}
+
+.globePopover {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: #ffffff;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  z-index: 250;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.12);
+  min-width: 200px;
+  text-align: center;
+}
+
+.globeDomain {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-heading);
+  margin-bottom: 2px;
+  word-break: break-all;
+}
+
+.globeStatus {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+@keyframes dropdownIn { from { opacity: 0; transform: translateY(-4px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }

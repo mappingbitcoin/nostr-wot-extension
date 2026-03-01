@@ -1,0 +1,17 @@
+.removeBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.removeBtn:hover {
+  color: var(--error);
+  background: rgba(220, 38, 38, 0.06);
+}

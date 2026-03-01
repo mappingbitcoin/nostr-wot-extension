@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["chrome", "node"],
+    "paths": {
+      "@assets": ["./src/assets/index.ts"],
+      "@assets/*": ["./src/assets/*"],
+      "@shared/*": ["./src/shared/*"],
+      "@components/*": ["./src/components/*"],
+      "@lib/*": ["./lib/*"]
+    }
+  },
+  "include": [
+    "lib/**/*.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "background.ts",
+    "content.ts",
+    "inject.ts",
+    "badges/**/*.ts",
+    "tests/**/*.ts",
+    "vite.config.ts",
+    "vite-env.d.ts"
+  ]
+}

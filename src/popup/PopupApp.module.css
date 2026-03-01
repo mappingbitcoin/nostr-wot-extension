@@ -1,0 +1,46 @@
+/* Popup-specific body sizing (width/min-height in index.html for immediate apply) */
+:global(html) {
+  background: transparent;
+}
+
+:global(body) {
+  padding: 8px;
+  background: transparent;
+  position: relative;
+}
+
+.backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  filter: blur(18px) brightness(0.95);
+  transform: scale(1.1);
+}
+
+.card {
+  position: relative;
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  border-radius: 16px;
+  height: calc(600px - 16px);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.scrollArea {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

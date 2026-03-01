@@ -1,0 +1,71 @@
+.wrap {
+  position: relative;
+  width: 100%;
+}
+
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  border-radius: 8px;
+  font-size: 13px;
+  transition: all 0.2s;
+  background: rgba(99, 102, 241, 0.04);
+  color: var(--text-heading);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--brand);
+  background: rgba(99, 102, 241, 0.06);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.small {
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.center {
+  text-align: center;
+}
+
+.toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--brand);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.error {
+  font-size: 11px;
+  color: var(--error);
+}

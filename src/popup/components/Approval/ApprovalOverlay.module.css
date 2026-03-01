@@ -1,0 +1,136 @@
+.overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 250;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--card-border);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px 16px 0 0;
+  padding: 16px;
+  animation: sheetSlideIn 0.25s ease-out;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.count {
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--brand);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  text-align: left;
+  font-family: inherit;
+}
+
+.card:hover {
+  background: var(--card-active);
+  border-color: var(--brand-light);
+}
+
+.cardLeft {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cardOrigin {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.cardMethod {
+  font-size: 12px;
+  color: var(--text-body);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kindTag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--brand-light);
+  color: var(--brand-hover);
+  white-space: nowrap;
+}
+
+.cardCount {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.cardChevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.cardNip46 {
+  cursor: default;
+  opacity: 0.75;
+  border-style: dashed;
+}
+
+.cardNip46:hover {
+  background: var(--card-bg);
+  border-color: var(--card-border);
+}
+
+.spinnerIcon {
+  animation: spin 1.5s linear infinite;
+  flex-shrink: 0;
+}
+
+.legend {
+  padding: 4px 12px 8px;
+  font-size: 11px;
+  color: var(--text-tertiary, #888);
+  text-align: center;
+}
+
+@keyframes sheetSlideIn { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+

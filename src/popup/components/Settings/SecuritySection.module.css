@@ -1,0 +1,51 @@
+.section {
+  flex: 1;
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.passwordSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(99, 102, 241, 0.08);
+}
+
+.passwordHint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.warningBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(217, 119, 6, 0.06);
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--warning);
+  line-height: 1.4;
+}
+
+.warningBox svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.error {
+  font-size: 12px;
+  color: var(--error);
+}
+
+.confirmActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
