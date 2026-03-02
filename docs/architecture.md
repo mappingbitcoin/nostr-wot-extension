@@ -56,7 +56,7 @@ Runs in the **MAIN** world (page context). Written as an IIFE with `export {}` f
 Exposes two API surfaces on the page:
 
 - `window.nostr.getPublicKey()`, `window.nostr.signEvent(event)`, `window.nostr.getRelays()`, `window.nostr.nip04.{encrypt,decrypt}`, `window.nostr.nip44.{encrypt,decrypt}` -- NIP-07 signer.
-- `window.nostr.wot.{getDistance, isInMyWoT, getTrustScore, getDetails, getConfig, getDistanceBatch, getTrustScoreBatch, filterByWoT, getMyPubkey, getStatus, getFollows, getCommonFollows, getStats, getPath}` -- Web of Trust API.
+- `window.nostr.wot.{getDistance, isInMyWoT, getTrustScore, getDetails, getConfig, getDistanceBatch, getTrustScoreBatch, filterByWoT, getStatus, getFollows, getCommonFollows, getStats, getPath}` -- Web of Trust API.
 
 Each method posts a typed message to `window.postMessage` and returns a Promise that resolves when the matching response arrives. Timeouts: 30 seconds for WoT calls, 120 seconds for NIP-07 calls (users may need time to respond to signing prompts).
 

@@ -17,10 +17,7 @@
     "scripting",
     "activeTab"
   ],
-  "optional_permissions": [
-    "notifications"
-  ],
-  "optional_host_permissions": [
+"optional_host_permissions": [
     "<all_urls>"
   ],
   "background": {

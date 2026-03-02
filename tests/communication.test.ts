@@ -108,7 +108,7 @@ import type { VaultPayload, UnsignedEvent } from '../lib/types.ts';
 
 const WOT_ALLOWED_METHODS = [
   'getDistance', 'isInMyWoT', 'getTrustScore', 'getDetails', 'getConfig',
-  'getMyPubkey', 'getStatus', 'getDistanceBatch', 'getTrustScoreBatch', 'filterByWoT',
+  'getStatus', 'getDistanceBatch', 'getTrustScoreBatch', 'filterByWoT',
   'getFollows', 'getCommonFollows', 'getPath', 'getStats'
 ] as const;
 

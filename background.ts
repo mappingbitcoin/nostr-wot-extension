@@ -819,9 +819,6 @@ async function handleRequest({ method, params }: { method: string; params: Recor
                 scoring: config.scoring
             };
 
-        case 'getMyPubkey':
-            return config.myPubkey;
-
         case 'getStatus':
             return {
                 configured: !!config.myPubkey,

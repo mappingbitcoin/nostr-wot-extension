@@ -201,9 +201,6 @@ Returns pubkeys followed by both you and the target.
 ### `window.nostr.wot.getPath(targetPubkey)`
 Returns an array of pubkeys representing the shortest path from you to the target. Requires user permission.
 
-### `window.nostr.wot.getMyPubkey()`
-Returns the configured pubkey of the extension user.
-
 ### `window.nostr.wot.getStats()`
 Returns graph statistics (node count, edge count, etc.).
 

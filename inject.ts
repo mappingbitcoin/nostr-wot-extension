@@ -34,7 +34,6 @@ interface WotApi {
     getDistanceBatch: (targets: string[], options?: boolean | Record<string, unknown>) => Promise<unknown>;
     getTrustScoreBatch: (targets: string[]) => Promise<unknown>;
     filterByWoT: (pubkeys: string[], maxHops?: number) => Promise<unknown>;
-    getMyPubkey: () => Promise<unknown>;
     getStatus: () => Promise<unknown>;
     getFollows: (pubkey?: string) => Promise<unknown>;
     getCommonFollows: (pubkey: string) => Promise<unknown>;
@@ -183,7 +182,6 @@ declare global {
         },
         getTrustScoreBatch: (targets) => wotCall('getTrustScoreBatch', { targets }),
         filterByWoT: (pubkeys, maxHops) => wotCall('filterByWoT', { pubkeys, maxHops }),
-        getMyPubkey: () => wotCall('getMyPubkey', {}),
         getStatus: () => wotCall('getStatus', {}),
         getFollows: (pubkey) => wotCall('getFollows', { pubkey }),
         getCommonFollows: (pubkey) => wotCall('getCommonFollows', { pubkey }),
