@@ -107,9 +107,9 @@ const TRANSITIONS: Record<string, Record<string, TransitionHandler>> = {
   password: {
     SET: (ctx, { upgraded }) => {
       if (upgraded) return { step: 'done' };
-      // Read-only methods can't sign, skip follow suggestions
-      if (ctx.method === 'npub' || ctx.method === 'nip46') return { step: 'wotSync' };
-      return { step: 'followSuggestions' };
+      // Only show follow suggestions for new identity creation
+      if (ctx.method === 'create') return { step: 'followSuggestions' };
+      return { step: 'wotSync' };
     },
     BACK: (ctx) => {
       if (ctx.method === 'create') return { step: 'verify' };
@@ -132,8 +132,8 @@ const TRANSITIONS: Record<string, Record<string, TransitionHandler>> = {
       step: hasAccounts ? 'permCopy' : 'done',
     }),
     BACK: (ctx) => {
-      if (ctx.method === 'npub' || ctx.method === 'nip46') return { step: 'password' };
-      return { step: 'followSuggestions' };
+      if (ctx.method === 'create') return { step: 'followSuggestions' };
+      return { step: 'password' };
     },
   },
 

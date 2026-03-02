@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { rpc } from '@shared/rpc.ts';
 import { t } from '@lib/i18n.js';
 import { npubDecode, npubEncode } from '@lib/crypto/bech32.ts';
 import { liveQuery } from '@lib/relay.ts';
 import { DEFAULT_RELAYS } from '@shared/constants.ts';
+import browser from '@lib/browser.ts';
 import type { LiveEvent } from '@lib/types.ts';
 import Button from '@components/Button/Button';
 import styles from './WizardOverlay.module.css';
@@ -88,6 +89,40 @@ interface FollowSuggestionsStepProps {
 }
 
 export default function FollowSuggestionsStep({ onNext }: FollowSuggestionsStepProps) {
+  const [checking, setChecking] = useState(true);
+  const skippedRef = useRef(false);
+
+  // Check if user already has follows — if so, skip this step
+  useEffect(() => {
+    let unmounted = false;
+    (async () => {
+      try {
+        const data = await browser.storage.sync.get(['myPubkey']) as Record<string, string>;
+        const myPubkey = data.myPubkey;
+        if (!myPubkey) { setChecking(false); return; }
+
+        const relays = DEFAULT_RELAYS.split(',');
+        const gen = liveQuery(
+          [{ kinds: [3], authors: [myPubkey], limit: 1 }],
+          relays,
+          { closeOnExhaust: true, cache: true },
+        );
+        for await (const msg of gen) {
+          if (unmounted) break;
+          if ((msg.type === 'event' || msg.type === 'update') &&
+              msg.event.kind === 3 && msg.event.tags.length > 0) {
+            skippedRef.current = true;
+            gen.return(undefined);
+            if (!unmounted) onNext();
+            return;
+          }
+        }
+      } catch { /* proceed to show suggestions */ }
+      if (!unmounted) setChecking(false);
+    })();
+    return () => { unmounted = true; };
+  }, [onNext]);
+
   const npubs = useMemo(() => selectAccounts(), []);
   const hexKeys = useMemo(
     () => npubs.reduce<Array<{ npub: string; hex: string }>>((acc, npub) => {
@@ -236,12 +271,12 @@ export default function FollowSuggestionsStep({ onNext }: FollowSuggestionsStepP
       </div>
 
       <div className={styles.stepActions}>
-        <Button variant="secondary" onClick={onNext}>{t('wizard.skipForNow')}</Button>
+        <Button variant="secondary" onClick={onNext} disabled={checking}>{t('wizard.skipForNow')}</Button>
         <Button
           onClick={handleFollow}
-          disabled={selected.size === 0 || publishing}
+          disabled={selected.size === 0 || publishing || checking}
         >
-          {publishing ? t('wizard.followPublishing') : t('wizard.followSuggestions')}
+          {checking ? t('common.loading') : publishing ? t('wizard.followPublishing') : t('wizard.followSuggestions')}
         </Button>
       </div>
     </div>

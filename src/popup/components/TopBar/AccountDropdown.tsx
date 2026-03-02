@@ -117,7 +117,12 @@ export default function AccountDropdown({ onClose, onAddAccount, onEditProfile }
                   )}
                 </div>
                 <div className={styles.dropdownInfo}>
-                  <span className={styles.dropdownName}>{name}</span>
+                  <div className={styles.dropdownNameRow}>
+                    <span className={styles.dropdownName}>{name}</span>
+                    {(account.readOnly || account.type === 'npub') && (
+                      <span className={styles.dropdownReadOnly}>{t('account.readOnly')}</span>
+                    )}
+                  </div>
                   <span className={styles.dropdownSub}>{cached?.nip05 || truncateNpub(account.pubkey)}</span>
                 </div>
                 {isActive && <span className={styles.dropdownCheck}>&#10003;</span>}

@@ -32,6 +32,19 @@ export default function PermissionCopyStep({ onNext, account }: PermissionCopySt
       const data: any = await browser.storage.local.get(['accounts']);
       const existing = (data.accounts || []).filter((a: any) => a.id !== account?.id);
 
+      // No other accounts — nothing to copy, skip this step
+      if (existing.length === 0) { onNext(); return; }
+
+      // Check if any other account actually has permissions set
+      let hasPerms = false;
+      for (const a of existing) {
+        try {
+          const perms = await rpc<Record<string, unknown>>('signer_getPermissions', { accountId: a.id });
+          if (perms && Object.keys(perms).length > 0) { hasPerms = true; break; }
+        } catch { /* ignore */ }
+      }
+      if (!hasPerms) { onNext(); return; }
+
       // Try to get profile names
       const enriched: EnrichedAccount[] = await Promise.all(existing.map(async (a: any) => {
         let displayName: string = a.name || a.pubkey?.slice(0, 16) + '...';
@@ -45,7 +58,7 @@ export default function PermissionCopyStep({ onNext, account }: PermissionCopySt
       setAccounts(enriched);
       if (enriched.length > 0) setSelectedId(enriched[0].id);
     })();
-  }, [account?.id]);
+  }, [account?.id, onNext]);
 
   const handleCopy = async () => {
     if (!selectedId || !account?.id) return;

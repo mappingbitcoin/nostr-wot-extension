@@ -1,4 +1,5 @@
 import React, { useState, useEffect, ChangeEvent, KeyboardEvent } from 'react';
+import browser from '@shared/browser.ts';
 import { rpc } from '@shared/rpc.ts';
 import { AUTO_LOCK_OPTIONS } from '@shared/constants.ts';
 import { t } from '@lib/i18n.js';
@@ -20,11 +21,37 @@ export default function PasswordStep({ account, upgradeId, onNext }: PasswordSte
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [vaultExists, setVaultExists] = useState<boolean | null>(null); // null = checking
+  const [needsUnlock, setNeedsUnlock] = useState(false);
 
   useEffect(() => {
-    rpc<boolean>('vault_exists')
-      .then((exists) => setVaultExists(!!exists))
-      .catch(() => setVaultExists(false));
+    (async () => {
+      try {
+        const exists = await rpc<boolean>('vault_exists');
+        if (!exists) { setVaultExists(false); return; }
+        // Vault blob exists but may have no accounts (user removed all)
+        // In that case, treat as new vault so user can set auto-lock
+        const data: any = await browser.storage.local.get(['accounts']);
+        const accts = data.accounts || [];
+        if (accts.length === 0) { setVaultExists(false); return; }
+
+        // Vault exists with accounts — auto-add without showing UI
+        // First ensure vault is unlocked
+        const locked = await rpc<boolean>('vault_isLocked');
+        if (locked) {
+          // Try empty password (Never-lock vaults)
+          const ok = await rpc<boolean>('vault_unlock', { password: '' });
+          if (!ok) { setNeedsUnlock(true); setVaultExists(true); return; }
+        }
+        // Vault unlocked — add account and proceed
+        await rpc('onboarding_addToVault', {
+          account,
+          upgradeFromReadOnly: upgradeId || null,
+        });
+        onNext(!!upgradeId);
+      } catch {
+        setVaultExists(false);
+      }
+    })();
   }, []);
 
   const isNever = autoLockMs === 0;
@@ -67,20 +94,49 @@ export default function PasswordStep({ account, upgradeId, onNext }: PasswordSte
   // Still checking vault state
   if (vaultExists === null) return null;
 
-  // Vault already exists -- simplified UI (no password needed)
-  if (vaultExists) {
+  // Vault exists but locked — need password to unlock
+  if (vaultExists && needsUnlock) {
+    const handleUnlock = async () => {
+      if (!password) return;
+      setLoading(true);
+      setError('');
+      try {
+        const ok = await rpc<boolean>('vault_unlock', { password });
+        if (!ok) { setError(t('key.wrongPassword')); setLoading(false); return; }
+        await rpc('onboarding_addToVault', {
+          account,
+          upgradeFromReadOnly: upgradeId || null,
+        });
+        onNext(!!upgradeId);
+      } catch (e: any) {
+        setError(e.message || t('key.failedUnlock'));
+        setLoading(false);
+      }
+    };
+
     return (
       <div className={styles.step}>
         <h2 className={styles.stepTitle}>{t('wizard.addToVault')}</h2>
-        <p className={styles.stepDesc}>
-          {t('wizard.addToVaultDesc')}
-        </p>
+        <p className={styles.stepDesc}>{t('unlock.vaultLocked')}</p>
+
+        <div className={styles.formGroup}>
+          <label>{t('wizard.password')}</label>
+          <Input
+            type="password"
+            showToggle
+            placeholder={t('unlock.enterPassword')}
+            value={password}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => { setPassword(e.target.value); setError(''); }}
+            onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleUnlock()}
+            autoFocus
+          />
+        </div>
 
         {error && <div className={styles.error}>{error}</div>}
 
         <div className={styles.stepActions}>
-          <Button onClick={handleContinue} disabled={loading}>
-            {loading ? t('wizard.addingAccount') : t('common.continue')}
+          <Button onClick={handleUnlock} disabled={loading || !password}>
+            {loading ? t('common.loading') : t('common.unlock')}
           </Button>
         </div>
       </div>
