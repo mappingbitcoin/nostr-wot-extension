@@ -161,6 +161,7 @@ interface WotSyncSectionProps {
 
 export default function WotSyncSection({ onOpenDetail }: WotSyncSectionProps) {
   const [databases, setDatabases] = useState<SyncItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [syncState, setSyncState] = useState<SyncState | null>(null);
   const [autoSync, setAutoSync] = useState<boolean>(false);
 
@@ -204,6 +205,7 @@ export default function WotSyncSection({ onOpenDetail }: WotSyncSectionProps) {
 
     items.sort((a, b) => (b.isActive ? 1 : 0) - (a.isActive ? 1 : 0));
     setDatabases(items);
+    setLoading(false);
   }, []);
 
   useEffect(() => { loadDatabases(); }, [loadDatabases]);
@@ -247,7 +249,12 @@ export default function WotSyncSection({ onOpenDetail }: WotSyncSectionProps) {
           </div>
         </Card>
       </div>
-      {databases.length === 0 ? (
+      {loading ? (
+        <div className={styles.loadingWrap}>
+          <div className={styles.loadingSpinner} />
+          <span className={styles.loadingText}>{t('common.loading')}</span>
+        </div>
+      ) : databases.length === 0 ? (
         <EmptyState text={t('sync.noDatabases')} hint={t('sync.noDatabasesHint')} />
       ) : (
         <>

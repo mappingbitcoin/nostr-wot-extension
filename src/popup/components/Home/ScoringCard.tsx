@@ -1,7 +1,6 @@
 import React, { useState, ChangeEvent } from 'react';
 import { t } from '@lib/i18n.js';
 import { IconTuner } from '@assets';
-import Card from '@components/Card/Card';
 import { useScoring } from '../../context/ScoringContext';
 import ScoringModal from './ScoringModal';
 import styles from './HomeTab.module.css';
@@ -16,7 +15,7 @@ export default function ScoringCard() {
 
   return (
     <>
-      <Card>
+      <div className={styles.scoringContent}>
         <div className={styles.scoringHeader}>
           <label>{t('scoring.trustSensitivity')}</label>
           <button
@@ -35,7 +34,7 @@ export default function ScoringCard() {
           </div>
         </div>
         <p className={styles.sensitivityDesc}>{presetDesc}</p>
-      </Card>
+      </div>
 
       {modalOpen && (
         <ScoringModal onClose={() => setModalOpen(false)} />

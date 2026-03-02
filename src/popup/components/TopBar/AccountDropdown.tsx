@@ -5,13 +5,14 @@ import { t } from '@lib/i18n.js';
 import { npubEncode } from '@lib/crypto/bech32.js';
 import { useAccount } from '../../context/AccountContext';
 import { truncateNpub, getInitial } from '@shared/format/text.ts';
-import { IconClose, IconCopy } from '@assets';
+import { IconClose, IconCopy, IconPencil } from '@assets';
 import Button from '@components/Button/Button';
 import styles from './TopBar.module.css';
 
 interface AccountDropdownProps {
   onClose: () => void;
   onAddAccount: () => void;
+  onEditProfile: () => void;
 }
 
 interface CopyMenuPos {
@@ -19,7 +20,7 @@ interface CopyMenuPos {
   right: number;
 }
 
-export default function AccountDropdown({ onClose, onAddAccount }: AccountDropdownProps) {
+export default function AccountDropdown({ onClose, onAddAccount, onEditProfile }: AccountDropdownProps) {
   const { accounts, activeId, profileCache, switchAccount, reload } = useAccount();
   const ref = useRef<HTMLDivElement>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -122,6 +123,20 @@ export default function AccountDropdown({ onClose, onAddAccount }: AccountDropdo
                 {isActive && <span className={styles.dropdownCheck}>&#10003;</span>}
               </button>
               <div className={styles.dropdownActions}>
+                {!account.readOnly && account.type !== 'npub' && (
+                  <button
+                    className={styles.dropdownEditBtn}
+                    title={t('settings.editProfile')}
+                    onClick={(e: MouseEvent<HTMLButtonElement>) => {
+                      e.stopPropagation();
+                      switchAccount(account.id);
+                      onClose();
+                      onEditProfile();
+                    }}
+                  >
+                    <IconPencil size={13} />
+                  </button>
+                )}
                 <div className={styles.copyWrap}>
                   {copiedId === account.pubkey ? (
                     <span className={styles.copiedLabel}>{t('common.copied')}</span>

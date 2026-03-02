@@ -288,6 +288,10 @@
 }
 
 /* Scoring card */
+.scoringContent {
+  padding: 11px 14px;
+}
+
 .scoringHeader {
   display: flex;
   align-items: center;

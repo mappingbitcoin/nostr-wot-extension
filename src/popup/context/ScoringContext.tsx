@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import browser from '@shared/browser.ts';
 import { rpcNotify } from '@shared/rpc.ts';
-import { t } from '@lib/i18n.ts';
+import { t } from '@lib/i18n.js';
 import { DEFAULT_SCORING } from '@lib/scoring.ts';
 import { SENSITIVITY_PRESETS } from '@shared/constants.ts';
 

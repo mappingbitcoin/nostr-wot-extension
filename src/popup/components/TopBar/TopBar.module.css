@@ -343,6 +343,29 @@
   border-top: 1px solid var(--card-border);
 }
 
+.dropdownEditBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: all 0.15s;
+}
+
+.dropdownItem:hover .dropdownEditBtn {
+  opacity: 1;
+}
+
+.dropdownEditBtn:hover {
+  color: var(--brand);
+  background: rgba(99, 102, 241, 0.08);
+}
+
 .dropdownRemoveBtn {
   background: none;
   border: none;

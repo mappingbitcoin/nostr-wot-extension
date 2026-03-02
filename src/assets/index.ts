@@ -24,3 +24,4 @@ export { default as IconTuner } from './IconTuner';
 export { default as IconDatabase } from './IconDatabase';
 export { default as IconCloud } from './IconCloud';
 export { default as IconMerge } from './IconMerge';
+export { default as IconPencil } from './IconPencil';

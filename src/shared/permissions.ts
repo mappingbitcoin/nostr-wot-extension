@@ -1,4 +1,4 @@
-import { t } from '@lib/i18n.ts';
+import { t } from '@lib/i18n.js';
 import { KIND_LABELS } from '@shared/constants.ts';
 
 interface NostrEvent {

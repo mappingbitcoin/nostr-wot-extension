@@ -26,6 +26,7 @@ function PopupInner() {
   const [splashVisible, setSplashVisible] = useState<boolean>(true);
   const [unlockVisible, setUnlockVisible] = useState<boolean>(false);
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
+  const [menuSection, setMenuSection] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState<boolean>(false);
   const [activityOpen, setActivityOpen] = useState<boolean>(false);
   const [activityDomain, setActivityDomain] = useState<string | null>(null);
@@ -74,6 +75,7 @@ function PopupInner() {
         <TopBar
           onMenuOpen={() => setMenuOpen(true)}
           onAddAccount={() => setWizardOpen(true)}
+          onEditProfile={() => setEditProfileOpen(true)}
         />
 
         <div className={styles.scrollArea}>
@@ -81,6 +83,7 @@ function PopupInner() {
             onViewAllActivity={(d: string | null) => { setActivityDomain(d || null); setActivityOpen(true); }}
             onManagePermissions={(domain: string) => setPermsDomain(domain)}
             onManageFilters={() => setFiltersOpen(true)}
+            onManageBadges={() => { setMenuSection('wot-injection'); setMenuOpen(true); }}
             onEditProfile={() => setEditProfileOpen(true)}
           />
         </div>
@@ -91,8 +94,8 @@ function PopupInner() {
 
         <MenuOverlay
           visible={menuOpen}
-          onClose={() => setMenuOpen(false)}
-          onEditProfile={() => setEditProfileOpen(true)}
+          onClose={() => { setMenuOpen(false); setMenuSection(null); }}
+          initialSection={menuSection}
         />
 
         <FiltersModal

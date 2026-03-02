@@ -527,24 +527,26 @@ export default function WotInjectionSection({ onOpenDetail }: WotInjectionSectio
           <SectionLabel style={{ marginTop: 8 }}>{t('badges.siteConfigurations')}</SectionLabel>
           <SectionHint>{t('badges.siteHint')}</SectionHint>
 
-          {allSites.map((domain) => {
-            const siteEnabled = !disabledSites.includes(domain);
-            const hasCustom = !!customAdapters[domain];
-            return (
-              <button key={domain} className={styles.permRow} onClick={() => onOpenDetail(domain)}>
-                <SiteIcon domain={domain} />
-                <div className={styles.permInfo}>
-                  <div className={styles.permDomain}>{domain}</div>
-                  {hasCustom && <span className={styles.siteBadge}>{t('badges.custom')}</span>}
-                </div>
-                {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events */}
-                <div onClick={(e) => e.stopPropagation()} role="presentation">
-                  <Toggle checked={siteEnabled} onChange={() => handleSiteToggle(domain)} />
-                </div>
-                <IconChevronRight className={styles.chevron} size={14} />
-              </button>
-            );
-          })}
+          <div className={styles.siteListScroll}>
+            {allSites.map((domain) => {
+              const siteEnabled = !disabledSites.includes(domain);
+              const hasCustom = !!customAdapters[domain];
+              return (
+                <button key={domain} className={styles.permRow} onClick={() => onOpenDetail(domain)}>
+                  <SiteIcon domain={domain} />
+                  <div className={styles.permInfo}>
+                    <div className={styles.permDomain}>{domain}</div>
+                    {hasCustom && <span className={styles.siteBadge}>{t('badges.custom')}</span>}
+                  </div>
+                  {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events */}
+                  <div onClick={(e) => e.stopPropagation()} role="presentation">
+                    <Toggle checked={siteEnabled} onChange={() => handleSiteToggle(domain)} />
+                  </div>
+                  <IconChevronRight className={styles.chevron} size={14} />
+                </button>
+              );
+            })}
+          </div>
         </>
       )}
 

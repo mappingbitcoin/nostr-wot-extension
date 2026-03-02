@@ -13,7 +13,9 @@ interface SiteControlsProps {
   onWotToggle: (checked: boolean) => void;
   onManagePermissions: () => void;
   onManageFilters: () => void;
+  onManageBadges: () => void;
   onRecentActivity: () => void;
+  children?: React.ReactNode;
 }
 
 export default function SiteControls({
@@ -24,44 +26,60 @@ export default function SiteControls({
   onWotToggle,
   onManagePermissions,
   onManageFilters,
+  onManageBadges,
   onRecentActivity,
+  children,
 }: SiteControlsProps) {
   return (
-    <Card className={styles.siteControls}>
-      <div className={styles.controlRow}>
-        <div className={styles.controlInfo}>
-          <IconUser size={15} className={styles.controlIcon} />
-          <span className={styles.controlLabel}>{t('home.allowIdentity')}</span>
-        </div>
-        <Toggle checked={identityEnabled} onChange={onIdentityToggle} />
-      </div>
-
-      {canInject && (
+    <>
+      <Card className={styles.siteControls}>
         <div className={styles.controlRow}>
           <div className={styles.controlInfo}>
-            <IconEye size={15} className={styles.controlIcon} />
-            <span className={styles.controlLabel}>{t('home.showTrustScores')}</span>
+            <IconUser size={15} className={styles.controlIcon} />
+            <span className={styles.controlLabel}>{t('home.allowIdentity')}</span>
           </div>
-          <Toggle checked={wotEnabled} onChange={onWotToggle} />
+          <Toggle checked={identityEnabled} onChange={onIdentityToggle} />
         </div>
-      )}
 
-      <div className={styles.controlDivider} />
+        <button className={styles.controlLink} onClick={onManagePermissions}>
+          <span>{t('home.managePermissions')}</span>
+          <IconChevronRight size={14} />
+        </button>
 
-      <button className={styles.controlLink} onClick={onManagePermissions}>
-        <span>{t('home.managePermissions')}</span>
-        <IconChevronRight size={14} />
-      </button>
+        <button className={styles.controlLink} onClick={onRecentActivity}>
+          <span>{t('home.recentActivity')}</span>
+          <IconChevronRight size={14} />
+        </button>
+      </Card>
 
-      <button className={styles.controlLink} onClick={onManageFilters}>
-        <span>{t('home.manageFilters')}</span>
-        <IconChevronRight size={14} />
-      </button>
+      <Card className={styles.siteControls}>
+        {canInject && (
+          <div className={styles.controlRow}>
+            <div className={styles.controlInfo}>
+              <IconEye size={15} className={styles.controlIcon} />
+              <span className={styles.controlLabel}>{t('home.showTrustScores')}</span>
+            </div>
+            <Toggle checked={wotEnabled} onChange={onWotToggle} />
+          </div>
+        )}
 
-      <button className={styles.controlLink} onClick={onRecentActivity}>
-        <span>{t('home.recentActivity')}</span>
-        <IconChevronRight size={14} />
-      </button>
-    </Card>
+        <button className={styles.controlLink} onClick={onManageFilters}>
+          <span>{t('home.manageFilters')}</span>
+          <IconChevronRight size={14} />
+        </button>
+
+        <button className={styles.controlLink} onClick={onManageBadges}>
+          <span>{t('wot.badges')}</span>
+          <IconChevronRight size={14} />
+        </button>
+
+        {children && (
+          <>
+            <div className={styles.controlDivider} />
+            {children}
+          </>
+        )}
+      </Card>
+    </>
   );
 }

@@ -18,6 +18,7 @@ interface HomeTabProps {
   onViewAllActivity: (domain: string | null) => void;
   onManagePermissions: (domain: string) => void;
   onManageFilters: () => void;
+  onManageBadges: () => void;
   onEditProfile: () => void;
 }
 
@@ -26,7 +27,7 @@ interface SyncStaleInfo {
   dismissed?: boolean;
 }
 
-export default function HomeTab({ onViewAllActivity, onManagePermissions, onManageFilters, onEditProfile }: HomeTabProps) {
+export default function HomeTab({ onViewAllActivity, onManagePermissions, onManageFilters, onManageBadges, onEditProfile }: HomeTabProps) {
   const { active, cachedProfile, isReadOnly } = useAccount();
   const [domain, setDomain] = useState<string | null>(null);
   const [siteState, setSiteState] = useState<string | null>(null); // null = loading, 'empty' | 'notConnected' | 'connected'
@@ -215,7 +216,6 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
   if (siteState === 'notConnected') {
     return (
       <div className={styles.centerWrap}>
-        {showProfileSuggestion && <ProfileSuggestion onEdit={onEditProfile} onDismiss={handleDismissProfile} />}
         <Card className={styles.emptyState}>
           <EmptyState
             icon={
@@ -259,9 +259,11 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
         onWotToggle={handleWotToggle}
         onManagePermissions={() => onManagePermissions(domain!)}
         onManageFilters={onManageFilters}
+        onManageBadges={onManageBadges}
         onRecentActivity={() => onViewAllActivity(domain)}
-      />
-      <ScoringCard />
+      >
+        <ScoringCard />
+      </SiteControls>
     </>
   );
 }

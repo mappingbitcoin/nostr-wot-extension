@@ -2,7 +2,7 @@ import React, { useState, useEffect, ChangeEvent, KeyboardEvent } from 'react';
 import { rpc } from '@shared/rpc.ts';
 import { AUTO_LOCK_OPTIONS } from '@shared/constants.ts';
 import { t } from '@lib/i18n.js';
-import { IconShield, IconLock } from '@assets';
+import { IconLock } from '@assets';
 import Card from '@components/Card/Card';
 import Input from '@components/Input/Input';
 import Button from '@components/Button/Button';
@@ -14,11 +14,10 @@ import { useVault } from '../../context/VaultContext';
 import styles from './SecuritySection.module.css';
 
 interface SecuritySectionProps {
-  onPermissions: () => void;
   onChangePassword: () => void;
 }
 
-export default function SecuritySection({ onPermissions, onChangePassword }: SecuritySectionProps) {
+export default function SecuritySection({ onChangePassword }: SecuritySectionProps) {
   const [autoLockMs, setAutoLockMs] = useState<number>(900000);
   const [pendingMs, setPendingMs] = useState<number | null>(null);
   const [password, setPassword] = useState<string>('');
@@ -174,16 +173,7 @@ export default function SecuritySection({ onPermissions, onChangePassword }: Sec
         </Card>
       )}
 
-      <NavItem
-        icon={
-          <IconShield />
-        }
-        label={t('security.permissions')}
-        desc={t('security.permissionsDesc')}
-        onClick={onPermissions}
-      />
-
-      {vault.exists && !vault.locked && (
+      {vault.exists && !vault.locked && !isNever && (
         <NavItem
           icon={
             <IconLock />

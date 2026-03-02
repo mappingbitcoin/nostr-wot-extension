@@ -1,6 +1,6 @@
 import React, { useEffect, ChangeEvent, KeyboardEvent } from 'react';
 import { rpc } from '@shared/rpc.ts';
-import { t } from '@lib/i18n.ts';
+import { t } from '@lib/i18n.js';
 import useVaultUnlock from '@shared/hooks/useVaultUnlock.ts';
 import styles from '../PromptApp.module.css';
 

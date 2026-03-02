@@ -1,6 +1,6 @@
-import React, { useState, useRef, ReactNode } from 'react';
+import React, { useState, useEffect, useRef, ReactNode } from 'react';
 import { t, getSupportedLanguages, getLanguage, setLanguage } from '@lib/i18n.js';
-import { IconUser, IconLock, IconUsers, IconGlobe, IconKey } from '@assets';
+import { IconLock, IconShield, IconUsers, IconGlobe, IconKey } from '@assets';
 import iconBaseSvg from '/icons/icon-base.svg';
 import OverlayPanel from '@components/OverlayPanel/OverlayPanel';
 import ScrollWheelPicker from '@components/ScrollWheelPicker/ScrollWheelPicker';
@@ -22,7 +22,7 @@ import styles from './MenuOverlay.module.css';
 interface MenuOverlayProps {
   visible: boolean;
   onClose: () => void;
-  onEditProfile: () => void;
+  initialSection?: string | null;
 }
 
 interface MenuItem {
@@ -47,8 +47,8 @@ interface Language {
   prompt: string;
 }
 
-export default function MenuOverlay({ visible, onClose, onEditProfile }: MenuOverlayProps) {
-  const [navStack, setNavStack] = useState<string[]>([]); // stack of section ids
+export default function MenuOverlay({ visible, onClose, initialSection }: MenuOverlayProps) {
+  const [navStack, setNavStack] = useState<string[]>([]);
   const [keyAction, setKeyAction] = useState<string | null>(null); // 'nsec' | 'ncryptsec' | 'changePassword'
   const [langModalOpen, setLangModalOpen] = useState<boolean>(false);
   const [langSelected, setLangSelected] = useState<Language | null>(null);
@@ -61,13 +61,15 @@ export default function MenuOverlay({ visible, onClose, onEditProfile }: MenuOve
   const { shouldRender, animating } = useAnimatedVisible(visible);
   const languages: Language[] = getSupportedLanguages();
 
+  useEffect(() => {
+    if (visible && initialSection) {
+      setNavStack([initialSection]);
+    } else if (!visible) {
+      setNavStack([]);
+    }
+  }, [visible, initialSection]);
+
   const menuItems: MenuItem[] = [
-    {
-      id: 'editProfile',
-      label: t('settings.editProfile'),
-      desc: t('settings.editProfileDesc'),
-      icon: <IconUser />,
-    },
     {
       id: 'key-backup',
       label: t('security.keyBackup'),
@@ -75,9 +77,15 @@ export default function MenuOverlay({ visible, onClose, onEditProfile }: MenuOve
       icon: <IconKey />,
     },
     {
+      id: 'site-permissions',
+      label: t('security.permissions'),
+      desc: t('security.permissionsDesc'),
+      icon: <IconShield />,
+    },
+    {
       id: 'security',
-      label: t('settings.securityPrivacy'),
-      desc: t('settings.securityPrivacyDesc'),
+      label: t('settings.autoLockPassword'),
+      desc: t('settings.autoLockPasswordDesc'),
       icon: <IconLock />,
     },
     {
@@ -95,7 +103,7 @@ export default function MenuOverlay({ visible, onClose, onEditProfile }: MenuOve
   ];
 
   const sectionTitles: Record<string, string> = {
-    security: t('settings.securityPrivacy'),
+    security: t('settings.autoLockPassword'),
     wot: t('settings.webOfTrust'),
     network: t('settings.network'),
     'key-backup': t('security.keyBackup'),
@@ -122,11 +130,7 @@ export default function MenuOverlay({ visible, onClose, onEditProfile }: MenuOve
   const handleClose = () => { setNavStack([]); onClose(); };
 
   const handleMenuItem = (id: string) => {
-    if (id === 'editProfile') {
-      onEditProfile?.();
-    } else {
-      pushSection(id);
-    }
+    pushSection(id);
   };
 
   const openLangPicker = () => {
@@ -150,7 +154,6 @@ export default function MenuOverlay({ visible, onClose, onEditProfile }: MenuOve
       case 'security':
         return (
           <SecuritySection
-            onPermissions={() => pushSection('site-permissions')}
             onChangePassword={() => setKeyAction('changePassword')}
           />
         );
@@ -208,7 +211,6 @@ export default function MenuOverlay({ visible, onClose, onEditProfile }: MenuOve
             <div className={styles.items}>
               {menuItems.map((item) => {
                 if (item.id === 'nip46' && !vault.isNip46) return null;
-                if (item.id === 'editProfile' && isReadOnly) return null;
                 if (item.id === 'key-backup' && isReadOnly) return null;
                 return (
                   <NavItem

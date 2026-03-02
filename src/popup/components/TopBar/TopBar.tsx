@@ -9,9 +9,10 @@ import styles from './TopBar.module.css';
 interface TopBarProps {
   onMenuOpen: () => void;
   onAddAccount: () => void;
+  onEditProfile: () => void;
 }
 
-export default function TopBar({ onMenuOpen, onAddAccount }: TopBarProps) {
+export default function TopBar({ onMenuOpen, onAddAccount, onEditProfile }: TopBarProps) {
   const [dropdownOpen, setDropdownOpen] = useState<boolean>(false);
 
   return (
@@ -22,7 +23,7 @@ export default function TopBar({ onMenuOpen, onAddAccount }: TopBarProps) {
           onToggleDropdown={() => setDropdownOpen((v) => !v)}
         />
         {dropdownOpen && (
-          <AccountDropdown onClose={() => setDropdownOpen(false)} onAddAccount={() => { setDropdownOpen(false); onAddAccount?.(); }} />
+          <AccountDropdown onClose={() => setDropdownOpen(false)} onAddAccount={() => { setDropdownOpen(false); onAddAccount?.(); }} onEditProfile={() => { setDropdownOpen(false); onEditProfile(); }} />
         )}
       </div>
       <GlobeButton />
