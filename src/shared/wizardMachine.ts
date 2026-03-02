@@ -70,7 +70,7 @@ const TRANSITIONS: Record<string, Record<string, TransitionHandler>> = {
 
   subaccount: {
     CREATED: (_ctx, { account }) => ({
-      step: 'password',
+      step: 'followSuggestions',
       ctx: { account: account as unknown },
     }),
     BACK: () => ({ step: 'method' }),
@@ -105,14 +105,25 @@ const TRANSITIONS: Record<string, Record<string, TransitionHandler>> = {
   },
 
   password: {
-    SET: (_ctx, { upgraded }) => ({
-      step: upgraded ? 'done' : 'wotSync',
-    }),
-    BACK: (ctx, _payload, { hasGeneratedAccount }) => {
-      if (ctx.method === 'create' && hasGeneratedAccount) return { step: 'subaccount' };
+    SET: (ctx, { upgraded }) => {
+      if (upgraded) return { step: 'done' };
+      // Read-only methods can't sign, skip follow suggestions
+      if (ctx.method === 'npub' || ctx.method === 'nip46') return { step: 'wotSync' };
+      return { step: 'followSuggestions' };
+    },
+    BACK: (ctx) => {
       if (ctx.method === 'create') return { step: 'verify' };
       if (ctx.method === 'import') return { step: 'import' };
       return { step: 'method' };
+    },
+  },
+
+  followSuggestions: {
+    DONE: () => ({ step: 'wotSync' }),
+    BACK: (ctx, _payload, { hasGeneratedAccount }) => {
+      // Subaccounts skip password, go back to subaccount step
+      if (ctx.method === 'create' && hasGeneratedAccount) return { step: 'subaccount' };
+      return { step: 'password' };
     },
   },
 
@@ -121,9 +132,8 @@ const TRANSITIONS: Record<string, Record<string, TransitionHandler>> = {
       step: hasAccounts ? 'permCopy' : 'done',
     }),
     BACK: (ctx) => {
-      if (ctx.method === 'npub' || ctx.method === 'nip46')
-        return { step: 'method' };
-      return { step: 'password' };
+      if (ctx.method === 'npub' || ctx.method === 'nip46') return { step: 'password' };
+      return { step: 'followSuggestions' };
     },
   },
 

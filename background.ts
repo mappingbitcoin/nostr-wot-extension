@@ -28,7 +28,7 @@ function sanitizeCSS(css: string): string {
 }
 
 const DEFAULT_ORACLE_URL = 'https://wot-oracle.mappingbitcoin.com';
-const DEFAULT_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.nostr.band', 'wss://relay.mappingbitcoin.com'];
+const DEFAULT_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://nostr-01.yakihonne.com'];
 
 // In-memory sessions for pending nostrconnect:// QR flows
 interface NostrConnectSession {
@@ -87,7 +87,7 @@ const PRIVILEGED_METHODS = new Set([
     'nip46_getSessionInfo', 'nip46_revokeSession',
     'checkRelayHealth', 'checkOracleHealth',
     'previewBadgeConfig', 'getAllowedDomains', 'isDomainAllowed',
-    'getSyncState', 'hasHostPermission', 'getProfileMetadata',
+    'getSyncState', 'hasHostPermission', 'getProfileMetadata', 'getProfileMetadataBatch',
 ]);
 
 function checkRateLimit(method: string): boolean {
@@ -1230,6 +1230,16 @@ async function handleRequest({ method, params }: { method: string; params: Recor
         case 'getProfileMetadata':
             return fetchProfileMetadata(params.pubkey as string);
 
+        case 'getProfileMetadataBatch': {
+            const pubkeys = params.pubkeys as string[];
+            if (!Array.isArray(pubkeys)) throw new Error('pubkeys must be an array');
+            const results: Record<string, Record<string, unknown> | null> = {};
+            await Promise.all(pubkeys.map(async (pk) => {
+                results[pk] = await fetchProfileMetadata(pk);
+            }));
+            return results;
+        }
+
         // === NIP-07 signer methods ===
 
         case 'nip07_getPublicKey': {
@@ -1905,6 +1915,9 @@ async function handleRequest({ method, params }: { method: string; params: Recor
             try {
                 const signed = await signEvent(params.event as UnsignedEvent, privkeyBytes);
                 const result = await broadcastEvent(signed, config.relays);
+                if ((params.event as UnsignedEvent).kind === 3) {
+                    triggerAutoSyncIfEnabled();
+                }
                 return { ok: true, sent: result.sent, failed: result.failed };
             } finally {
                 privkeyBytes.fill(0);
