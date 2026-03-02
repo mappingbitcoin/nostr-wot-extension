@@ -201,6 +201,76 @@ describe('vault -- account management', () => {
   });
 });
 
+describe('vault -- seed export', () => {
+  const TEST_MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
+
+  beforeEach(() => {
+    resetMockStorage();
+    vault.lock();
+  });
+
+  it('getDecryptedPayload returns mnemonic for generated account', async () => {
+    const payload: VaultPayload = {
+      accounts: [{
+        id: 'seed1',
+        name: 'Generated',
+        type: 'generated',
+        pubkey: TEST_PUBKEY_HEX,
+        privkey: TEST_PRIVKEY_HEX,
+        mnemonic: TEST_MNEMONIC,
+        nip46Config: null,
+        readOnly: false,
+        createdAt: 1000000
+      }],
+      activeAccountId: 'seed1'
+    };
+    await vault.create(TEST_PASSWORD, payload);
+    const decrypted = vault.getDecryptedPayload();
+    const acct = decrypted.accounts.find(a => a.id === 'seed1');
+    assert.ok(acct);
+    assert.strictEqual(acct!.type, 'generated');
+    assert.strictEqual(acct!.mnemonic, TEST_MNEMONIC);
+    assert.strictEqual(acct!.mnemonic!.split(' ').length, 12);
+  });
+
+  it('getDecryptedPayload throws when vault is locked', async () => {
+    await vault.create(TEST_PASSWORD, makePayload());
+    vault.lock();
+    assert.throws(() => vault.getDecryptedPayload(), /Vault is locked/);
+  });
+
+  it('nsec account has no mnemonic', async () => {
+    await vault.create(TEST_PASSWORD, makePayload());
+    const decrypted = vault.getDecryptedPayload();
+    const acct = decrypted.accounts.find(a => a.id === 'acct1');
+    assert.ok(acct);
+    assert.strictEqual(acct!.mnemonic, null);
+  });
+
+  it('mnemonic persists across lock/unlock', async () => {
+    const payload: VaultPayload = {
+      accounts: [{
+        id: 'seed1',
+        name: 'Generated',
+        type: 'generated',
+        pubkey: TEST_PUBKEY_HEX,
+        privkey: TEST_PRIVKEY_HEX,
+        mnemonic: TEST_MNEMONIC,
+        nip46Config: null,
+        readOnly: false,
+        createdAt: 1000000
+      }],
+      activeAccountId: 'seed1'
+    };
+    await vault.create(TEST_PASSWORD, payload);
+    vault.lock();
+    await vault.unlock(TEST_PASSWORD);
+    const decrypted = vault.getDecryptedPayload();
+    const acct = decrypted.accounts.find(a => a.id === 'seed1');
+    assert.strictEqual(acct!.mnemonic, TEST_MNEMONIC);
+  });
+});
+
 describe('vault -- encryption integrity', () => {
   beforeEach(() => {
     resetMockStorage();

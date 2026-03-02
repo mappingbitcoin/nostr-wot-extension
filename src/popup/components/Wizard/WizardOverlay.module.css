@@ -191,6 +191,25 @@
   white-space: nowrap;
 }
 
+.seedLegend {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(99, 102, 241, 0.06);
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.seedLegend svg {
+  flex-shrink: 0;
+  color: var(--brand);
+  margin-top: 1px;
+}
+
 .upgradeNotice {
   padding: 8px 12px;
   background: rgba(37, 99, 235, 0.06);

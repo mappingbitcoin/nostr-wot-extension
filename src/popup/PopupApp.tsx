@@ -56,6 +56,18 @@ function PopupInner() {
     }
   }, [account.accounts]);
 
+  // Resume wizard if there's persisted mid-flow state (e.g. user closed popup during seed creation)
+  useEffect(() => {
+    browser.storage.session.get('wizardState')
+      .then((data: Record<string, unknown>) => {
+        const saved = data.wizardState as { step?: string; ts?: number } | undefined;
+        if (saved?.step && saved?.ts && Date.now() - saved.ts < 5 * 60 * 1000) {
+          setWizardOpen(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const handleWizardComplete = () => {
     setWizardOpen(false);
     account.reload();

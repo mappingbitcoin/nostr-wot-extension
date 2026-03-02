@@ -1,21 +1,32 @@
-import React, { useState, ChangeEvent } from 'react';
+import React, { useState, useEffect, ChangeEvent } from 'react';
 import { rpc } from '@shared/rpc.ts';
 import { t } from '@lib/i18n.js';
+import { IconInfo } from '@assets';
 import Input from '@components/Input/Input';
 import Button from '@components/Button/Button';
 import styles from './WizardOverlay.module.css';
 
-function detectType(val: string): 'ncryptsec' | 'nsec' | null {
+type ImportType = 'ncryptsec' | 'nsec' | 'mnemonic' | null;
+
+function detectType(val: string): ImportType {
   if (val.startsWith('ncryptsec1')) return 'ncryptsec';
   if (val.startsWith('nsec1') || /^[0-9a-f]{64}$/i.test(val)) return 'nsec';
+  // Check for 12 or 24 word mnemonic (words separated by spaces)
+  const words = val.split(/\s+/).filter(Boolean);
+  if (words.length === 12 || words.length === 24) return 'mnemonic';
   return null;
+}
+
+function wordCount(val: string): number {
+  return val.split(/\s+/).filter(Boolean).length;
 }
 
 interface ImportStepProps {
   onNext: (account: any, upgradeId: string | null) => void;
+  hasGeneratedAccount?: boolean;
 }
 
-export default function ImportStep({ onNext }: ImportStepProps) {
+export default function ImportStep({ onNext, hasGeneratedAccount }: ImportStepProps) {
   const [input, setInput] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [name, setName] = useState<string>('');
@@ -24,10 +35,18 @@ export default function ImportStep({ onNext }: ImportStepProps) {
   const [pubkey, setPubkey] = useState<string>('');
   const [upgradeNotice, setUpgradeNotice] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+  const [hasSeed, setHasSeed] = useState<boolean>(!!hasGeneratedAccount);
+
+  // Check for existing seed on mount (more accurate than prop alone)
+  useEffect(() => {
+    rpc<{ hasSeed: boolean }>('onboarding_checkExistingSeed')
+      .then(r => setHasSeed(!!r?.hasSeed))
+      .catch(() => {});
+  }, []);
 
   const importType = detectType(input.trim());
 
-  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const val = e.target.value;
     setInput(val);
     setError('');
@@ -39,6 +58,8 @@ export default function ImportStep({ onNext }: ImportStepProps) {
       setTypeHint(t('wizard.encryptedDetected'));
     } else if (type === 'nsec') {
       setTypeHint(t('wizard.privateKeyDetected'));
+    } else if (type === 'mnemonic') {
+      setTypeHint(t('wizard.seedDetected', { count: String(wordCount(val.trim())) }));
     } else if (val.trim()) {
       setTypeHint('');
     } else {
@@ -58,6 +79,14 @@ export default function ImportStep({ onNext }: ImportStepProps) {
         if (!password) { setError(t('wizard.enterDecryptPassword')); setLoading(false); return; }
         const result = await rpc<{ account: any; upgradeFromReadOnly?: string }>('onboarding_validateNcryptsec', { ncryptsec: val, password, name: name || undefined });
         onNext(result.account, result.upgradeFromReadOnly || null);
+      } else if (importType === 'mnemonic') {
+        const result = await rpc<{ account: any; upgradeFromReadOnly?: string; importedAsMain?: boolean }>('onboarding_validateMnemonic', { mnemonic: val });
+        const acct = result.account;
+        setPubkey(acct.pubkey);
+        if (result.upgradeFromReadOnly) {
+          setUpgradeNotice(t('wizard.upgradeNotice'));
+        }
+        onNext(acct, result.upgradeFromReadOnly || null);
       } else {
         const result = await rpc<{ account: any; upgradeFromReadOnly?: string }>('onboarding_validateNsec', { input: val });
         const acct = result.account;
@@ -114,6 +143,13 @@ export default function ImportStep({ onNext }: ImportStepProps) {
             />
           </div>
         </>
+      )}
+
+      {importType === 'mnemonic' && (
+        <div className={styles.seedLegend}>
+          <IconInfo size={14} />
+          <span>{hasSeed ? t('wizard.seedDerivedLegend') : t('wizard.seedMainLegend')}</span>
+        </div>
       )}
 
       {pubkey && (

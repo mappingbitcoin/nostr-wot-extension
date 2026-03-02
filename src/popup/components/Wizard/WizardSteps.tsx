@@ -54,7 +54,7 @@ function buildSteps(
     },
     import: {
       title: t('wizard.importKey'),
-      content: <ImportStep onNext={(acct: any, upId: string | null) => flow.send('IMPORTED', { account: acct, upgradeId: upId })} />,
+      content: <ImportStep onNext={(acct: any, upId: string | null) => flow.send('IMPORTED', { account: acct, upgradeId: upId })} hasGeneratedAccount={hasGeneratedAccount} />,
     },
     npub: {
       title: t('wizard.watchOnly'),

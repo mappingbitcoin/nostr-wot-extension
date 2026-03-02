@@ -101,6 +101,34 @@ export async function generateNewAccount(name: string = 'Main'): Promise<{ accou
 }
 
 /**
+ * Import only the first derived key from a mnemonic (no mnemonic stored).
+ * Used when a main seed already exists and we only want the key, not the seed.
+ * @param mnemonic - 12 or 24 word mnemonic
+ * @param name - Account display name
+ * @returns Account object with type 'nsec' (no mnemonic field)
+ */
+export async function importFromMnemonicDerived(mnemonic: string, name: string = 'Imported'): Promise<Account> {
+  const valid = await validateMnemonic(mnemonic);
+  if (!valid) throw new Error('Invalid mnemonic');
+
+  const seed = await mnemonicToSeed(mnemonic);
+  const privkey = await derivePath(seed, NIP06_PATH);
+  const pubkey = getPublicKey(privkey);
+
+  return {
+    id: generateId(),
+    name,
+    type: 'nsec',
+    pubkey: bytesToHex(pubkey),
+    privkey: bytesToHex(privkey),
+    mnemonic: null,
+    nip46Config: null,
+    readOnly: false,
+    createdAt: Math.floor(Date.now() / 1000)
+  };
+}
+
+/**
  * Import an account from an nsec or hex private key
  * @param input - nsec1... or 64-char hex
  * @param name

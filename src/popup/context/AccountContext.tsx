@@ -97,6 +97,11 @@ export function AccountProvider({ children }: AccountProviderProps) {
     if (!account) return;
     setActiveId(accountId);
     await rpc('switchAccount', { accountId });
+    // Reload active tab so injected NIP-07 content reflects the new identity
+    try {
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+      if (tabs[0]?.id) browser.tabs.reload(tabs[0].id);
+    } catch { /* ignore — fails on chrome:// pages */ }
   }, [accounts]);
 
   const reload = useCallback(() => load(), [load]);

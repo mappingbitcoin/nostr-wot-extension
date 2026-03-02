@@ -287,35 +287,7 @@
   padding: 8px 0;
 }
 
-/* Scoring card */
-.scoringContent {
-  padding: 11px 14px;
-}
-
-.scoringHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 2px;
-}
-
-.tunerBtn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  transition: all 0.15s;
-}
-
-.tunerBtn:hover {
-  color: var(--brand);
-  background: rgba(99, 102, 241, 0.06);
-}
-
+/* Scoring slider (used in ScoringModal) */
 .sensitivitySlider {
   margin-bottom: 4px;
 }
@@ -366,13 +338,6 @@
   justify-content: space-between;
   font-size: 10px;
   color: var(--text-muted);
-}
-
-.sensitivityDesc {
-  font-size: 11px;
-  color: var(--text-secondary);
-  margin-top: 2px;
-  line-height: 1.4;
 }
 
 /* Sync in-progress variant */

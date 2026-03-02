@@ -31,6 +31,7 @@ export default function WizardOverlay({ visible, canClose, onClose, onComplete }
     skipLang: isLanguageChosen(),
     hasAccounts: canClose,
     hasGeneratedAccount,
+    persist: true,
   });
 
   const { shouldRender, animating } = useAnimatedVisible(visible);
@@ -43,14 +44,16 @@ export default function WizardOverlay({ visible, canClose, onClose, onComplete }
   return (
     <OverlayPanel showHeader={false} noPadding zIndex={500} animating={animating} className={styles.transparentOverlay}>
       <TopoBg className={styles.topoBgFill}>
-        <WizardSteps
-          flow={flow}
-          onClose={canClose ? handleClose : null}
-          onDone={handleDone}
-          onLangSelect={() => flow.send('NEXT')}
-          hasAccounts={canClose}
-          hasGeneratedAccount={hasGeneratedAccount}
-        />
+        {flow.loading ? null : (
+          <WizardSteps
+            flow={flow}
+            onClose={canClose ? handleClose : null}
+            onDone={handleDone}
+            onLangSelect={() => flow.send('NEXT')}
+            hasAccounts={canClose}
+            hasGeneratedAccount={hasGeneratedAccount}
+          />
+        )}
       </TopoBg>
     </OverlayPanel>
   );

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import browser from '@shared/browser.ts';
 import { rpc } from '@shared/rpc.ts';
 
 interface VaultContextValue {
@@ -6,6 +7,7 @@ interface VaultContextValue {
   locked: boolean;
   autoLockEnabled: boolean;
   isNip46: boolean;
+  isGenerated: boolean;
   unlock: (password: string) => Promise<boolean>;
   lock: () => Promise<void>;
   checkState: () => Promise<void>;
@@ -22,6 +24,7 @@ export function VaultProvider({ children }: VaultProviderProps) {
   const [locked, setLocked] = useState<boolean>(true);
   const [autoLockEnabled, setAutoLockEnabled] = useState<boolean>(false);
   const [isNip46, setIsNip46] = useState<boolean>(false);
+  const [isGenerated, setIsGenerated] = useState<boolean>(false);
 
   const checkState = useCallback(async () => {
     try {
@@ -36,11 +39,13 @@ export function VaultProvider({ children }: VaultProviderProps) {
 
       const acctType = await rpc<{ type?: string }>('vault_getActiveAccountType');
       setIsNip46(acctType?.type === 'nip46');
+      setIsGenerated(acctType?.type === 'generated');
     } catch {
       setExists(false);
       setLocked(true);
       setAutoLockEnabled(false);
       setIsNip46(false);
+      setIsGenerated(false);
     }
   }, []);
 
@@ -62,11 +67,23 @@ export function VaultProvider({ children }: VaultProviderProps) {
     checkState();
   }, [checkState]);
 
+  // Re-check vault state when active account changes
+  useEffect(() => {
+    function onChange(changes: Record<string, any>, area: string) {
+      if (area === 'local' && changes.activeAccountId) {
+        checkState();
+      }
+    }
+    browser.storage.onChanged.addListener(onChange);
+    return () => browser.storage.onChanged.removeListener(onChange);
+  }, [checkState]);
+
   const value: VaultContextValue = {
     exists,
     locked,
     autoLockEnabled,
     isNip46,
+    isGenerated,
     unlock,
     lock,
     checkState,

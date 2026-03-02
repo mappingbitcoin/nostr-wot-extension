@@ -61,15 +61,16 @@ const PRIVILEGED_METHODS = new Set([
     'vault_unlock', 'vault_lock', 'vault_create', 'vault_isLocked', 'vault_exists',
     'vault_listAccounts', 'vault_addAccount', 'vault_removeAccount',
     'vault_setActiveAccount', 'vault_getActivePubkey', 'vault_setAutoLock', 'vault_getAutoLock',
-    'vault_exportNsec', 'vault_exportNcryptsec', 'vault_importNcryptsec', 'vault_changePassword',
+    'vault_exportNsec', 'vault_exportNcryptsec', 'vault_exportSeed', 'vault_importNcryptsec', 'vault_changePassword',
     'vault_getActiveAccountType',
     'signer_getPermissions', 'signer_getPermissionsForDomain',
     'signer_clearPermissions', 'signer_savePermission',
     'signer_getPermissionsRaw', 'signer_getPermissionsForDomainRaw',
     'signer_copyPermissions', 'signer_getUseGlobalDefaults', 'signer_setUseGlobalDefaults',
     'signer_getPending', 'signer_resolve', 'signer_resolveBatch',
-    'onboarding_validateNsec', 'onboarding_validateNcryptsec', 'onboarding_validateNpub', 'onboarding_connectNip46',
-    'onboarding_generateAccount', 'onboarding_exportNcryptsec', 'onboarding_saveReadOnly', 'onboarding_createVault', 'onboarding_addToVault',
+    'onboarding_validateNsec', 'onboarding_validateNcryptsec', 'onboarding_validateMnemonic', 'onboarding_validateNpub', 'onboarding_connectNip46',
+    'onboarding_generateAccount', 'onboarding_checkExistingSeed', 'onboarding_generateSubAccount',
+    'onboarding_exportNcryptsec', 'onboarding_saveReadOnly', 'onboarding_createVault', 'onboarding_addToVault',
     'onboarding_initNostrConnect', 'onboarding_pollNostrConnect', 'onboarding_cancelNostrConnect',
     'configUpdated', 'syncGraph', 'stopSync', 'clearGraph',
     'requestHostPermission', 'enableForCurrentDomain',
@@ -727,6 +728,15 @@ async function handleRequest({ method, params }: { method: string; params: Recor
         validateNip07Params(method, params);
     }
 
+    // Gate all NIP-07 methods behind the "Connect this site" allowlist
+    if (method.startsWith('nip07_')) {
+        const origin = params?.origin as string;
+        if (!origin || !(await isDomainAllowed(origin))) {
+            logActivity({ domain: origin || 'unknown', method: method.replace('nip07_', ''), decision: 'blocked' });
+            throw new Error('Site not connected');
+        }
+    }
+
     // Read-only account guard — reject all NIP-07 signing operations before they
     // reach the signer queue / permission check / popup approval flow
     const NIP07_SIGNING_METHODS = ['nip07_signEvent', 'nip07_nip04Encrypt', 'nip07_nip04Decrypt', 'nip07_nip44Encrypt', 'nip07_nip44Decrypt'];
@@ -1174,6 +1184,17 @@ async function handleRequest({ method, params }: { method: string; params: Recor
             }
         }
 
+        case 'vault_exportSeed': {
+            if (vault.isLocked()) throw new Error('Vault is locked');
+            const payload = vault.getDecryptedPayload();
+            const activeId = (await browser.storage.local.get(['activeAccountId']) as Record<string, string>).activeAccountId;
+            const activeAcct = payload.accounts.find(a => a.id === activeId);
+            if (!activeAcct || activeAcct.type !== 'generated' || !activeAcct.mnemonic) {
+                throw new Error('Active account has no seed phrase');
+            }
+            return { mnemonic: activeAcct.mnemonic, wordCount: activeAcct.mnemonic.split(' ').length };
+        }
+
         case 'vault_importNcryptsec': {
             const privkeyHex = await ncryptsecDecode(params.ncryptsec as string, params.password as string);
             const acct = await accounts.importNsec(privkeyHex, params.name as string);
@@ -1406,6 +1427,47 @@ async function handleRequest({ method, params }: { method: string; params: Recor
                 pubkey: acct.pubkey,
                 npub: npubEncode(acct.pubkey),
                 upgradeFromReadOnly: existing2 && !hasEncryptedKey2 ? existing2.id : null
+            };
+        }
+
+        case 'onboarding_validateMnemonic': {
+            const mnemonic = (params.mnemonic as string).trim().toLowerCase().replace(/\s+/g, ' ');
+            // Determine if vault already has a seed
+            let hasSeed = false;
+            if (await vault.exists() && !vault.isLocked()) {
+                try {
+                    const payload = vault.getDecryptedPayload();
+                    hasSeed = payload.accounts.some(a => a.type === 'generated' && a.mnemonic);
+                } catch { /* ignore */ }
+            }
+            // If no existing seed: import as main (type 'generated', mnemonic stored)
+            // If existing seed: import only the first derived key (type 'nsec', no mnemonic stored)
+            const acct = hasSeed
+                ? await accounts.importFromMnemonicDerived(mnemonic)
+                : await accounts.createFromMnemonic(mnemonic, 'Imported');
+            const { privkey, mnemonic: _mn, ...safeAcct } = acct;
+
+            // Check for duplicate / read-only upgrade
+            const localAccts3 = ((await browser.storage.local.get(['accounts'])) as Record<string, Array<{ pubkey: string; id: string }>>).accounts || [];
+            const existing3 = localAccts3.find(a => a.pubkey === acct.pubkey);
+            let hasEncryptedKey3 = false;
+            if (existing3 && await vault.exists() && !vault.isLocked()) {
+                hasEncryptedKey3 = vault.listAccounts().some(
+                    a => a.pubkey === acct.pubkey && !a.readOnly
+                );
+            }
+            if (hasEncryptedKey3) {
+                throw new Error('This account is already added with full signing access.');
+            }
+
+            await setPendingOnboardingAccount(acct);
+
+            return {
+                account: safeAcct,
+                pubkey: acct.pubkey,
+                npub: npubEncode(acct.pubkey),
+                upgradeFromReadOnly: existing3 && !hasEncryptedKey3 ? existing3.id : null,
+                importedAsMain: !hasSeed,
             };
         }
 

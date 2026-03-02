@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, ChangeEvent, KeyboardEvent } from 'react';
+import React, { useState, useEffect, useRef, useCallback, ChangeEvent, KeyboardEvent, MouseEvent } from 'react';
 import { rpc } from '@shared/rpc.js';
 import { t } from '@lib/i18n.js';
 import { IconClose, IconWarning } from '@assets';
@@ -30,6 +30,16 @@ export default function KeyActionModal({ action, onClose }: KeyActionModalProps)
   const [ncError, setNcError] = useState<string>('');
   const [ncGenerating, setNcGenerating] = useState<boolean>(false);
 
+  // seed state
+  const [seedWords, setSeedWords] = useState<string[]>([]);
+  const [seedRevealed, setSeedRevealed] = useState<boolean>(false);
+  const [seedBlurred, setSeedBlurred] = useState<boolean>(true);
+  const [seedEncMode, setSeedEncMode] = useState<boolean>(false);
+  const [seedEncPw, setSeedEncPw] = useState<string>('');
+  const [seedEncConfirm, setSeedEncConfirm] = useState<string>('');
+  const [seedEncError, setSeedEncError] = useState<string>('');
+  const [seedEncrypting, setSeedEncrypting] = useState<boolean>(false);
+
   // change password state
   const [cpCurrent, setCpCurrent] = useState<string>('');
   const [cpNew, setCpNew] = useState<string>('');
@@ -37,7 +47,7 @@ export default function KeyActionModal({ action, onClose }: KeyActionModalProps)
   const [cpError, setCpError] = useState<string>('');
   const [cpSuccess, setCpSuccess] = useState<boolean>(false);
 
-  const titles: Record<string, string> = { nsec: t('key.exportTitle'), ncryptsec: t('key.exportEncTitle'), changePassword: t('key.changePasswordTitle') };
+  const titles: Record<string, string> = { nsec: t('key.exportTitle'), ncryptsec: t('key.exportEncTitle'), seed: t('key.exportSeedTitle'), changePassword: t('key.changePasswordTitle') };
 
   const {
     password: unlockPw,
@@ -75,6 +85,13 @@ export default function KeyActionModal({ action, onClose }: KeyActionModalProps)
     if (autoHideRef.current) clearTimeout(autoHideRef.current);
     setNsecValue('');
     setNcValue('');
+    setSeedWords([]);
+    setSeedRevealed(false);
+    setSeedBlurred(true);
+    setSeedEncMode(false);
+    setSeedEncPw('');
+    setSeedEncConfirm('');
+    setSeedEncError('');
     onClose();
   };
 
@@ -120,6 +137,79 @@ export default function KeyActionModal({ action, onClose }: KeyActionModalProps)
     navigator.clipboard.writeText(ncValue);
   };
 
+  // --- seed ---
+  const revealSeed = async () => {
+    try {
+      const result = await rpc<{ mnemonic: string }>('vault_exportSeed');
+      if (result?.mnemonic) {
+        setSeedWords(result.mnemonic.split(' '));
+        setSeedRevealed(true);
+        setSeedBlurred(true);
+        autoHideRef.current = setTimeout(() => {
+          setSeedWords([]);
+          setSeedRevealed(false);
+          setSeedBlurred(true);
+        }, 60000);
+      }
+    } catch { /* ignore */ }
+  };
+
+  const copySeed = () => {
+    navigator.clipboard.writeText(seedWords.join(' '));
+  };
+
+  const downloadFile = (content: string, filename: string) => {
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadSeedPlain = () => {
+    downloadFile(seedWords.join(' '), 'nostr-seed-phrase.txt');
+  };
+
+  const downloadSeedEncrypted = async () => {
+    setSeedEncError('');
+    if (seedEncPw.length < 8) { setSeedEncError(t('key.passwordMin8')); return; }
+    if (seedEncPw !== seedEncConfirm) { setSeedEncError(t('key.passwordsNoMatch')); return; }
+    setSeedEncrypting(true);
+    try {
+      const enc = new TextEncoder();
+      const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(seedEncPw), 'PBKDF2', false, ['deriveKey']);
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const key = await crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt, iterations: 210000, hash: 'SHA-256' },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt']
+      );
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(seedWords.join(' ')));
+      const payload = JSON.stringify({
+        v: 1,
+        salt: btoa(String.fromCharCode(...salt)),
+        iv: btoa(String.fromCharCode(...iv)),
+        ct: btoa(String.fromCharCode(...new Uint8Array(ciphertext))),
+      });
+      downloadFile(payload, 'nostr-seed-phrase-encrypted.json');
+      setSeedEncMode(false);
+      setSeedEncPw('');
+      setSeedEncConfirm('');
+    } catch {
+      setSeedEncError(t('key.failedExport'));
+    }
+    setSeedEncrypting(false);
+  };
+
+  const handleOverlayClick = useCallback((e: MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) handleClose();
+  }, []);
+
   // --- change password ---
   const handleChangePassword = async () => {
     setCpError('');
@@ -140,7 +230,7 @@ export default function KeyActionModal({ action, onClose }: KeyActionModalProps)
   };
 
   return (
-    <div className={styles.overlay}>
+    <div className={styles.overlay} onClick={handleOverlayClick}>
       <div className={styles.modal}>
         <div className={styles.header}>
           <span className={styles.title}>{titles[action] || t('key.keyAction')}</span>
@@ -229,6 +319,67 @@ export default function KeyActionModal({ action, onClose }: KeyActionModalProps)
                   <Button variant="secondary" small onClick={handleClose}>{t('common.close')}</Button>
                   <Button small onClick={copyNcryptsec}>{t('common.copy')}</Button>
                 </div>
+              </>
+            )}
+          </div>
+        ) : action === 'seed' ? (
+          <div className={styles.section}>
+            {!seedRevealed ? (
+              <>
+                <div className={styles.warning}>
+                  <IconWarning />
+                  <span>{t('key.seedWarning')}</span>
+                </div>
+                <div className={styles.actions}>
+                  <Button variant="secondary" small onClick={handleClose}>{t('common.cancel')}</Button>
+                  <Button variant="danger" small onClick={revealSeed}>{t('key.revealKey')}</Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={styles.seedGridWrap} onClick={() => setSeedBlurred((b) => !b)}>
+                  <div className={`${styles.seedGrid} ${seedBlurred ? styles.blurred : ''}`}>
+                    {seedWords.map((word, i) => (
+                      <span key={i} className={styles.seedWord}>
+                        <span className={styles.seedWordNum}>{i + 1}</span>
+                        {word}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className={styles.hint}>{`${t(seedBlurred ? 'key.clickToReveal' : 'key.clickToBlur')} \u00b7 ${t('key.seedAutoHideHint')}`}</div>
+                {seedEncMode ? (
+                  <>
+                    <Input
+                      type="password"
+                      showToggle
+                      placeholder={t('key.seedDownloadPassword')}
+                      value={seedEncPw}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => setSeedEncPw(e.target.value)}
+                    />
+                    <Input
+                      type="password"
+                      placeholder={t('key.seedDownloadConfirm')}
+                      value={seedEncConfirm}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => setSeedEncConfirm(e.target.value)}
+                      onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && downloadSeedEncrypted()}
+                    />
+                    {seedEncError && <div className={styles.error}>{seedEncError}</div>}
+                    <div className={styles.actions}>
+                      <Button variant="secondary" small onClick={() => { setSeedEncMode(false); setSeedEncPw(''); setSeedEncConfirm(''); setSeedEncError(''); }}>{t('common.cancel')}</Button>
+                      <Button small onClick={downloadSeedEncrypted} disabled={seedEncrypting}>
+                        {seedEncrypting ? t('key.seedEncrypting') : t('common.download')}
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <div className={styles.seedActions}>
+                    <Button variant="secondary" small onClick={handleClose}>{t('common.close')}</Button>
+                    <Button variant="secondary" small onClick={copySeed}>{t('common.copy')}</Button>
+                    <Button variant="secondary" small onClick={downloadSeedPlain}>{t('key.downloadPlain')}</Button>
+                    <Button small onClick={() => setSeedEncMode(true)}>{t('key.downloadEncrypted')}</Button>
+                  </div>
+                )}
               </>
             )}
           </div>

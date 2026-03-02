@@ -1,10 +1,14 @@
 import React, { useState, useEffect, ChangeEvent } from 'react';
+import browser from '@shared/browser.ts';
 import { rpc } from '@shared/rpc.ts';
 import { t } from '@lib/i18n.js';
 import { IconWarning, IconEye, IconCopy, IconDownload, IconLock } from '@assets';
 import Button from '@components/Button/Button';
 import Input from '@components/Input/Input';
 import styles from './WizardOverlay.module.css';
+
+const CREATE_STORAGE_KEY = 'wizardCreateData';
+const CREATE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 interface CreateStepProps {
   onNext: (account: any, mnemonic: string) => void;
@@ -26,15 +30,39 @@ export default function CreateStep({ onNext }: CreateStepProps) {
   useEffect(() => {
     (async () => {
       try {
+        // Try restoring from session storage (popup was closed and reopened)
+        const saved = await browser.storage.session.get(CREATE_STORAGE_KEY);
+        const data = (saved as Record<string, any>)[CREATE_STORAGE_KEY];
+        if (data?.account && data?.mnemonic && data?.ts && Date.now() - data.ts < CREATE_TTL_MS) {
+          setAccount(data.account);
+          setMnemonic(data.mnemonic);
+          setRevealed(true);
+          setBackedUp(true);
+          setLoading(false);
+          return;
+        }
+
+        // Generate new account
         const result = await rpc<{ account: any; mnemonic: string }>('onboarding_generateAccount');
         setAccount(result.account);
         setMnemonic(result.mnemonic);
+
+        // Persist so it survives popup close (with timestamp)
+        await browser.storage.session.set({
+          [CREATE_STORAGE_KEY]: { account: result.account, mnemonic: result.mnemonic, ts: Date.now() },
+        });
       } catch (e: any) {
         setError(e.message || t('wizard.failedGenerate'));
       }
       setLoading(false);
     })();
   }, []);
+
+  const handleNext = () => {
+    // Clear persisted create data — wizard context takes over from here
+    browser.storage.session.remove(CREATE_STORAGE_KEY).catch(() => {});
+    onNext(account, mnemonic!);
+  };
 
   if (loading) {
     return (
@@ -155,7 +183,7 @@ export default function CreateStep({ onNext }: CreateStepProps) {
       </div>
 
       <div className={styles.stepActions}>
-        <Button onClick={() => onNext(account, mnemonic!)} disabled={!backedUp}>
+        <Button onClick={handleNext} disabled={!backedUp}>
           {t('wizard.iWrittenItDown')}
         </Button>
       </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, ReactNode } from 'react';
 import { t, getSupportedLanguages, getLanguage, setLanguage } from '@lib/i18n.js';
-import { IconLock, IconShield, IconUsers, IconGlobe, IconKey } from '@assets';
+import { IconLock, IconShield, IconUsers, IconGlobe, IconKey, IconDownload } from '@assets';
 import iconBaseSvg from '/icons/icon-base.svg';
 import OverlayPanel from '@components/OverlayPanel/OverlayPanel';
 import ScrollWheelPicker from '@components/ScrollWheelPicker/ScrollWheelPicker';
@@ -172,6 +172,14 @@ export default function MenuOverlay({ visible, onClose, initialSection }: MenuOv
               desc={t('key.exportNcryptsecDesc')}
               onClick={() => setKeyAction('ncryptsec')}
             />
+            {vault.isGenerated && (
+              <NavItem
+                icon={<IconDownload />}
+                label={t('key.exportSeed')}
+                desc={t('key.exportSeedDesc')}
+                onClick={() => setKeyAction('seed')}
+              />
+            )}
           </MenuSection>
         );
       case 'site-permissions':

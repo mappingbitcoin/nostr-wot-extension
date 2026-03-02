@@ -156,6 +156,13 @@ export function reducer(state: WizardState, action: WizardAction, options: Wizar
     return createInitialState(options);
   }
 
+  if (action.type === 'RESTORE' && action.payload) {
+    return {
+      step: action.payload.step as string,
+      ctx: action.payload.ctx as unknown as WizardContext,
+    };
+  }
+
   const stepTransitions = TRANSITIONS[state.step];
   if (!stepTransitions) return state;
 

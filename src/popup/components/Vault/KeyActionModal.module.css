@@ -128,5 +128,57 @@
   margin-top: 4px;
 }
 
+.seedGridWrap {
+  cursor: pointer;
+  border-radius: 10px;
+}
+
+.seedGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 10px 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  transition: filter 0.2s;
+}
+
+.seedGrid.blurred {
+  filter: blur(6px);
+  user-select: none;
+}
+
+.seedActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.seedEncryptRow {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.seedWord {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-heading);
+}
+
+.seedWordNum {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  min-width: 16px;
+}
+
 @keyframes backdropIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modalFadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }

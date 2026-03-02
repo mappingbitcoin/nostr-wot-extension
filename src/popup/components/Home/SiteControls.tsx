@@ -73,12 +73,7 @@ export default function SiteControls({
           <IconChevronRight size={14} />
         </button>
 
-        {children && (
-          <>
-            <div className={styles.controlDivider} />
-            {children}
-          </>
-        )}
+        {children}
       </Card>
     </>
   );

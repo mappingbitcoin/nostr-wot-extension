@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-  createFromMnemonic, createFromMnemonicAtIndex, generateNewAccount, importNsec, importNpub, connectNip46
+  createFromMnemonic, createFromMnemonicAtIndex, generateNewAccount, importNsec, importNpub, connectNip46, importFromMnemonicDerived
 } from '../lib/accounts.js';
 import { nsecEncode, npubEncode } from '../lib/crypto/bech32.js';
 
@@ -110,6 +110,37 @@ describe('generateNewAccount', () => {
     const b: any = await generateNewAccount();
     assert.notStrictEqual(a.account.pubkey, b.account.pubkey);
     assert.notStrictEqual(a.mnemonic, b.mnemonic);
+  });
+});
+
+describe('importFromMnemonicDerived', () => {
+  it('derives first key from mnemonic as nsec type', async () => {
+    const acct: any = await importFromMnemonicDerived(VALID_MNEMONIC, 'Derived');
+    assert.strictEqual(acct.type, 'nsec');
+    assert.strictEqual(acct.name, 'Derived');
+    assert.strictEqual(acct.readOnly, false);
+    assert.match(acct.pubkey, /^[0-9a-f]{64}$/);
+    assert.match(acct.privkey, /^[0-9a-f]{64}$/);
+    assert.strictEqual(acct.mnemonic, null);
+  });
+
+  it('produces same keys as createFromMnemonic (same derivation path)', async () => {
+    const full: any = await createFromMnemonic(VALID_MNEMONIC);
+    const derived: any = await importFromMnemonicDerived(VALID_MNEMONIC);
+    assert.strictEqual(full.pubkey, derived.pubkey);
+    assert.strictEqual(full.privkey, derived.privkey);
+  });
+
+  it('does not store mnemonic', async () => {
+    const acct: any = await importFromMnemonicDerived(VALID_MNEMONIC);
+    assert.strictEqual(acct.mnemonic, null);
+  });
+
+  it('rejects invalid mnemonic', async () => {
+    await assert.rejects(
+      () => importFromMnemonicDerived('invalid words here'),
+      /Invalid mnemonic/
+    );
   });
 });
 
