@@ -612,6 +612,11 @@
   "wizard.verifyBackup": "Backup verifizieren",
   "wizard.setPassword": "Passwort festlegen",
   "wizard.wotSync": "WoT-Sync",
+  "wizard.followTitle": "Vertrauenswürdigen Konten folgen",
+  "wizard.followDesc": "Folge bekannten Konten, um dein Vertrauensnetzwerk aufzubauen. Du kannst dies später ändern.",
+  "wizard.followSelected": "{count} ausgewählt",
+  "wizard.followPublishing": "Veröffentlichen...",
+  "wizard.followSuggestions": "Auswahl folgen",
   "wizard.allSet": "Alles fertig",
 
   "lang.title": "Sprache",

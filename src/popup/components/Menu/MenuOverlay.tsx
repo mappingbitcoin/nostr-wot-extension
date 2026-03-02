@@ -57,7 +57,7 @@ export default function MenuOverlay({ visible, onClose, initialSection }: MenuOv
   const [permDetailDomain, setPermDetailDomain] = useState<string | null>(null);
   const permsSectionRef = useRef<any>(null);
   const vault = useVault();
-  const { isReadOnly } = useAccount();
+  const { isReadOnly, active } = useAccount();
   const { shouldRender, animating } = useAnimatedVisible(visible);
   const languages: Language[] = getSupportedLanguages();
 
@@ -219,7 +219,7 @@ export default function MenuOverlay({ visible, onClose, initialSection }: MenuOv
             <div className={styles.items}>
               {menuItems.map((item) => {
                 if (item.id === 'nip46' && !vault.isNip46) return null;
-                if (item.id === 'key-backup' && isReadOnly) return null;
+                if (item.id === 'key-backup' && (isReadOnly || active?.type === 'nip46')) return null;
                 return (
                   <NavItem
                     key={item.id}

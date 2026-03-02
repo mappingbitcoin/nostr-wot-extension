@@ -795,6 +795,11 @@
   "wizard.verifyBackup": "Verify Backup",
   "wizard.setPassword": "Set Password",
   "wizard.wotSync": "WoT Sync",
+  "wizard.followTitle": "Follow Trusted Accounts",
+  "wizard.followDesc": "Follow some well-known accounts to start building your web of trust. You can always change this later.",
+  "wizard.followSelected": "{count} selected",
+  "wizard.followPublishing": "Publishing...",
+  "wizard.followSuggestions": "Follow Selected",
   "wizard.allSet": "All Set",
 
   "topbar.vaultLocked": "Vault locked",

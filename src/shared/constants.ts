@@ -16,7 +16,7 @@ export const SENSITIVITY_PRESETS: readonly SensitivityPreset[] = [
 
 export const KNOWN_ORACLES: readonly string[] = ['https://wot-oracle.mappingbitcoin.com'] as const;
 
-export const DEFAULT_RELAYS = 'wss://relay.damus.io,wss://nos.lol,wss://relay.nostr.band,wss://relay.mappingbitcoin.com' as const;
+export const DEFAULT_RELAYS = 'wss://relay.damus.io,wss://nos.lol,wss://nostr-01.yakihonne.com' as const;
 
 export const KIND_LABELS: Record<number, string> = {
   0: 'Profile Metadata',

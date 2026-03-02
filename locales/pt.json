@@ -782,6 +782,11 @@
   "wizard.verifyBackup": "Verificar backup",
   "wizard.setPassword": "Definir senha",
   "wizard.wotSync": "Sincronizar WoT",
+  "wizard.followTitle": "Seguir contas de confiança",
+  "wizard.followDesc": "Siga contas conhecidas para começar sua rede de confiança. Você pode mudar depois.",
+  "wizard.followSelected": "{count} selecionados",
+  "wizard.followPublishing": "Publicando...",
+  "wizard.followSuggestions": "Seguir selecionados",
   "wizard.allSet": "Tudo pronto",
 
   "topbar.vaultLocked": "Cofre bloqueado",

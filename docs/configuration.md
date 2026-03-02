@@ -24,8 +24,7 @@ The remote oracle is at `https://wot-oracle.mappingbitcoin.com` by default (`lib
     relays: [
         'wss://relay.damus.io',
         'wss://nos.lol',
-        'wss://relay.nostr.band',
-        'wss://relay.mappingbitcoin.com'
+        'wss://nostr-01.yakihonne.com'
     ],
     maxHops: 3,
     timeout: 5000,

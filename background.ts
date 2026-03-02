@@ -1604,6 +1604,7 @@ async function handleRequest({ method, params }: { method: string; params: Recor
         case 'onboarding_saveReadOnly': {
             const acctId = (params.account as Record<string, string>).id;
             const pubkey = (params.account as Record<string, string>).pubkey;
+            const acctType = (params.account as Record<string, string>).type || 'npub';
             if (pubkey) {
                 config.myPubkey = pubkey;
                 await browser.storage.sync.set({ myPubkey: pubkey });
@@ -1611,12 +1612,13 @@ async function handleRequest({ method, params }: { method: string; params: Recor
             const localAccts = await browser.storage.local.get(['accounts']) as Record<string, Array<{ id: string; name: string; pubkey: string; type: string; readOnly: boolean }>>;
             const accts = localAccts.accounts || [];
             if (!accts.some(a => a.id === acctId)) {
+                // NIP-46 accounts can sign via remote signer — not read-only
                 accts.push({
                     id: acctId,
                     name: (params.account as Record<string, string>).name || 'Account',
                     pubkey,
-                    type: (params.account as Record<string, string>).type || 'npub',
-                    readOnly: true
+                    type: acctType,
+                    readOnly: acctType !== 'nip46'
                 });
             }
             await browser.storage.local.set({ accounts: accts, activeAccountId: acctId });
@@ -1657,8 +1659,12 @@ async function handleRequest({ method, params }: { method: string; params: Recor
                     name: fullAccount.name || 'Account',
                     pubkey: fullAccount.pubkey,
                     type: fullAccount.type || 'generated',
-                    readOnly: !fullAccount.privkey
+                    readOnly: !fullAccount.privkey && fullAccount.type !== 'nip46'
                 });
+            } else {
+                // Update readOnly in case account was saved earlier with wrong flag
+                const idx = accts.findIndex(a => a.id === vaultAcctId);
+                if (idx !== -1) accts[idx].readOnly = !fullAccount.privkey && fullAccount.type !== 'nip46';
             }
             await browser.storage.local.set({ accounts: accts, activeAccountId: vaultAcctId });
             await storage.switchDatabase((params.upgradeFromReadOnly as string) || vaultAcctId);
@@ -1693,8 +1699,11 @@ async function handleRequest({ method, params }: { method: string; params: Recor
                     name: fullAccountAdd.name || 'Account',
                     pubkey: fullAccountAdd.pubkey,
                     type: fullAccountAdd.type || 'generated',
-                    readOnly: !fullAccountAdd.privkey
+                    readOnly: !fullAccountAdd.privkey && fullAccountAdd.type !== 'nip46'
                 });
+            } else {
+                const idx = addVaultAccts.findIndex(a => a.id === fullAccountAdd.id);
+                if (idx !== -1) addVaultAccts[idx].readOnly = !fullAccountAdd.privkey && fullAccountAdd.type !== 'nip46';
             }
             await browser.storage.local.set({ accounts: addVaultAccts, activeAccountId: fullAccountAdd.id });
             if (isSyncInProgress()) {

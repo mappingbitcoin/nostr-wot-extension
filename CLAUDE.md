@@ -2,6 +2,13 @@
 
 Every code change must pass through these gates. No exceptions, no shortcuts.
 
+## Before Commiting Code
+Read existing code and documentation before commiting anything.
+
+1. **Run the build** — `npm run build` must succeed with no errors.
+2. **Run full suite** — `./tests/run.sh` (module tests may hang after completion due to open handles in mock — this is known, not a failure).
+3. **Do not coauthor or cosign commits**.
+
 ## Before Writing Code
 
 Read existing code and documentation before modifying anything.
@@ -26,10 +33,9 @@ Read existing code and documentation before modifying anything.
 Complete every step before claiming work is done.
 
 1. **Run targeted tests** — run the specific test file(s) for the area you changed.
-2. **Run full suite** — `./tests/run.sh` (module tests may hang after completion due to open handles in mock — this is known, not a failure).
-3. **Run the build** — `npm run build` must succeed with no errors.
-4. **Verify test coverage** — every new or changed function must have a test. If none exists, write one. Work is not done until the test exists.
-5. **Update documentation** — if your change alters behavior described in any `docs/` file, update that doc in the same changeset. A code change without its corresponding doc update is incomplete work. Do not defer this.
+2. **Run the build** — `npm run build` must succeed with no errors.
+3. **Verify test coverage** — every new or changed function must have a test. If none exists, write one. Work is not done until the test exists.
+4. **Update documentation** — if your change alters behavior described in any `docs/` file, update that doc in the same changeset. A code change without its corresponding doc update is incomplete work. Do not defer this.
 
 **Hard rule:** Never claim "done" or "all tests pass" without actually running the commands and reading the output. No assumptions. No "should work." Show the TAP summary or build output.
 

@@ -236,8 +236,7 @@ When using **Local** or **Hybrid** mode, the extension indexes your social graph
 
 - wss://relay.damus.io
 - wss://nos.lol
-- wss://relay.nostr.band
-- wss://relay.mappingbitcoin.com
+- wss://nostr-01.yakihonne.com
 
 ## Try It Out
 

@@ -12,6 +12,7 @@ import VerifyStep from './VerifyStep';
 import PasswordStep from './PasswordStep';
 import BackupStep from './BackupStep';
 import WotSyncStep from './WotSyncStep';
+import FollowSuggestionsStep from './FollowSuggestionsStep';
 import PermissionCopyStep from './PermissionCopyStep';
 import DoneStep from './DoneStep';
 import styles from './WizardSteps.module.css';
@@ -93,6 +94,10 @@ function buildSteps(
     wotSync: {
       title: t('wizard.wotSync'),
       content: <WotSyncStep onNext={() => flow.send('DONE')} />,
+    },
+    followSuggestions: {
+      title: t('wizard.followSuggestions'),
+      content: <FollowSuggestionsStep onNext={() => flow.send('DONE')} />,
     },
     permCopy: {
       title: t('wizard.copyPermissions'),
