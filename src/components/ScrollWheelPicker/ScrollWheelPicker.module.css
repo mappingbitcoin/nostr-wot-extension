@@ -1,0 +1,55 @@
+.wheel {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  user-select: none;
+  touch-action: none;
+  cursor: grab;
+  perspective: 900px;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 0, 0, 0.3) 12%,
+    black 28%,
+    black 72%,
+    rgba(0, 0, 0, 0.3) 88%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 0, 0, 0.3) 12%,
+    black 28%,
+    black 72%,
+    rgba(0, 0, 0, 0.3) 88%,
+    transparent 100%
+  );
+}
+
+.wheel:active {
+  cursor: grabbing;
+}
+
+.band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 1;
+  border-top: 0.5px solid rgba(99, 102, 241, 0.18);
+  border-bottom: 0.5px solid rgba(99, 102, 241, 0.18);
+}
+
+.item {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}

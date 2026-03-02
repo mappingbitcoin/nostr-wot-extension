@@ -1,10 +1,12 @@
 # Nostr WOT Extension
 
-Query Nostr Web of Trust distance between pubkeys. Know how many hops separate you from anyone on Nostr.
+[![Tests](https://github.com/nostr-wot/nostr-wot-extension/actions/workflows/tests.yml/badge.svg)](https://github.com/nostr-wot/nostr-wot-extension/actions/workflows/tests.yml)
+
+Query Nostr Web of Trust distance between pubkeys, and optionally manage your Nostr identity — all in one extension.
 
 ## What It Does
 
-Answers: **"How many hops separate me from this pubkey?"** and **"What's their trust score?"**
+**Web of Trust** — Answers: **"How many hops separate me from this pubkey?"** and **"What's their trust score?"**
 
 ```javascript
 // Any web app can call:
@@ -40,12 +42,13 @@ Implements the [`window.nostr.wot` NIP proposal](https://github.com/nostr-protoc
 
 ## Configuration
 
-1. Click extension icon
-2. Your pubkey is auto-detected from NIP-07 signer (Alby, nos2x, etc.) if available
-3. Or enter your pubkey manually (hex format)
-4. Choose mode (Remote/Local/Hybrid)
-5. Customize scoring weights (optional)
-6. Click "Save Settings"
+**First run:** The onboarding wizard guides you through account setup — generate new keys, import an nsec, add a watch-only npub, or connect a NIP-46 bunker.
+
+**After setup:**
+1. Click the extension icon to open the popup
+2. Choose WoT mode (Remote/Local/Hybrid)
+3. Customize scoring weights and relays (optional)
+4. Sync your follow graph for local/hybrid mode
 
 ### Scoring Settings
 
@@ -83,6 +86,50 @@ score = baseScore * distanceWeight * (1 + pathBonus)
 - **Relays**: Nostr relays for local sync
 - **Max Hops**: Maximum search depth (default: 3)
 - **Timeout**: Request timeout in ms (default: 5000)
+
+## Identity Management (Optional)
+
+The extension includes an optional NIP-07 identity provider. You can use it as a standalone WoT tool, or also manage your Nostr keys.
+
+### Account Types
+
+| Type | Description | Signing |
+|------|-------------|---------|
+| **Generated** | New keys from a BIP-39 mnemonic (NIP-06 derivation) | Full |
+| **Imported (nsec)** | Import an existing private key (nsec or hex) | Full |
+| **Watch-only (npub)** | Load a public key for WoT queries only | None |
+| **NIP-46 (Bunker)** | Remote signing via Nostr Connect (`bunker://` URL) | Remote |
+| **External** | Delegates to another NIP-07 extension | Delegated |
+
+### Key Security
+
+- Private keys are encrypted at rest with **AES-256-GCM** (PBKDF2 with 210,000 iterations)
+- Keys are only decrypted in memory when the vault is unlocked
+- Auto-lock timer clears keys after 15 minutes of inactivity (configurable)
+- Private key bytes are zeroed immediately after each signing operation
+- Watch-only accounts never touch private key material
+
+### NIP-07 Signer
+
+When identity management is active, the extension exposes the standard `window.nostr` API:
+
+```javascript
+// Get public key
+const pubkey = await window.nostr.getPublicKey();
+
+// Sign an event
+const signed = await window.nostr.signEvent(event);
+
+// Encrypt/decrypt (NIP-04 legacy)
+const ciphertext = await window.nostr.nip04.encrypt(theirPubkey, plaintext);
+const plaintext = await window.nostr.nip04.decrypt(theirPubkey, ciphertext);
+
+// Encrypt/decrypt (NIP-44 recommended)
+const ciphertext = await window.nostr.nip44.encrypt(theirPubkey, plaintext);
+const plaintext = await window.nostr.nip44.decrypt(theirPubkey, ciphertext);
+```
+
+Signing requests show a permission prompt. You can grant persistent permissions per-domain, per-method, or per-event-kind.
 
 ## For Web Developers
 
@@ -154,9 +201,6 @@ Returns pubkeys followed by both you and the target.
 ### `window.nostr.wot.getPath(targetPubkey)`
 Returns an array of pubkeys representing the shortest path from you to the target. Requires user permission.
 
-### `window.nostr.wot.getMyPubkey()`
-Returns the configured pubkey of the extension user.
-
 ### `window.nostr.wot.getStats()`
 Returns graph statistics (node count, edge count, etc.).
 
@@ -189,12 +233,20 @@ When using **Local** or **Hybrid** mode, the extension indexes your social graph
 
 - wss://relay.damus.io
 - wss://nos.lol
-- wss://relay.nostr.band
-- wss://relay.mappingbitcoin.com
+- wss://nostr-01.yakihonne.com
 
 ## Try It Out
 
 Visit the [Nostr WoT Playground](https://nostr-wot.com/playground) to test the extension's API in your browser.
+
+## Documentation
+
+- [Architecture Reference](docs/architecture.md) - Technical deep dive into the extension's internals
+- [Adding Badge Support](docs/add_badge.md) - Guide for contributing badge adapters for new Nostr clients
+- [Contributing](CONTRIBUTING.md) - How to contribute to the project
+- [Security](SECURITY.md) - Security model and vulnerability reporting
+- [Deployment](DEPLOY.md) - Building and publishing to browser stores
+- [Changelog](CHANGELOG.md) - Version history
 
 ## Related
 

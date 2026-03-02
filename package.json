@@ -1,0 +1,37 @@
+{
+  "name": "nostr-wot-extension",
+  "version": "0.2.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "bash tests/run.sh",
+    "package:chrome": "vite build && node -e \"import{readFileSync as r,writeFileSync as w}from'node:fs';const f='dist/manifest.json',m=JSON.parse(r(f,'utf8'));delete m.browser_specific_settings;w(f,JSON.stringify(m,null,2)+'\\n')\" && cd dist && zip -r ../nostr-wot-chrome.zip . -x '.vite/*'",
+    "package:firefox": "vite build --minify false && node -e \"import{readFileSync as r,writeFileSync as w}from'node:fs';const f='dist/manifest.json',m=JSON.parse(r(f,'utf8'));m.background.scripts=[m.background.service_worker];delete m.background.service_worker;if(m.browser_specific_settings?.gecko)delete m.browser_specific_settings.gecko.data_collection_permissions;w(f,JSON.stringify(m,null,2)+'\\n')\" && cd dist && zip -r ../nostr-wot-firefox.zip . -x '.vite/*'"
+  },
+  "dependencies": {
+    "@noble/ciphers": "^2.1.1",
+    "@noble/curves": "^2.0.1",
+    "@noble/hashes": "^2.0.1",
+    "@scure/base": "^2.0.0",
+    "@scure/bip32": "^2.0.1",
+    "@scure/bip39": "^2.0.1",
+    "qrcode-generator": "^2.0.4",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^2.3.0",
+    "@types/chrome": "^0.1.37",
+    "@types/node": "^25.3.3",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.4",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1"
+  }
+}

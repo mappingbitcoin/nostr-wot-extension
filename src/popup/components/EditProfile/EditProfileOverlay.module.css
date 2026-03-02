@@ -1,0 +1,227 @@
+.body {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Avatar picker */
+.avatarPicker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.avatarCircle {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  cursor: pointer;
+  overflow: hidden;
+  background: var(--brand-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--card-border);
+  transition: border-color 0.2s;
+}
+
+.avatarCircle:hover {
+  border-color: var(--brand);
+}
+
+.avatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatarPlaceholder {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--brand);
+  text-transform: uppercase;
+}
+
+.cameraOverlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.avatarHint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+/* Form fields */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Advanced toggle */
+.advancedToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 4px 0;
+}
+
+.advancedToggle svg {
+  transition: transform 0.2s;
+}
+
+.advancedToggle[data-open="true"] svg {
+  transform: rotate(180deg);
+}
+
+.advancedFields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Preview card */
+.previewCard {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.previewHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.previewAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--card-border);
+}
+
+.previewAvatarPlaceholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--brand-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--brand);
+}
+
+.previewName {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.previewAbout {
+  font-size: 12px;
+  color: var(--text-body);
+  line-height: 1.4;
+}
+
+.previewField {
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.previewField dt {
+  color: var(--text-muted);
+  min-width: 60px;
+  font-weight: 600;
+}
+
+.previewField dd {
+  color: var(--text-body);
+  word-break: break-all;
+}
+
+.previewHint {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* Status / spinner / success */
+.statusRow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px 0;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--card-border);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.statusText {
+  font-size: 13px;
+  color: var(--text-body);
+  font-weight: 600;
+}
+
+.successText {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--success);
+}
+
+.errorText {
+  font-size: 12px;
+  color: var(--error);
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.actions button {
+  flex: 1;
+}

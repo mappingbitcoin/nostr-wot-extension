@@ -1,0 +1,107 @@
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.origin {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.methodBadge {
+  display: inline-flex;
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 10px;
+  background: var(--brand-light);
+  color: var(--brand-hover);
+}
+
+.description {
+  font-size: 13px;
+  color: var(--text-body);
+  margin: 4px 0 0;
+  line-height: 1.45;
+}
+
+.countNote {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 4px 0 0;
+}
+
+.entryBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.entryBlock + .entryBlock {
+  padding-top: 10px;
+  border-top: 1px solid rgba(99, 102, 241, 0.06);
+}
+
+.entryHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.entryTime {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--card-border);
+  margin-top: 4px;
+}
+
+.actionsRow {
+  display: flex;
+  gap: 8px;
+}
+
+.actionsRow > * {
+  flex: 1;
+}
+
+.nip46Pending {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--brand-light);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--brand-hover);
+}
+
+.nip46Spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--brand-light);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

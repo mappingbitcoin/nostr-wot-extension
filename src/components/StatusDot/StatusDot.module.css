@@ -1,0 +1,20 @@
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.reachable { background: #4ade80; }
+.approved { background: #4ade80; }
+.unreachable { background: #ef4444; }
+.rejected { background: #ef4444; }
+.checking { background: #f59e0b; animation: pulse 1.5s ease-in-out infinite; }
+.blocked { background: #f59e0b; }
+.pending { background: #f59e0b; animation: pulse 1.5s ease-in-out infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

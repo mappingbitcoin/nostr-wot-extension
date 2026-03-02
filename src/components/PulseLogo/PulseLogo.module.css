@@ -1,0 +1,45 @@
+.wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo {
+  position: relative;
+}
+
+.wrap::before,
+.wrap::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 60px;
+  height: 60px;
+  margin-top: -30px;
+  margin-left: -30px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.10) 0%, rgba(99, 102, 241, 0) 70%);
+  animation: logoPulse 5s ease-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.wrap::after {
+  animation-delay: 2.5s;
+}
+
+@keyframes logoPulse {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(8);
+    opacity: 0;
+  }
+}

@@ -1,0 +1,27 @@
+.field {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 6px 0;
+  font-size: 13px;
+  gap: 12px;
+}
+
+.label {
+  color: var(--text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.value {
+  color: var(--text-heading);
+  text-align: right;
+  word-break: break-all;
+  min-width: 0;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}

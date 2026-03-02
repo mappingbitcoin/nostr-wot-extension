@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Nostr WOT Extension",
-  "version": "0.1.2",
+  "name": "Nostr WoT",
+  "version": "0.2.1",
   "browser_specific_settings": {
     "gecko": {
       "id": "nostr-wot@dandelionlabs.io",
@@ -11,29 +11,55 @@
       }
     }
   },
-  "description": "Query Nostr Web of Trust distance between pubkeys. Know how many hops separate you from anyone on Nostr.",
+  "description": "Nostr identity provider, NIP-07 signer, and Web of Trust distance checker.",
   "permissions": [
     "storage",
-    "scripting"
+    "scripting",
+    "activeTab"
   ],
-  "optional_host_permissions": [
+"optional_host_permissions": [
     "<all_urls>"
   ],
   "background": {
-    "scripts": ["background.js"],
-    "service_worker": "background.js",
+    "scripts": ["background.ts"],
+    "service_worker": "background.ts",
     "type": "module"
   },
   "action": {
-    "default_popup": "popup/popup.html",
+    "default_popup": "src/popup/index.html",
     "default_icon": "icons/icon48.png"
   },
   "icons": {
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.ts"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["inject.ts"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    }
+  ],
   "web_accessible_resources": [{
-    "resources": ["detect.json"],
+    "resources": [
+      "icons/icon-base.svg",
+      "locales/en.json",
+      "locales/es.json",
+      "locales/pt.json",
+      "locales/de.json",
+      "locales/fr.json",
+      "locales/it.json",
+      "badges/engine.ts",
+      "badges/badges.css",
+      "icons/clients/primal.svg",
+      "icons/clients/coracle.svg"
+    ],
     "matches": ["<all_urls>"]
   }]
 }

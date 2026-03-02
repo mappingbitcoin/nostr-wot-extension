@@ -1,0 +1,190 @@
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 500;
+  background: rgba(0, 0, 0, 0.25);
+  animation: scrimFadeIn 0.2s ease-out;
+}
+
+.overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 501;
+  max-height: 85vh;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(16px);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  animation: sheetSlideIn 0.25s ease-out;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.headerActions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toggleBtn {
+  background: none;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.toggleBtn:hover {
+  border-color: var(--brand-light);
+  color: var(--brand);
+}
+
+.rejectAllBtn {
+  background: none;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--danger, #ef4444);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.rejectAllBtn:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.count {
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--brand);
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 12px;
+  min-width: 24px;
+  text-align: center;
+}
+
+.list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  text-align: left;
+  font-family: inherit;
+}
+
+.card:hover {
+  background: var(--card-active);
+  border-color: var(--brand-light);
+}
+
+.cardLeft {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cardOrigin {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.cardMethod {
+  font-size: 12px;
+  color: var(--text-body);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kindTag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--brand-light);
+  color: var(--brand-hover);
+  white-space: nowrap;
+}
+
+.cardCount {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.cardChevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.cardNip46 {
+  cursor: default;
+  opacity: 0.75;
+  border-style: dashed;
+}
+
+.cardNip46:hover {
+  background: var(--card-bg);
+  border-color: var(--card-border);
+}
+
+.spinnerIcon {
+  animation: spin 1.5s linear infinite;
+  flex-shrink: 0;
+}
+
+.legend {
+  padding: 4px 12px 8px;
+  font-size: 11px;
+  color: var(--text-tertiary, #888);
+  text-align: center;
+}
+
+@keyframes scrimFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sheetSlideIn { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
