@@ -1,6 +1,6 @@
 {
   "name": "nostr-wot-extension",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "bash tests/run.sh",
     "package:chrome": "vite build && node -e \"import{readFileSync as r,writeFileSync as w}from'node:fs';const f='dist/manifest.json',m=JSON.parse(r(f,'utf8'));delete m.browser_specific_settings;w(f,JSON.stringify(m,null,2)+'\\n')\" && cd dist && zip -r ../nostr-wot-chrome.zip . -x '.vite/*'",
-    "package:firefox": "vite build && node -e \"import{readFileSync as r,writeFileSync as w}from'node:fs';const f='dist/manifest.json',m=JSON.parse(r(f,'utf8'));m.background.scripts=[m.background.service_worker];w(f,JSON.stringify(m,null,2)+'\\n')\" && cd dist && zip -r ../nostr-wot-firefox.zip . -x '.vite/*'"
+    "package:firefox": "vite build --minify false && node -e \"import{readFileSync as r,writeFileSync as w}from'node:fs';const f='dist/manifest.json',m=JSON.parse(r(f,'utf8'));m.background.scripts=[m.background.service_worker];delete m.background.service_worker;if(m.browser_specific_settings?.gecko)delete m.browser_specific_settings.gecko.data_collection_permissions;w(f,JSON.stringify(m,null,2)+'\\n')\" && cd dist && zip -r ../nostr-wot-firefox.zip . -x '.vite/*'"
   },
   "dependencies": {
     "@noble/ciphers": "^2.1.1",

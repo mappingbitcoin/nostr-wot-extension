@@ -249,7 +249,7 @@ export default function MenuOverlay({ visible, onClose, initialSection }: MenuOv
           <div className={styles.aboutFooter}>
             <img src={iconBaseSvg} className={styles.aboutLogo} alt="" />
             <span className={styles.aboutName}>Nostr WoT Extension</span>
-            <span className={styles.aboutVersion}>v0.2.0</span>
+            <span className={styles.aboutVersion}>v0.2.1</span>
           </div>
         </div>
       </div>
