@@ -547,9 +547,17 @@ browser.tabs.onActivated.addListener(async ({ tabId }: chrome.tabs.OnActivatedIn
 
 if (browser.permissions?.onAdded) {
     browser.permissions.onAdded.addListener(async (permissions: chrome.permissions.Permissions) => {
-        // If host permissions were granted, inject into matching allowed tabs
+        // When host permissions are granted, auto-add domains to allowedDomains
+        // This handles the case where the popup closes during the permission prompt
         if (permissions.origins?.length) {
             try {
+                for (const origin of permissions.origins) {
+                    // Extract domain from origin pattern like "*://*.example.com/*" or "*://example.com/*"
+                    const match = origin.match(/^\*:\/\/(?:\*\.)?([^/]+)\/\*$/);
+                    if (match?.[1]) {
+                        await addAllowedDomain(match[1]);
+                    }
+                }
                 const tabs = await browser.tabs.query({ status: 'complete' });
                 for (const tab of tabs) {
                     if (tab.url && tab.id) {

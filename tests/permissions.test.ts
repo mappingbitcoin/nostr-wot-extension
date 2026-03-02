@@ -105,6 +105,89 @@ describe('permissions -- save and clear', () => {
   });
 });
 
+describe('permissions -- per-account clear isolation', () => {
+  beforeEach(() => resetMockStorage());
+
+  it('clear in global-defaults mode only removes _default bucket', async () => {
+    // Global defaults mode is the default (signerUseGlobalDefaults defaults to true)
+    // Save permissions for _default bucket (global mode)
+    await permissions.save('example.com', 'getPublicKey', null, 'allow');
+    await permissions.save('example.com', 'signEvent', 1, 'allow');
+
+    // Switch to per-account mode and save permissions for acct1
+    await permissions.setUseGlobalDefaults(false);
+    await permissions.save('example.com', 'signEvent', 1, 'allow', 'acct1');
+    await permissions.save('example.com', 'nip04Encrypt', null, 'deny', 'acct1');
+
+    // Switch back to global mode and clear for this domain
+    await permissions.setUseGlobalDefaults(true);
+    await permissions.clear('example.com');
+
+    // Global defaults should be gone
+    assert.strictEqual(await permissions.check('example.com', 'getPublicKey'), 'ask');
+    assert.strictEqual(await permissions.check('example.com', 'signEvent', 1), 'ask');
+
+    // Per-account permissions for acct1 should still exist
+    await permissions.setUseGlobalDefaults(false);
+    assert.strictEqual(await permissions.check('example.com', 'signEvent', 1, 'acct1'), 'allow');
+    assert.strictEqual(await permissions.check('example.com', 'nip04Encrypt', undefined, 'acct1'), 'deny');
+  });
+
+  it('clear in per-account mode only removes that account bucket', async () => {
+    await permissions.setUseGlobalDefaults(false);
+
+    // Save permissions for two different accounts
+    await permissions.save('example.com', 'getPublicKey', null, 'allow', 'acct1');
+    await permissions.save('example.com', 'signEvent', 1, 'allow', 'acct1');
+    await permissions.save('example.com', 'getPublicKey', null, 'allow', 'acct2');
+    await permissions.save('example.com', 'signEvent', 1, 'deny', 'acct2');
+
+    // Clear acct1's permissions
+    await permissions.clear('example.com', 'acct1');
+
+    // acct1 should be cleared
+    assert.strictEqual(await permissions.check('example.com', 'getPublicKey', undefined, 'acct1'), 'ask');
+    assert.strictEqual(await permissions.check('example.com', 'signEvent', 1, 'acct1'), 'ask');
+
+    // acct2 should be untouched
+    assert.strictEqual(await permissions.check('example.com', 'getPublicKey', undefined, 'acct2'), 'allow');
+    assert.strictEqual(await permissions.check('example.com', 'signEvent', 1, 'acct2'), 'deny');
+  });
+
+  it('clear preserves _default when clearing per-account bucket', async () => {
+    // Save global defaults
+    await permissions.save('example.com', 'getPublicKey', null, 'allow');
+
+    // Save per-account permissions
+    await permissions.setUseGlobalDefaults(false);
+    await permissions.save('example.com', 'signEvent', 1, 'allow', 'acct1');
+
+    // Clear acct1
+    await permissions.clear('example.com', 'acct1');
+
+    // _default should be preserved
+    await permissions.setUseGlobalDefaults(true);
+    assert.strictEqual(await permissions.check('example.com', 'getPublicKey'), 'allow');
+  });
+
+  it('domain entry removed only when all buckets are empty', async () => {
+    await permissions.setUseGlobalDefaults(false);
+    await permissions.save('example.com', 'signEvent', 1, 'allow', 'acct1');
+
+    // Clear the only bucket — domain entry should be removed
+    await permissions.clear('example.com', 'acct1');
+    const raw = await permissions.getAllRaw();
+    assert.strictEqual(raw['example.com'], undefined);
+  });
+
+  it('clear does nothing for nonexistent domain', async () => {
+    // Should not throw
+    await permissions.clear('nonexistent.com', 'acct1');
+    const raw = await permissions.getAllRaw();
+    assert.strictEqual(raw['nonexistent.com'], undefined);
+  });
+});
+
 describe('permissions -- NIP-07 methods', () => {
   beforeEach(() => resetMockStorage());
 

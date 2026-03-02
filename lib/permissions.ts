@@ -243,14 +243,14 @@ export async function clear(domain?: string, accountId?: string): Promise<void> 
     return;
   }
   const perms = await load();
-  if (accountId) {
-    if (perms[domain]) {
-      delete perms[domain][accountId];
-      if (Object.keys(perms[domain]).length === 0) {
-        delete perms[domain];
-      }
-    }
-  } else {
+  if (!perms[domain]) return;
+
+  // Use the same mode-aware bucket resolution as save() and check()
+  const useDefaults = await getUseGlobalDefaults();
+  const bucket = useDefaults ? DEFAULT_BUCKET : (accountId || DEFAULT_BUCKET);
+
+  delete perms[domain][bucket];
+  if (Object.keys(perms[domain]).length === 0) {
     delete perms[domain];
   }
   await browser.storage.local.set({ [STORAGE_KEY]: perms });
