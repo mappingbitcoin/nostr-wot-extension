@@ -384,6 +384,19 @@ export function clearActiveAccount(): void {
 }
 
 /**
+ * Update the NIP-46 ephemeral keypair for an account (persists to vault).
+ * Called after first NIP-46 connect to store the generated keypair so
+ * reconnects after service worker restart use the same identity.
+ */
+export async function updateAccountNip46Keys(accountId: string, localPrivkey: string, localPubkey: string): Promise<void> {
+  if (!_decrypted) throw new Error('Vault is locked');
+  const acct = _decrypted.accounts.find(a => a.id === accountId);
+  if (!acct || !acct.nip46Config) throw new Error('Account not found or not NIP-46');
+  acct.nip46Config = { ...acct.nip46Config, localPrivkey, localPubkey };
+  await save();
+}
+
+/**
  * Set auto-lock timeout
  * @param ms - milliseconds (0 to disable)
  */

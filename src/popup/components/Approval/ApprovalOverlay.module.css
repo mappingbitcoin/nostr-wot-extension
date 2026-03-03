@@ -172,6 +172,30 @@
   border-color: var(--card-border);
 }
 
+.cancelBtn {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  background: none;
+  color: var(--danger, #ef4444);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  padding: 0;
+}
+
+.cancelBtn:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
 .spinnerIcon {
   animation: spin 1.5s linear infinite;
   flex-shrink: 0;

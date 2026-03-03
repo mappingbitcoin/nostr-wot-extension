@@ -35,9 +35,10 @@ export default forwardRef<PermissionsSectionHandle, PermissionsSectionProps>(fun
   // When toggle is ON, use _default (null) for global permissions; otherwise per-account
   const effectiveAccountId = allAccountsMode ? null : selectedAccountId;
 
-  // Is the currently selected account read-only?
+  // Is the currently selected account read-only or NIP-46?
   const selectedAccount = (accounts || []).find((a: any) => a.id === selectedAccountId);
   const isSelectedReadOnly = selectedAccount?.readOnly === true || selectedAccount?.type === 'npub';
+  const isSelectedNip46 = selectedAccount?.type === 'nip46';
 
   // Derive the visible domains from the provider for the current bucket
   const domains = permissions.getDomainsForBucket(effectiveAccountId)
@@ -105,9 +106,9 @@ export default forwardRef<PermissionsSectionHandle, PermissionsSectionProps>(fun
     return a.pubkey?.slice(0, 12) + '...';
   };
 
-  // Filter permission keys for read-only accounts (only getPublicKey)
+  // Filter permission keys for read-only/NIP-46 accounts (only getPublicKey)
   const filterKeysForAccount = (keys: string[]): string[] => {
-    if (!allAccountsMode && isSelectedReadOnly) {
+    if (!allAccountsMode && (isSelectedReadOnly || isSelectedNip46)) {
       return keys.filter((k) => READ_ONLY_KEYS.includes(k));
     }
     return keys;
@@ -152,6 +153,13 @@ export default forwardRef<PermissionsSectionHandle, PermissionsSectionProps>(fun
         <div className={styles.nip46Banner}>
           <span className={styles.nip46BannerTitle}>{t('perms.readOnlyTitle')}</span>
           <span className={styles.nip46BannerHint}>{t('perms.readOnlyHint')}</span>
+        </div>
+      )}
+
+      {!allAccountsMode && isSelectedNip46 && (
+        <div className={styles.nip46Banner}>
+          <span className={styles.nip46BannerTitle}>{t('perms.managedBySigner')}</span>
+          <span className={styles.nip46BannerHint}>{t('perms.managedBySignerHint')}</span>
         </div>
       )}
     </div>

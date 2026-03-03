@@ -66,6 +66,14 @@
   background: rgba(99, 102, 241, 0.04);
 }
 
+.managedBySigner {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 /* Profile suggestion */
 .profileSuggestion {
   display: flex;

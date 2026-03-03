@@ -443,6 +443,48 @@ describe('signer -- nip44Decrypt approval flow', () => {
   });
 });
 
+// -- NIP-46 Cancel Tests --
+
+describe('signer -- cancelNip46InFlight', () => {
+  beforeEach(async () => {
+    resetMockStorage();
+    vault.lock();
+    await signer.cleanupStale();
+  });
+
+  it('cancelNip46InFlight removes nip46 entry from storage', async () => {
+    // Manually insert a NIP-46 in-flight entry into session storage
+    const fakeId = 'nip46_test_123';
+    const entry = {
+      id: fakeId,
+      type: 'signEvent',
+      origin: 'test.com',
+      nip46InFlight: true,
+      timestamp: Date.now(),
+    };
+    await browserMock.storage.session.set({ signerPending: [entry] });
+
+    // Verify it's there
+    const before = await signer.getPending();
+    assert.strictEqual(before.length, 1);
+    assert.strictEqual(before[0].id, fakeId);
+
+    // Cancel it
+    await signer.cancelNip46InFlight(fakeId);
+
+    // Verify it's gone
+    const after = await signer.getPending();
+    assert.strictEqual(after.length, 0, 'Entry should be removed after cancel');
+  });
+
+  it('cancelNip46InFlight is safe to call with unknown id', async () => {
+    // Should not throw even if the ID doesn't exist
+    await signer.cancelNip46InFlight('nonexistent_id');
+    const pending = await signer.getPending();
+    assert.strictEqual(pending.length, 0);
+  });
+});
+
 // -- Edge Cases --
 
 describe('signer -- edge cases', () => {

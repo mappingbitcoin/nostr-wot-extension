@@ -36,6 +36,7 @@ interface AccountContextValue {
   switchAccount: (accountId: string) => Promise<void>;
   reload: () => void;
   isReadOnly: boolean;
+  isNip46: boolean;
   displayName: string;
   displaySub: string;
   avatarUrl: string | null;
@@ -132,6 +133,7 @@ export function AccountProvider({ children }: AccountProviderProps) {
     switchAccount,
     reload,
     isReadOnly: active?.readOnly === true || active?.type === 'npub',
+    isNip46: active?.type === 'nip46',
     displayName: cachedProfile?.name || active?.name || t('topbar.noAccounts'),
     displaySub: active ? (cachedProfile?.nip05 || truncateNpub(active.pubkey)) : t('topbar.addToStart'),
     avatarUrl: cachedProfile?.picture || null,

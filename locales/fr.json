@@ -501,7 +501,7 @@
   "status.syncFailed": "Échec de la synchronisation",
 
   "about.name": "Nostr WoT Extension",
-  "about.version": "v0.2.0",
+  "about.version": "v0.2.2",
 
   "onboarding.title": "Nostr WoT Extension",
   "onboarding.subtitle": "Identité et Web of Trust",
@@ -864,5 +864,6 @@
   "perms.readOnlyHint": "Ce compte ne peut que partager sa clé publique. La signature et le chiffrement ne sont pas disponibles.",
   "approval.appliesToAllAccounts": "La permission s'applique \u00e0 tous les comptes",
   "approval.awaitingSigner": "En attente du signataire distant...",
-  "approval.pendingSignature": "Signature en attente"
+  "approval.pendingSignature": "Signature en attente",
+  "approval.cancelNip46": "Annuler"
 }

@@ -9,6 +9,7 @@ interface SiteControlsProps {
   identityEnabled: boolean;
   wotEnabled: boolean;
   canInject: boolean;
+  isNip46?: boolean;
   onIdentityToggle: (checked: boolean) => void;
   onWotToggle: (checked: boolean) => void;
   onManagePermissions: () => void;
@@ -22,6 +23,7 @@ export default function SiteControls({
   identityEnabled,
   wotEnabled,
   canInject,
+  isNip46,
   onIdentityToggle,
   onWotToggle,
   onManagePermissions,
@@ -41,10 +43,16 @@ export default function SiteControls({
           <Toggle checked={identityEnabled} onChange={onIdentityToggle} />
         </div>
 
-        <button className={styles.controlLink} onClick={onManagePermissions}>
-          <span>{t('home.managePermissions')}</span>
-          <IconChevronRight size={14} />
-        </button>
+        {isNip46 ? (
+          <div className={styles.managedBySigner}>
+            <span>{t('perms.managedBySigner')}</span>
+          </div>
+        ) : (
+          <button className={styles.controlLink} onClick={onManagePermissions}>
+            <span>{t('home.managePermissions')}</span>
+            <IconChevronRight size={14} />
+          </button>
+        )}
 
         <button className={styles.controlLink} onClick={onRecentActivity}>
           <span>{t('home.recentActivity')}</span>

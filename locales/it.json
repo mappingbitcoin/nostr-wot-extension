@@ -501,7 +501,7 @@
   "status.syncFailed": "Sincronizzazione fallita",
 
   "about.name": "Nostr WoT Extension",
-  "about.version": "v0.2.0",
+  "about.version": "v0.2.2",
 
   "onboarding.title": "Nostr WoT Extension",
   "onboarding.subtitle": "Identita e Web of Trust",
@@ -864,5 +864,6 @@
   "perms.readOnlyHint": "Questo account può solo condividere la sua chiave pubblica. Firma e crittografia non sono disponibili.",
   "approval.appliesToAllAccounts": "Il permesso si applica a tutti gli account",
   "approval.awaitingSigner": "In attesa del firmatario remoto...",
-  "approval.pendingSignature": "Firma in sospeso"
+  "approval.pendingSignature": "Firma in sospeso",
+  "approval.cancelNip46": "Annulla"
 }

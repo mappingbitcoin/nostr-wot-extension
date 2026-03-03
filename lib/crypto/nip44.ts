@@ -91,15 +91,16 @@ export async function nip44Encrypt(plaintext: string, privkey: Uint8Array, their
     const padded = pad(plaintext);
     const ciphertext = chacha20(chachaKey, chaChaNonce, padded);
 
-    const payload = concatBytes(
+    // HMAC covers nonce || ciphertext (NOT the version byte) per NIP-44 spec
+    const hmacInput = concatBytes(nonce, ciphertext);
+    const mac = hmac(sha256, hmacKey, hmacInput);
+
+    const final = concatBytes(
       new Uint8Array([NIP44_VERSION]),
       nonce,
-      ciphertext
+      ciphertext,
+      mac
     );
-
-    const mac = hmac(sha256, hmacKey, payload);
-
-    const final = concatBytes(payload, mac);
 
     return arrayToBase64(final);
   } finally {
@@ -118,15 +119,16 @@ export async function nip44Decrypt(data: string, privkey: Uint8Array, theirPubke
   if (version !== NIP44_VERSION) throw new Error(`Unsupported NIP-44 version: ${version}`);
 
   const nonce = raw.slice(1, 33);
-  const mac = raw.slice(raw.length - 32);
-  const payload = raw.slice(0, raw.length - 32);
   const ciphertext = raw.slice(33, raw.length - 32);
+  const mac = raw.slice(raw.length - 32);
 
   const conversationKey = getConversationKey(privkey, theirPubkey);
   const { chachaKey, chaChaNonce, hmacKey } = getMessageKeys(conversationKey, nonce);
 
   try {
-    const expectedMac = hmac(sha256, hmacKey, payload);
+    // HMAC covers nonce || ciphertext (NOT the version byte) per NIP-44 spec
+    const hmacInput = concatBytes(nonce, ciphertext);
+    const expectedMac = hmac(sha256, hmacKey, hmacInput);
     if (!constantTimeEqual(mac, expectedMac)) {
       throw new Error('Invalid MAC');
     }

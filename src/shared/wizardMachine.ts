@@ -90,7 +90,7 @@ const TRANSITIONS: Record<string, Record<string, TransitionHandler>> = {
   },
 
   nip46: {
-    DONE: (_ctx, { account }) => ({ step: 'wotSync', ctx: { account: account as unknown } }),
+    DONE: (_ctx, { account }) => ({ step: 'password', ctx: { account: account as unknown } }),
     BACK: () => ({ step: 'method' }),
   },
 
@@ -114,6 +114,7 @@ const TRANSITIONS: Record<string, Record<string, TransitionHandler>> = {
     BACK: (ctx) => {
       if (ctx.method === 'create') return { step: 'verify' };
       if (ctx.method === 'import') return { step: 'import' };
+      if (ctx.method === 'nip46') return { step: 'nip46' };
       return { step: 'method' };
     },
   },

@@ -73,8 +73,6 @@ export default function Nip46Step({ onNext }: Nip46StepProps) {
         if (result.connected) {
           clearInterval(pollRef.current!);
           setQrState('connected');
-          // Save as read-only (NIP-46 accounts don't need local vault)
-          await rpc('onboarding_saveReadOnly', { account: result.account });
           onNext(result.account);
         } else if (result.expired) {
           clearInterval(pollRef.current!);
@@ -121,7 +119,6 @@ export default function Nip46Step({ onNext }: Nip46StepProps) {
 
     try {
       const result = await rpc<{ account: any }>('onboarding_connectNip46', { bunkerUrl: val });
-      await rpc('onboarding_saveReadOnly', { account: result.account });
       onNext(result.account);
     } catch (e: any) {
       setError(e.message || t('wizard.connectionFailed'));

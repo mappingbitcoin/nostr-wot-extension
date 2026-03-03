@@ -15,7 +15,8 @@ import { bytesToHex } from './lib/crypto/utils.ts';
 import { ncryptsecEncode, ncryptsecDecode } from './lib/crypto/nip49.ts';
 import { signEvent } from './lib/crypto/nip01.ts';
 import { getDefaultsForDomain } from './src/shared/adapterDefaults.ts';
-import { Nip46Client } from './lib/nip46.ts';
+import { BunkerSigner, createNostrConnectURI } from 'nostr-tools/nip46';
+import { generateSecretKey, getPublicKey as ntGetPublicKey } from 'nostr-tools/pure';
 import type { Account, SignedEvent, ScoringConfig, UnsignedEvent, VaultPayload } from './lib/types.ts';
 
 // Sanitize user-provided CSS to prevent data exfiltration via url(), @import, etc.
@@ -32,13 +33,13 @@ const DEFAULT_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://nostr-01
 
 // In-memory sessions for pending nostrconnect:// QR flows
 interface NostrConnectSession {
-    client: Nip46Client;
-    relay: string;
-    localPrivkey: string;
+    signerPromise: Promise<BunkerSigner>;
+    signer: BunkerSigner | null;
+    secretKey: Uint8Array;
     localPubkey: string;
-    signerPubkey: string | null;
-    connected: boolean;
-    expired: boolean;
+    relays: string[];
+    error: Error | null;
+    abortController: AbortController;
 }
 const _nostrConnectSessions = new Map<string, NostrConnectSession>();
 
@@ -67,7 +68,7 @@ const PRIVILEGED_METHODS = new Set([
     'signer_clearPermissions', 'signer_savePermission',
     'signer_getPermissionsRaw', 'signer_getPermissionsForDomainRaw',
     'signer_copyPermissions', 'signer_getUseGlobalDefaults', 'signer_setUseGlobalDefaults',
-    'signer_getPending', 'signer_resolve', 'signer_resolveBatch',
+    'signer_getPending', 'signer_resolve', 'signer_resolveBatch', 'signer_cancelNip46',
     'onboarding_validateNsec', 'onboarding_validateNcryptsec', 'onboarding_validateMnemonic', 'onboarding_validateNpub', 'onboarding_connectNip46',
     'onboarding_generateAccount', 'onboarding_checkExistingSeed', 'onboarding_generateSubAccount',
     'onboarding_exportNcryptsec', 'onboarding_saveReadOnly', 'onboarding_createVault', 'onboarding_addToVault',
@@ -1389,6 +1390,10 @@ async function handleRequest({ method, params }: { method: string; params: Recor
             await signer.resolveBatch(params.origin as string, params.method as string, params.decision as unknown as import('./lib/types.ts').RequestDecision, params.eventKind as number | undefined);
             return { ok: true };
 
+        case 'signer_cancelNip46':
+            await signer.cancelNip46InFlight(params.id as string);
+            return { ok: true };
+
         // === Onboarding methods ===
 
         case 'onboarding_validateNsec': {
@@ -1493,50 +1498,80 @@ async function handleRequest({ method, params }: { method: string; params: Recor
 
         case 'onboarding_connectNip46': {
             const acct = accounts.connectNip46(params.bunkerUrl as string);
-            return { account: acct };
+            await setPendingOnboardingAccount(acct);
+            const { nip46Config: _n46, privkey: _pk, mnemonic: _mn, ...safeNip46 } = acct;
+            return { account: safeNip46 };
         }
 
         case 'onboarding_initNostrConnect': {
-            const relay = DEFAULT_RELAYS[0];
+            // Clean up any existing sessions before creating a new one
+            for (const [oldId, oldSession] of _nostrConnectSessions) {
+                oldSession.abortController.abort();
+                if (oldSession.signer) oldSession.signer.close().catch(() => {});
+                _nostrConnectSessions.delete(oldId);
+            }
+
+            // Known NIP-46 signer relays (nsec.app, etc.) + general relays
+            const NIP46_RELAYS = ['wss://relay.nsec.app', ...DEFAULT_RELAYS];
             const connectSecret = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
-            const client = new Nip46Client({ pubkey: null, relay, secret: null, connectSecret });
-            await client.init();
-            const { privkey: localPrivkey, pubkey: localPubkey } = client.getLocalKeyPair();
-            const nostrconnectUri = Nip46Client.buildConnectUri(localPubkey, relay, {
-                name: 'Nostr WoT Extension'
-            }) + `&secret=${connectSecret}`;
-            await client.connect();
+            const ncSecretKey = generateSecretKey();
+            const ncLocalPubkey = ntGetPublicKey(ncSecretKey);
 
-            const sessionId = Array.from(crypto.getRandomValues(new Uint8Array(8)), b => b.toString(16).padStart(2, '0')).join('');
-            const session: NostrConnectSession = { client, relay, localPrivkey, localPubkey, signerPubkey: null, connected: false, expired: false };
-            _nostrConnectSessions.set(sessionId, session);
-
-            // Start listening in the background
-            client.listenForConnect(120000).then(signerPubkey => {
-                session.signerPubkey = signerPubkey;
-                session.connected = true;
-            }).catch(() => {
-                session.expired = true;
+            const nostrconnectUri = createNostrConnectURI({
+                clientPubkey: ncLocalPubkey,
+                relays: NIP46_RELAYS,
+                secret: connectSecret,
+                name: 'Nostr WoT',
+                url: 'https://nostr-wot.com',
+                image: 'https://nostr-wot.com/icon-512.png'
             });
 
+            const abortController = new AbortController();
+            const sessionId = Array.from(crypto.getRandomValues(new Uint8Array(8)), b => b.toString(16).padStart(2, '0')).join('');
+            const session: NostrConnectSession = {
+                signerPromise: null!,  // set below
+                signer: null,
+                secretKey: ncSecretKey,
+                localPubkey: ncLocalPubkey,
+                relays: NIP46_RELAYS,
+                error: null,
+                abortController,
+            };
+
+            // BunkerSigner.fromURI waits for the remote signer to connect
+            session.signerPromise = BunkerSigner.fromURI(
+                ncSecretKey,
+                nostrconnectUri,
+                { onauth(url: string) { browser.tabs.create({ url }); } },
+                abortController.signal
+            );
+            session.signerPromise
+                .then(signer => { session.signer = signer; })
+                .catch(err => { session.error = err; });
+
+            _nostrConnectSessions.set(sessionId, session);
             return { nostrconnectUri, sessionId };
         }
 
         case 'onboarding_pollNostrConnect': {
             const session = _nostrConnectSessions.get(params.sessionId as string);
             if (!session) return { expired: true };
-            if (session.connected) {
+
+            if (session.signer) {
+                const signerPk = session.signer.bp.pubkey;
+                const primaryRelay = session.relays[0];
+                const localPrivkeyHex = bytesToHex(session.secretKey);
                 const acct = accounts.connectNostrConnect(
-                    session.signerPubkey!, session.relay,
-                    session.localPrivkey, session.localPubkey
+                    signerPk, primaryRelay,
+                    localPrivkeyHex, session.localPubkey
                 );
                 _nostrConnectSessions.delete(params.sessionId as string);
-                session.client.close();
-                return { connected: true, account: acct };
+                await setPendingOnboardingAccount(acct);
+                const { nip46Config: _n46, privkey: _pk, mnemonic: _mn, ...safeNc } = acct;
+                return { connected: true, account: safeNc };
             }
-            if (session.expired) {
+            if (session.error) {
                 _nostrConnectSessions.delete(params.sessionId as string);
-                session.client.close();
                 return { expired: true };
             }
             return { connected: false };
@@ -1545,7 +1580,8 @@ async function handleRequest({ method, params }: { method: string; params: Recor
         case 'onboarding_cancelNostrConnect': {
             const session2 = _nostrConnectSessions.get(params.sessionId as string);
             if (session2) {
-                session2.client.close();
+                session2.abortController.abort();
+                if (session2.signer) session2.signer.close().catch(() => {});
                 _nostrConnectSessions.delete(params.sessionId as string);
             }
             return { ok: true };
@@ -1842,7 +1878,7 @@ async function handleRequest({ method, params }: { method: string; params: Recor
             const clientConnected = signer.isNip46Connected(nip46Acct.id);
 
             return {
-                bunkerPubkey: nip46Config.bunkerUrl ? new URL('nostr://' + nip46Config.bunkerUrl.replace('bunker://', '')).pathname.slice(2, 66) : null,
+                bunkerPubkey: nip46Acct.pubkey,
                 relay: nip46Config.relay,
                 connected: clientConnected,
                 accountId: nip46Acct.id,

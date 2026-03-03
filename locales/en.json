@@ -508,7 +508,7 @@
   "status.syncFailed": "Sync failed",
 
   "about.name": "Nostr WoT Extension",
-  "about.version": "v0.2.0",
+  "about.version": "v0.2.2",
 
   "onboarding.title": "Nostr WoT Extension",
   "onboarding.subtitle": "Identity & Web of Trust",
@@ -878,5 +878,6 @@
   "perms.readOnlyHint": "This account can only share its public key. Signing and encryption are not available.",
   "approval.appliesToAllAccounts": "Permission applies to all accounts",
   "approval.awaitingSigner": "Awaiting remote signer...",
-  "approval.pendingSignature": "Pending signature"
+  "approval.pendingSignature": "Pending signature",
+  "approval.cancelNip46": "Cancel"
 }

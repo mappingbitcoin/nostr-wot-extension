@@ -267,6 +267,12 @@ export default function ApprovalOverlay({ onRequestUnlock }: ApprovalOverlayProp
             <ApprovalCard
               key={`nip46::${group.origin}::${group.method}`}
               group={group}
+              onCancel={async () => {
+                for (const req of group.requests) {
+                  await rpc('signer_cancelNip46', { id: req.id });
+                }
+                refresh();
+              }}
               onClick={() => setSelectedNip46(group)}
             />
           ))}
@@ -301,6 +307,12 @@ export default function ApprovalOverlay({ onRequestUnlock }: ApprovalOverlayProp
         <EventDetailModal
           request={selectedNip46.requests[0]}
           nip46InFlight
+          onDeny={async () => {
+            for (const req of selectedNip46.requests) {
+              await rpc('signer_cancelNip46', { id: req.id });
+            }
+            closeAndRefresh();
+          }}
           onClose={() => setSelectedNip46(null)}
           zIndex={510}
         />

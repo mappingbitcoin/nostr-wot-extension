@@ -31,9 +31,10 @@ import * as permissions from './permissions.ts';
 import { signEvent as cryptoSignEvent } from './crypto/nip01.js';
 import { bytesToHex, hexToBytes } from './crypto/utils.js';
 import { getPublicKey } from './crypto/secp256k1.js';
-import { Nip46Client } from './nip46.ts';
 import { nip04Encrypt, nip04Decrypt } from './crypto/nip04.js';
 import { nip44Encrypt, nip44Decrypt } from './crypto/nip44.js';
+import { BunkerSigner, parseBunkerInput } from 'nostr-tools/nip46';
+import { generateSecretKey } from 'nostr-tools/pure';
 
 // In-memory resolvers for pending requests (keyed by request ID)
 const _pendingResolvers: Map<string, (decision: RequestDecision) => void> = new Map();
@@ -54,7 +55,18 @@ async function withStorageLock<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 // NIP-46 client instances (keyed by account ID)
-const _nip46Clients: Map<string, Nip46Client> = new Map();
+const _nip46Clients: Map<string, BunkerSigner> = new Map();
+
+// NIP-46 abort controllers (keyed by nip46 request ID)
+const _nip46Aborts: Map<string, AbortController> = new Map();
+
+function raceAbort<T>(signal: AbortSignal, promise: Promise<T>): Promise<T> {
+  if (signal.aborted) return Promise.reject(new Error('Cancelled by user'));
+  return new Promise((resolve, reject) => {
+    signal.addEventListener('abort', () => reject(new Error('Cancelled by user')), { once: true });
+    promise.then(resolve, reject);
+  });
+}
 
 /**
  * Get info about the currently active account for permission checks.
@@ -211,6 +223,15 @@ async function removeNip46InFlight(id: string): Promise<void> {
     await browser.storage.session.set({ signerPending: pending });
   });
   browser.runtime.sendMessage({ type: 'signerPendingUpdated' }).catch(() => {});
+}
+
+/**
+ * Cancel a NIP-46 in-flight request by aborting its signal and cleaning up storage.
+ */
+export async function cancelNip46InFlight(reqId: string): Promise<void> {
+  const ac = _nip46Aborts.get(reqId);
+  if (ac) ac.abort();
+  await removeNip46InFlight(reqId);
 }
 
 async function updateBadge(count: number): Promise<void> {
@@ -370,44 +391,55 @@ export async function handleSignEvent(event: UnsignedEvent, origin: string): Pro
 
   if (!(await vault.exists()) && accountType !== 'nip46') throw new Error('No signing key available');
 
-  const decision = await permissions.check(origin, 'signEvent', event.kind, accountId ?? undefined);
-  if (decision === 'deny') throw new Error('Permission denied');
+  // NIP-46 accounts: skip local permission prompt — the remote signer handles approval
+  if (accountType !== 'nip46') {
+    const decision = await permissions.check(origin, 'signEvent', event.kind, accountId ?? undefined);
+    if (decision === 'deny') throw new Error('Permission denied');
 
-  if (decision === 'ask') {
-    const pubkey = await getActivePublicKey();
-    const approved = await queueRequest({
-      type: 'signEvent',
-      origin,
-      event: (() => {
-        const e: Partial<UnsignedEvent> = { kind: event.kind, content: event.content?.slice(0, 200) };
-        if (event.kind === 3 && event.tags) e.tags = event.tags;
-        return e;
-      })(),
-      pubkey: pubkey ?? undefined,
-      permKey: permissions.permissionKey('signEvent', event.kind),
-      eventKind: event.kind,
-      needsPermission: true,
-      accountId,
-    });
-    if (!approved.allow) throw new Error('User denied signing');
+    if (decision === 'ask') {
+      const pubkey = await getActivePublicKey();
+      const approved = await queueRequest({
+        type: 'signEvent',
+        origin,
+        event: (() => {
+          const e: Partial<UnsignedEvent> = { kind: event.kind, content: event.content?.slice(0, 200) };
+          if (event.kind === 3 && event.tags) e.tags = event.tags;
+          return e;
+        })(),
+        pubkey: pubkey ?? undefined,
+        permKey: permissions.permissionKey('signEvent', event.kind),
+        eventKind: event.kind,
+        needsPermission: true,
+        accountId,
+      });
+      if (!approved.allow) throw new Error('User denied signing');
 
-    // Save permission and batch-resolve remaining requests if user chose "remember"
-    if (approved.remember) {
-      const kind = approved.rememberKind !== false ? event.kind : null;
-      await permissions.save(origin, 'signEvent', kind ?? null, 'allow', accountId ?? undefined);
-      // Only batch-resolve requests with the same event kind
-      await resolveBatch(origin, 'signEvent', { allow: true, remember: false }, event.kind);
+      // Save permission and batch-resolve remaining requests if user chose "remember"
+      if (approved.remember) {
+        const kind = approved.rememberKind !== false ? event.kind : null;
+        await permissions.save(origin, 'signEvent', kind ?? null, 'allow', accountId ?? undefined);
+        // Only batch-resolve requests with the same event kind
+        await resolveBatch(origin, 'signEvent', { allow: true, remember: false }, event.kind);
+      }
     }
   }
 
   // Route by account type
   if (accountType === 'nip46') {
+    // NIP-46 needs vault unlocked to read nip46Config
+    if (vault.isLocked()) {
+      const pubkey = await getActivePublicKey();
+      await queueRequest({ type: 'signEvent', origin, pubkey: pubkey ?? undefined, waitingForUnlock: true, needsPermission: false, accountId });
+    }
     const acct = vault.getAccountById(accountId!);
     if (!acct || acct.type !== 'nip46') throw new Error('No NIP-46 account active');
     const nip46ReqId = await queueNip46InFlight({ type: 'signEvent', origin, accountId });
+    const ac = new AbortController();
+    _nip46Aborts.set(nip46ReqId, ac);
     try {
-      return await handleNip46Request(acct, 'signEvent', event, origin);
+      return await raceAbort(ac.signal, handleNip46Request(acct, 'signEvent', event, origin));
     } finally {
+      _nip46Aborts.delete(nip46ReqId);
       await removeNip46InFlight(nip46ReqId);
     }
   }
@@ -445,30 +477,39 @@ export async function handleNip04Encrypt(theirPubkey: string, plaintext: string,
 
   if (!(await vault.exists()) && accountType !== 'nip46') throw new Error('No signing key available');
 
-  const decision = await permissions.check(origin, 'nip04Encrypt', undefined, accountId ?? undefined);
-  if (decision === 'deny') throw new Error('Permission denied');
+  if (accountType !== 'nip46') {
+    const decision = await permissions.check(origin, 'nip04Encrypt', undefined, accountId ?? undefined);
+    if (decision === 'deny') throw new Error('Permission denied');
 
-  if (decision === 'ask') {
-    const pubkey = await getActivePublicKey();
-    const approved = await queueRequest({
-      type: 'nip04Encrypt',
-      origin,
-      theirPubkey,
-      pubkey: pubkey ?? undefined,
-      permKey: permissions.permissionKey('nip04Encrypt'),
-      needsPermission: true,
-      accountId,
-    });
-    if (!approved.allow) throw new Error('User denied encryption');
+    if (decision === 'ask') {
+      const pubkey = await getActivePublicKey();
+      const approved = await queueRequest({
+        type: 'nip04Encrypt',
+        origin,
+        theirPubkey,
+        pubkey: pubkey ?? undefined,
+        permKey: permissions.permissionKey('nip04Encrypt'),
+        needsPermission: true,
+        accountId,
+      });
+      if (!approved.allow) throw new Error('User denied encryption');
+    }
   }
 
   if (accountType === 'nip46') {
+    if (vault.isLocked()) {
+      const pubkey = await getActivePublicKey();
+      await queueRequest({ type: 'nip04Encrypt', origin, pubkey: pubkey ?? undefined, waitingForUnlock: true, needsPermission: false, accountId });
+    }
     const acct = vault.getAccountById(accountId!);
     if (!acct || acct.type !== 'nip46') throw new Error('No NIP-46 account active');
     const nip46ReqId = await queueNip46InFlight({ type: 'nip04Encrypt', origin, accountId });
+    const ac = new AbortController();
+    _nip46Aborts.set(nip46ReqId, ac);
     try {
-      return await handleNip46Request(acct, 'nip04Encrypt', { pubkey: theirPubkey, plaintext }, origin);
+      return await raceAbort(ac.signal, handleNip46Request(acct, 'nip04Encrypt', { pubkey: theirPubkey, plaintext }, origin));
     } finally {
+      _nip46Aborts.delete(nip46ReqId);
       await removeNip46InFlight(nip46ReqId);
     }
   }
@@ -504,30 +545,39 @@ export async function handleNip04Decrypt(theirPubkey: string, ciphertext: string
 
   if (!(await vault.exists()) && accountType !== 'nip46') throw new Error('No signing key available');
 
-  const decision = await permissions.check(origin, 'nip04Decrypt', undefined, accountId ?? undefined);
-  if (decision === 'deny') throw new Error('Permission denied');
+  if (accountType !== 'nip46') {
+    const decision = await permissions.check(origin, 'nip04Decrypt', undefined, accountId ?? undefined);
+    if (decision === 'deny') throw new Error('Permission denied');
 
-  if (decision === 'ask') {
-    const pubkey = await getActivePublicKey();
-    const approved = await queueRequest({
-      type: 'nip04Decrypt',
-      origin,
-      theirPubkey,
-      pubkey: pubkey ?? undefined,
-      permKey: permissions.permissionKey('nip04Decrypt'),
-      needsPermission: true,
-      accountId,
-    });
-    if (!approved.allow) throw new Error('User denied decryption');
+    if (decision === 'ask') {
+      const pubkey = await getActivePublicKey();
+      const approved = await queueRequest({
+        type: 'nip04Decrypt',
+        origin,
+        theirPubkey,
+        pubkey: pubkey ?? undefined,
+        permKey: permissions.permissionKey('nip04Decrypt'),
+        needsPermission: true,
+        accountId,
+      });
+      if (!approved.allow) throw new Error('User denied decryption');
+    }
   }
 
   if (accountType === 'nip46') {
+    if (vault.isLocked()) {
+      const pubkey = await getActivePublicKey();
+      await queueRequest({ type: 'nip04Decrypt', origin, pubkey: pubkey ?? undefined, waitingForUnlock: true, needsPermission: false, accountId });
+    }
     const acct = vault.getAccountById(accountId!);
     if (!acct || acct.type !== 'nip46') throw new Error('No NIP-46 account active');
     const nip46ReqId = await queueNip46InFlight({ type: 'nip04Decrypt', origin, accountId });
+    const ac = new AbortController();
+    _nip46Aborts.set(nip46ReqId, ac);
     try {
-      return await handleNip46Request(acct, 'nip04Decrypt', { pubkey: theirPubkey, ciphertext }, origin);
+      return await raceAbort(ac.signal, handleNip46Request(acct, 'nip04Decrypt', { pubkey: theirPubkey, ciphertext }, origin));
     } finally {
+      _nip46Aborts.delete(nip46ReqId);
       await removeNip46InFlight(nip46ReqId);
     }
   }
@@ -563,30 +613,39 @@ export async function handleNip44Encrypt(theirPubkey: string, plaintext: string,
 
   if (!(await vault.exists()) && accountType !== 'nip46') throw new Error('No signing key available');
 
-  const decision = await permissions.check(origin, 'nip44Encrypt', undefined, accountId ?? undefined);
-  if (decision === 'deny') throw new Error('Permission denied');
+  if (accountType !== 'nip46') {
+    const decision = await permissions.check(origin, 'nip44Encrypt', undefined, accountId ?? undefined);
+    if (decision === 'deny') throw new Error('Permission denied');
 
-  if (decision === 'ask') {
-    const pubkey = await getActivePublicKey();
-    const approved = await queueRequest({
-      type: 'nip44Encrypt',
-      origin,
-      theirPubkey,
-      pubkey: pubkey ?? undefined,
-      permKey: permissions.permissionKey('nip44Encrypt'),
-      needsPermission: true,
-      accountId,
-    });
-    if (!approved.allow) throw new Error('User denied encryption');
+    if (decision === 'ask') {
+      const pubkey = await getActivePublicKey();
+      const approved = await queueRequest({
+        type: 'nip44Encrypt',
+        origin,
+        theirPubkey,
+        pubkey: pubkey ?? undefined,
+        permKey: permissions.permissionKey('nip44Encrypt'),
+        needsPermission: true,
+        accountId,
+      });
+      if (!approved.allow) throw new Error('User denied encryption');
+    }
   }
 
   if (accountType === 'nip46') {
+    if (vault.isLocked()) {
+      const pubkey = await getActivePublicKey();
+      await queueRequest({ type: 'nip44Encrypt', origin, pubkey: pubkey ?? undefined, waitingForUnlock: true, needsPermission: false, accountId });
+    }
     const acct = vault.getAccountById(accountId!);
     if (!acct || acct.type !== 'nip46') throw new Error('No NIP-46 account active');
     const nip46ReqId = await queueNip46InFlight({ type: 'nip44Encrypt', origin, accountId });
+    const ac = new AbortController();
+    _nip46Aborts.set(nip46ReqId, ac);
     try {
-      return await handleNip46Request(acct, 'nip44Encrypt', { pubkey: theirPubkey, plaintext }, origin);
+      return await raceAbort(ac.signal, handleNip46Request(acct, 'nip44Encrypt', { pubkey: theirPubkey, plaintext }, origin));
     } finally {
+      _nip46Aborts.delete(nip46ReqId);
       await removeNip46InFlight(nip46ReqId);
     }
   }
@@ -622,30 +681,39 @@ export async function handleNip44Decrypt(theirPubkey: string, ciphertext: string
 
   if (!(await vault.exists()) && accountType !== 'nip46') throw new Error('No signing key available');
 
-  const decision = await permissions.check(origin, 'nip44Decrypt', undefined, accountId ?? undefined);
-  if (decision === 'deny') throw new Error('Permission denied');
+  if (accountType !== 'nip46') {
+    const decision = await permissions.check(origin, 'nip44Decrypt', undefined, accountId ?? undefined);
+    if (decision === 'deny') throw new Error('Permission denied');
 
-  if (decision === 'ask') {
-    const pubkey = await getActivePublicKey();
-    const approved = await queueRequest({
-      type: 'nip44Decrypt',
-      origin,
-      theirPubkey,
-      pubkey: pubkey ?? undefined,
-      permKey: permissions.permissionKey('nip44Decrypt'),
-      needsPermission: true,
-      accountId,
-    });
-    if (!approved.allow) throw new Error('User denied decryption');
+    if (decision === 'ask') {
+      const pubkey = await getActivePublicKey();
+      const approved = await queueRequest({
+        type: 'nip44Decrypt',
+        origin,
+        theirPubkey,
+        pubkey: pubkey ?? undefined,
+        permKey: permissions.permissionKey('nip44Decrypt'),
+        needsPermission: true,
+        accountId,
+      });
+      if (!approved.allow) throw new Error('User denied decryption');
+    }
   }
 
   if (accountType === 'nip46') {
+    if (vault.isLocked()) {
+      const pubkey = await getActivePublicKey();
+      await queueRequest({ type: 'nip44Decrypt', origin, pubkey: pubkey ?? undefined, waitingForUnlock: true, needsPermission: false, accountId });
+    }
     const acct = vault.getAccountById(accountId!);
     if (!acct || acct.type !== 'nip46') throw new Error('No NIP-46 account active');
     const nip46ReqId = await queueNip46InFlight({ type: 'nip44Decrypt', origin, accountId });
+    const ac = new AbortController();
+    _nip46Aborts.set(nip46ReqId, ac);
     try {
-      return await handleNip46Request(acct, 'nip44Decrypt', { pubkey: theirPubkey, ciphertext }, origin);
+      return await raceAbort(ac.signal, handleNip46Request(acct, 'nip44Decrypt', { pubkey: theirPubkey, ciphertext }, origin));
     } finally {
+      _nip46Aborts.delete(nip46ReqId);
       await removeNip46InFlight(nip46ReqId);
     }
   }
@@ -673,46 +741,72 @@ export async function handleNip44Decrypt(theirPubkey: string, ciphertext: string
   }
 }
 
-// -- NIP-46 Remote Signer --
+// -- NIP-46 Remote Signer (nostr-tools BunkerSigner) --
 
-async function getNip46Client(acct: SafeAccount): Promise<Nip46Client> {
+async function getNip46Client(acct: SafeAccount): Promise<BunkerSigner> {
+  console.log('[NIP-46] getNip46Client for', acct.id, 'cached:', _nip46Clients.has(acct.id));
   if (_nip46Clients.has(acct.id)) {
-    const client = _nip46Clients.get(acct.id)!;
-    if (client.connected) return client;
-    try { client.close(); } catch {}
-    _nip46Clients.delete(acct.id);
+    return _nip46Clients.get(acct.id)!;
   }
 
   if (!acct.nip46Config) throw new Error('No NIP-46 config');
+  console.log('[NIP-46] bunkerUrl:', acct.nip46Config.bunkerUrl, 'hasLocalKey:', !!acct.nip46Config.localPrivkey);
 
-  const config = Nip46Client.parseUrl(acct.nip46Config.bunkerUrl);
-  const client = new Nip46Client(config);
+  // Parse bunker URL to get { pubkey, relays, secret }
+  const bp = await parseBunkerInput(acct.nip46Config.bunkerUrl);
+  if (!bp) throw new Error('Failed to parse bunker URL');
+  console.log('[NIP-46] parsed: pubkey:', bp.pubkey.slice(0, 12), 'relays:', bp.relays, 'hasSecret:', !!bp.secret);
 
-  // Restore persisted ephemeral keypair so the signer recognizes this client
+  // Restore persisted keypair or generate a new one
+  let secretKey: Uint8Array;
   if (acct.nip46Config.localPrivkey) {
-    client.localPrivkey = hexToBytes(acct.nip46Config.localPrivkey);
-    client.localPubkey = acct.nip46Config.localPubkey ?? null;
+    secretKey = hexToBytes(acct.nip46Config.localPrivkey);
+    console.log('[NIP-46] restored persisted keypair');
+  } else {
+    secretKey = generateSecretKey();
+    // Persist the new keypair for reconnection after service worker restart
+    const pubkey = bytesToHex(getPublicKey(secretKey));
+    const privkeyHex = bytesToHex(secretKey);
+    console.log('[NIP-46] generated new keypair, persisting for', acct.id);
+    try {
+      await vault.updateAccountNip46Keys(acct.id, privkeyHex, pubkey);
+    } catch (e) {
+      console.warn('[NIP-46] failed to persist keypair:', (e as Error).message);
+    }
   }
 
-  await client.connect();
-  _nip46Clients.set(acct.id, client);
-  return client;
+  // Create BunkerSigner with auth_url handler (critical for nsec.app)
+  const signer = BunkerSigner.fromBunker(secretKey, bp, {
+    onauth(url: string) {
+      console.log('[NIP-46] auth_url received, opening:', url);
+      browser.tabs.create({ url });
+    }
+  });
+
+  // Send "connect" RPC to establish session
+  console.log('[NIP-46] connecting...');
+  await signer.connect();
+  console.log('[NIP-46] connected to', bp.pubkey.slice(0, 12));
+
+  _nip46Clients.set(acct.id, signer);
+  return signer;
 }
 
-async function handleNip46Request(acct: SafeAccount, method: string, data: unknown, origin: string): Promise<any> {
-  const client = await getNip46Client(acct);
+async function handleNip46Request(acct: SafeAccount, method: string, data: unknown, _origin: string): Promise<any> {
+  console.log('[NIP-46] handleNip46Request:', method, 'for account:', acct.id);
+  const signer = await getNip46Client(acct);
 
   switch (method) {
     case 'signEvent':
-      return client.signEventRemote(data as Partial<UnsignedEvent>);
+      return signer.signEvent(data as UnsignedEvent);
     case 'nip04Encrypt':
-      return client.nip04EncryptRemote((data as { pubkey: string; plaintext: string }).pubkey, (data as { pubkey: string; plaintext: string }).plaintext);
+      return signer.nip04Encrypt((data as { pubkey: string; plaintext: string }).pubkey, (data as { pubkey: string; plaintext: string }).plaintext);
     case 'nip04Decrypt':
-      return client.nip04DecryptRemote((data as { pubkey: string; ciphertext: string }).pubkey, (data as { pubkey: string; ciphertext: string }).ciphertext);
+      return signer.nip04Decrypt((data as { pubkey: string; ciphertext: string }).pubkey, (data as { pubkey: string; ciphertext: string }).ciphertext);
     case 'nip44Encrypt':
-      return client.nip44EncryptRemote((data as { pubkey: string; plaintext: string }).pubkey, (data as { pubkey: string; plaintext: string }).plaintext);
+      return signer.nip44Encrypt((data as { pubkey: string; plaintext: string }).pubkey, (data as { pubkey: string; plaintext: string }).plaintext);
     case 'nip44Decrypt':
-      return client.nip44DecryptRemote((data as { pubkey: string; ciphertext: string }).pubkey, (data as { pubkey: string; ciphertext: string }).ciphertext);
+      return signer.nip44Decrypt((data as { pubkey: string; ciphertext: string }).pubkey, (data as { pubkey: string; ciphertext: string }).ciphertext);
     default:
       throw new Error(`Unsupported NIP-46 method: ${method}`);
   }
@@ -722,17 +816,16 @@ async function handleNip46Request(acct: SafeAccount, method: string, data: unkno
  * Check if a NIP-46 client is currently connected
  */
 export function isNip46Connected(accountId: string): boolean {
-    const client = _nip46Clients.get(accountId);
-    return client?.connected === true;
+  return _nip46Clients.has(accountId);
 }
 
 /**
  * Disconnect and remove a NIP-46 client
  */
 export function disconnectNip46(accountId: string): void {
-    const client = _nip46Clients.get(accountId);
-    if (client) {
-        client.close();
-        _nip46Clients.delete(accountId);
-    }
+  const client = _nip46Clients.get(accountId);
+  if (client) {
+    client.close().catch(() => {});
+    _nip46Clients.delete(accountId);
+  }
 }

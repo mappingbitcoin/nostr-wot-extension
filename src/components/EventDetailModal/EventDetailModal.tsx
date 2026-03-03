@@ -197,12 +197,21 @@ export default function EventDetailModal({
           ))
         )}
 
-        {/* NIP-46 in-flight: read-only pending message */}
+        {/* NIP-46 in-flight: pending message + cancel button */}
         {nip46InFlight && request && (
-          <div className={styles.nip46Pending}>
-            <div className={styles.nip46Spinner} />
-            <span>{t('approval.pendingSignature')}</span>
-          </div>
+          <>
+            <div className={styles.nip46Pending}>
+              <div className={styles.nip46Spinner} />
+              <span>{t('approval.pendingSignature')}</span>
+            </div>
+            {onDeny && (
+              <div className={styles.actions}>
+                <Button variant="danger" small onClick={onDeny}>
+                  {t('approval.cancelNip46')}
+                </Button>
+              </div>
+            )}
+          </>
         )}
 
         {/* Approval action buttons */}

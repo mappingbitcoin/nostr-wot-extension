@@ -28,7 +28,7 @@ interface SyncStaleInfo {
 }
 
 export default function HomeTab({ onViewAllActivity, onManagePermissions, onManageFilters, onManageBadges, onEditProfile }: HomeTabProps) {
-  const { active, cachedProfile, isReadOnly } = useAccount();
+  const { active, cachedProfile, isReadOnly, isNip46 } = useAccount();
   const [domain, setDomain] = useState<string | null>(null);
   const [siteState, setSiteState] = useState<string | null>(null); // null = loading, 'empty' | 'notConnected' | 'connected'
   const [identityEnabled, setIdentityEnabled] = useState<boolean>(true);
@@ -255,6 +255,7 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
         identityEnabled={identityEnabled}
         wotEnabled={wotEnabled}
         canInject={canInject}
+        isNip46={isNip46}
         onIdentityToggle={handleIdentityToggle}
         onWotToggle={handleWotToggle}
         onManagePermissions={() => onManagePermissions(domain!)}
