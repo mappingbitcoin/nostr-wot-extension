@@ -1,8 +1,8 @@
 /**
- * inject.ts — Page-context script exposing window.nostr (NIP-07) and window.nostr.wot
+ * inject.ts — Page-context script exposing window.nostr (NIP-07), window.nostr.wot, and window.webln
  *
  * Runs in MAIN world (page context). Cannot use ES module imports.
- * All NIP-07 methods are thin message-passing wrappers — no crypto happens here.
+ * All NIP-07 and WebLN methods are thin message-passing wrappers — no crypto happens here.
  *
  * @see https://github.com/nostr-protocol/nips/blob/master/07.md — NIP-07: window.nostr capability for web browsers
  */
@@ -54,6 +54,14 @@ declare global {
     interface Window {
         __nostrWotInjected?: boolean;
         nostr: NostrProvider;
+        webln?: {
+            enabled: boolean;
+            enable(): Promise<void>;
+            getInfo(): Promise<{ node: { alias: string; pubkey: string } }>;
+            sendPayment(paymentRequest: string): Promise<{ preimage: string }>;
+            makeInvoice(args: { amount: number; defaultMemo?: string }): Promise<{ paymentRequest: string }>;
+            getBalance(): Promise<{ balance: number }>;
+        };
     }
 }
 
@@ -71,6 +79,11 @@ declare global {
 
     const nip07Pending = new Map<string, PendingEntry>();
     const NIP07_TIMEOUT_MS = 120000; // 2 min (user may need time for prompt)
+
+    // ── WebLN API ──
+
+    const weblnPending = new Map<string, PendingEntry>();
+    const WEBLN_TIMEOUT_MS = 120000;
 
     // Crypto-random request ID generator (prevents response spoofing from page scripts)
     function randomId(): string {
@@ -102,6 +115,19 @@ declare global {
             if (entry) {
                 clearTimeout(entry.timeoutId);
                 nip07Pending.delete(id);
+                if (error) entry.reject(new Error(error));
+                else entry.resolve(result);
+            }
+            return;
+        }
+
+        // WebLN responses
+        if (event.data?.type === 'WEBLN_RESPONSE') {
+            const { id, result, error } = event.data;
+            const entry = weblnPending.get(id);
+            if (entry) {
+                weblnPending.delete(id);
+                clearTimeout(entry.timeoutId);
                 if (error) entry.reject(new Error(error));
                 else entry.resolve(result);
             }
@@ -163,6 +189,18 @@ declare global {
         });
     }
 
+    function weblnCall(method: string, params: Record<string, unknown>): Promise<unknown> {
+        return new Promise((resolve, reject) => {
+            const id = randomId();
+            const timeoutId = setTimeout(() => {
+                weblnPending.delete(id);
+                reject(new Error('WebLN request timed out'));
+            }, WEBLN_TIMEOUT_MS);
+            weblnPending.set(id, { resolve, reject, timeoutId });
+            window.postMessage({ type: 'WEBLN_REQUEST', id, method, params }, window.location.origin);
+        });
+    }
+
     // ── Expose APIs ──
 
     window.nostr = window.nostr || {} as NostrProvider;
@@ -205,6 +243,33 @@ declare global {
         encrypt: (pubkey, plaintext) => nip07Call('nip44Encrypt', { pubkey, plaintext }) as Promise<string>,
         decrypt: (pubkey, ciphertext) => nip07Call('nip44Decrypt', { pubkey, ciphertext }) as Promise<string>
     };
+
+    // WebLN Lightning wallet API
+    let weblnEnabled = false;
+
+    window.webln = {
+        enabled: false,
+        async enable() {
+            await weblnCall('enable', {});
+            weblnEnabled = true;
+            window.webln!.enabled = true;
+        },
+        getInfo: () => weblnCall('getInfo', {}) as Promise<{ node: { alias: string; pubkey: string } }>,
+        sendPayment: (paymentRequest: string) => {
+            if (!weblnEnabled) return Promise.reject(new Error('WebLN not enabled. Call webln.enable() first.'));
+            return weblnCall('sendPayment', { paymentRequest }) as Promise<{ preimage: string }>;
+        },
+        makeInvoice: (args: { amount: number; defaultMemo?: string }) => {
+            if (!weblnEnabled) return Promise.reject(new Error('WebLN not enabled. Call webln.enable() first.'));
+            return weblnCall('makeInvoice', args) as Promise<{ paymentRequest: string }>;
+        },
+        getBalance: () => {
+            if (!weblnEnabled) return Promise.reject(new Error('WebLN not enabled. Call webln.enable() first.'));
+            return weblnCall('getBalance', {}) as Promise<{ balance: number }>;
+        },
+    };
+
+    window.dispatchEvent(new CustomEvent('webln-ready'));
 
     // Notify page that APIs are ready
     window.dispatchEvent(new CustomEvent('nostr-wot-ready'));

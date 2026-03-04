@@ -6,6 +6,7 @@ The Nostr WoT Extension is a Manifest V3 browser extension that combines two cap
 
 1. **NIP-07 Identity Provider (Signer)** -- Exposes `window.nostr` for web applications to request public keys, event signing, and NIP-04/NIP-44 encryption/decryption.
 2. **Web of Trust Distance Checker** -- Maintains a local social graph from Nostr kind:3 (contact list) events and provides hop-distance and trust-score queries via `window.nostr.wot`.
+3. **WebLN Lightning Wallet** -- Exposes `window.webln` for web applications to send/receive Lightning payments via connected wallets.
 
 The extension targets Chrome and Firefox, using a service worker on Chrome and a background script on Firefox (declared side by side in `manifest.json`).
 
@@ -40,27 +41,29 @@ Responsibilities:
 
 Runs in the **ISOLATED** world. Acts as a bidirectional message bridge between the page context (`inject.ts`) and the background script.
 
-- Listens for `window.postMessage` events with `type: 'WOT_REQUEST'` or `type: 'NIP07_REQUEST'`.
-- Validates the method name against hardcoded allowlists (`WOT_ALLOWED_METHODS`, `NIP07_ALLOWED_METHODS`).
+- Listens for `window.postMessage` events with `type: 'WOT_REQUEST'`, `type: 'NIP07_REQUEST'`, or `type: 'WEBLN_REQUEST'`.
+- Validates the method name against hardcoded allowlists (`WOT_ALLOWED_METHODS`, `NIP07_ALLOWED_METHODS`, `WEBLN_ALLOWED_METHODS`).
 - Forwards valid requests to the background via `browser.runtime.sendMessage`.
-- Posts responses back to the page as `WOT_RESPONSE` or `NIP07_RESPONSE`.
+- Posts responses back to the page as `WOT_RESPONSE`, `NIP07_RESPONSE`, or `WEBLN_RESPONSE`.
 - **Rate limiter**: 100 WoT requests per second (sliding window, separate from the background rate limiter).
-- **HTTPS enforcement**: NIP-07 methods are blocked on `http:` origins except `localhost`, `127.0.0.1`, and `[::1]`.
+- **HTTPS enforcement**: NIP-07 and WebLN methods are blocked on `http:` origins except `localhost`, `127.0.0.1`, and `[::1]`.
 - **NIP-07 prefixing**: Adds `nip07_` prefix and `origin` (hostname) to all NIP-07 requests before forwarding.
+- **WebLN prefixing**: Adds `webln_` prefix and `origin` (hostname) to all WebLN requests before forwarding.
 - Guards against double injection with `window.__nostrWotContentInjected`.
 
 ### 2.3 Inject Script -- `inject.ts`
 
 Runs in the **MAIN** world (page context). Written as an IIFE with `export {}` for module context. Bundled by Vite into a single script.
 
-Exposes two API surfaces on the page:
+Exposes three API surfaces on the page:
 
 - `window.nostr.getPublicKey()`, `window.nostr.signEvent(event)`, `window.nostr.getRelays()`, `window.nostr.nip04.{encrypt,decrypt}`, `window.nostr.nip44.{encrypt,decrypt}` -- NIP-07 signer.
 - `window.nostr.wot.{getDistance, isInMyWoT, getTrustScore, getDetails, getConfig, getDistanceBatch, getTrustScoreBatch, filterByWoT, getStatus, getFollows, getCommonFollows, getStats, getPath}` -- Web of Trust API.
+- `window.webln.{enable, getInfo, sendPayment, makeInvoice, getBalance}` -- WebLN Lightning wallet API.
 
-Each method posts a typed message to `window.postMessage` and returns a Promise that resolves when the matching response arrives. Timeouts: 30 seconds for WoT calls, 120 seconds for NIP-07 calls (users may need time to respond to signing prompts).
+Each method posts a typed message to `window.postMessage` and returns a Promise that resolves when the matching response arrives. Timeouts: 30 seconds for WoT calls, 120 seconds for NIP-07 and WebLN calls (users may need time to respond to prompts).
 
-Fires a `CustomEvent('nostr-wot-ready')` on `window` when injection completes so pages can detect API availability.
+Fires `CustomEvent('webln-ready')` and `CustomEvent('nostr-wot-ready')` on `window` when injection completes so pages can detect API availability.
 
 ### 2.4 Popup -- `src/popup/`
 
