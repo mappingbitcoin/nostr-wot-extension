@@ -189,3 +189,12 @@
   padding: 20px;
   color: var(--error);
 }
+
+/* Payment amount for WebLN requests */
+.paymentAmount {
+  text-align: center;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-heading);
+  padding: 12px 0;
+}
