@@ -22,5 +22,8 @@ icons/*.svg
 # Local settings
 .claude/
 
+# Git worktrees
+.worktrees/
+
 #
 *.zip
