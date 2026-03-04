@@ -145,9 +145,10 @@ interface QueueRequestInput {
   waitingForUnlock?: boolean;
   nip46InFlight?: boolean;
   accountId?: string | null;
+  walletAmount?: number;        // For WebLN payment approval
 }
 
-async function queueRequest(request: QueueRequestInput): Promise<RequestDecision> {
+export async function queueRequest(request: QueueRequestInput): Promise<RequestDecision> {
   const id = `req_${crypto.randomUUID()}`;
   const entry: PendingRequest = { id, ...request, timestamp: Date.now() };
 
