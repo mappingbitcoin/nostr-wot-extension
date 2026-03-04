@@ -17,6 +17,11 @@ import { signEvent } from './lib/crypto/nip01.ts';
 import { getDefaultsForDomain } from './src/shared/adapterDefaults.ts';
 import { BunkerSigner, createNostrConnectURI } from 'nostr-tools/nip46';
 import { generateSecretKey, getPublicKey as ntGetPublicKey } from 'nostr-tools/pure';
+import {
+  getWalletProvider, removeWalletProvider,
+  clearWalletProviders, hasWalletConfig
+} from './lib/wallet/index.ts';
+import type { WalletConfig } from './lib/wallet/types.ts';
 import type { Account, SignedEvent, ScoringConfig, UnsignedEvent, VaultPayload } from './lib/types.ts';
 
 // Sanitize user-provided CSS to prevent data exfiltration via url(), @import, etc.
@@ -89,6 +94,9 @@ const PRIVILEGED_METHODS = new Set([
     'checkRelayHealth', 'checkOracleHealth',
     'previewBadgeConfig', 'getAllowedDomains', 'isDomainAllowed',
     'getSyncState', 'hasHostPermission', 'getProfileMetadata', 'getProfileMetadataBatch',
+    'wallet_getInfo', 'wallet_getBalance', 'wallet_connect', 'wallet_disconnect',
+    'wallet_setAutoApproveThreshold', 'wallet_getAutoApproveThreshold',
+    'wallet_makeInvoice', 'wallet_hasConfig',
 ]);
 
 function checkRateLimit(method: string): boolean {
@@ -1024,6 +1032,7 @@ async function handleRequest({ method, params }: { method: string; params: Recor
 
         case 'vault_lock':
             vault.lock();
+            clearWalletProviders();
             return { ok: true };
 
         case 'vault_isLocked':
@@ -1340,6 +1349,185 @@ async function handleRequest({ method, params }: { method: string; params: Recor
             } catch (e) {
                 logActivity({ domain: params.origin as string, method: 'nip44Decrypt', decision: 'rejected', theirPubkey: params.pubkey as string });
                 throw e;
+            }
+        }
+
+
+        // ── WebLN (from web pages, non-privileged) ──
+
+        case 'webln_enable': {
+            if (vault.isLocked()) return { result: null, error: 'Vault is locked' };
+            const acct = vault.getActiveAccountWithWallet();
+            if (!acct || !acct.walletConfig) return { result: null, error: 'No wallet configured' };
+            return { result: true, error: null };
+        }
+
+        case 'webln_getInfo': {
+            if (vault.isLocked()) return { result: null, error: 'Vault is locked' };
+            const acct = vault.getActiveAccountWithWallet();
+            if (!acct?.walletConfig) return { result: null, error: 'No wallet configured' };
+            const provider = getWalletProvider(acct.id, acct.walletConfig);
+            if (!provider) return { result: null, error: 'Wallet provider not available' };
+            try {
+                if (!provider.isConnected()) await provider.connect();
+                const info = await provider.getInfo();
+                return { result: { node: { alias: info.alias || '', pubkey: acct.pubkey } }, error: null };
+            } catch (e) {
+                return { result: null, error: (e as Error).message };
+            }
+        }
+
+        case 'webln_getBalance': {
+            if (vault.isLocked()) return { result: null, error: 'Vault is locked' };
+            const acct = vault.getActiveAccountWithWallet();
+            if (!acct?.walletConfig) return { result: null, error: 'No wallet configured' };
+            const provider = getWalletProvider(acct.id, acct.walletConfig);
+            if (!provider) return { result: null, error: 'Wallet provider not available' };
+            try {
+                if (!provider.isConnected()) await provider.connect();
+                const bal = await provider.getBalance();
+                return { result: bal, error: null };
+            } catch (e) {
+                return { result: null, error: (e as Error).message };
+            }
+        }
+
+        case 'webln_sendPayment': {
+            const { paymentRequest, origin } = params as { paymentRequest: string; origin: string };
+            if (!paymentRequest) return { result: null, error: 'Missing paymentRequest' };
+
+            if (vault.isLocked()) return { result: null, error: 'Vault is locked' };
+            const acct = vault.getActiveAccountWithWallet();
+            if (!acct?.walletConfig) return { result: null, error: 'No wallet configured' };
+            const provider = getWalletProvider(acct.id, acct.walletConfig);
+            if (!provider) return { result: null, error: 'Wallet provider not available' };
+
+            // Permission check
+            const perm = await signerPermissions.check(origin, 'webln_sendPayment');
+            if (perm === 'deny') return { result: null, error: 'Permission denied' };
+            if (perm === 'ask') {
+                const decision = await signer.queueRequest({
+                    type: 'webln_sendPayment',
+                    origin,
+                    walletAmount: 0, // Amount parsing from bolt11 is complex — show in UI later
+                });
+                if (!decision.allow) return { result: null, error: 'Payment denied by user' };
+                if (decision.remember) {
+                    await signerPermissions.save(origin, 'webln_sendPayment', null, 'allow');
+                }
+            }
+
+            try {
+                if (!provider.isConnected()) await provider.connect();
+                const result = await provider.payInvoice(paymentRequest);
+                return { result, error: null };
+            } catch (e) {
+                return { result: null, error: (e as Error).message };
+            }
+        }
+
+        case 'webln_makeInvoice': {
+            const { amount, defaultMemo, origin } = params as { amount: number; defaultMemo?: string; origin: string };
+            if (vault.isLocked()) return { result: null, error: 'Vault is locked' };
+            const acct = vault.getActiveAccountWithWallet();
+            if (!acct?.walletConfig) return { result: null, error: 'No wallet configured' };
+            const provider = getWalletProvider(acct.id, acct.walletConfig);
+            if (!provider) return { result: null, error: 'Wallet provider not available' };
+            try {
+                if (!provider.isConnected()) await provider.connect();
+                const inv = await provider.makeInvoice(amount, defaultMemo);
+                return { result: { paymentRequest: inv.bolt11 }, error: null };
+            } catch (e) {
+                return { result: null, error: (e as Error).message };
+            }
+        }
+
+        // ── Wallet management (privileged, from extension UI) ──
+
+        case 'wallet_hasConfig': {
+            if (vault.isLocked()) return { result: false, error: null };
+            const acct = vault.getActiveAccountWithWallet();
+            return { result: hasWalletConfig(acct?.walletConfig), error: null };
+        }
+
+        case 'wallet_getInfo': {
+            if (vault.isLocked()) return { result: null, error: 'Vault is locked' };
+            const acct = vault.getActiveAccountWithWallet();
+            if (!acct?.walletConfig) return { result: null, error: 'No wallet configured' };
+            const provider = getWalletProvider(acct.id, acct.walletConfig);
+            if (!provider) return { result: null, error: 'Provider not available' };
+            try {
+                if (!provider.isConnected()) await provider.connect();
+                return { result: await provider.getInfo(), error: null };
+            } catch (e) {
+                return { result: null, error: (e as Error).message };
+            }
+        }
+
+        case 'wallet_getBalance': {
+            if (vault.isLocked()) return { result: null, error: 'Vault is locked' };
+            const acct = vault.getActiveAccountWithWallet();
+            if (!acct?.walletConfig) return { result: null, error: 'No wallet configured' };
+            const provider = getWalletProvider(acct.id, acct.walletConfig);
+            if (!provider) return { result: null, error: 'Provider not available' };
+            try {
+                if (!provider.isConnected()) await provider.connect();
+                return { result: await provider.getBalance(), error: null };
+            } catch (e) {
+                return { result: null, error: (e as Error).message };
+            }
+        }
+
+        case 'wallet_connect': {
+            const { walletConfig } = params as { walletConfig: WalletConfig };
+            if (vault.isLocked()) return { result: null, error: 'Vault is locked' };
+            const acctId = vault.getActiveAccountId();
+            if (!acctId) return { result: null, error: 'No active account' };
+            await vault.updateAccountWalletConfig(acctId, walletConfig);
+            const provider = getWalletProvider(acctId, walletConfig);
+            if (provider) {
+                await provider.connect();
+            }
+            return { result: true, error: null };
+        }
+
+        case 'wallet_disconnect': {
+            if (vault.isLocked()) return { result: null, error: 'Vault is locked' };
+            const acctId = vault.getActiveAccountId();
+            if (!acctId) return { result: null, error: 'No active account' };
+            removeWalletProvider(acctId);
+            await vault.updateAccountWalletConfig(acctId, null);
+            return { result: true, error: null };
+        }
+
+        case 'wallet_setAutoApproveThreshold': {
+            const { threshold } = params as { threshold: number };
+            const acctId = vault.getActiveAccountId();
+            if (!acctId) return { result: null, error: 'No active account' };
+            await browser.storage.local.set({ [`walletThreshold_${acctId}`]: threshold });
+            return { result: true, error: null };
+        }
+
+        case 'wallet_getAutoApproveThreshold': {
+            const acctId = vault.getActiveAccountId();
+            if (!acctId) return { result: 0, error: null };
+            const data = await browser.storage.local.get(`walletThreshold_${acctId}`) as Record<string, number>;
+            return { result: data[`walletThreshold_${acctId}`] || 0, error: null };
+        }
+
+        case 'wallet_makeInvoice': {
+            const { amount, memo } = params as { amount: number; memo?: string };
+            if (vault.isLocked()) return { result: null, error: 'Vault is locked' };
+            const acct = vault.getActiveAccountWithWallet();
+            if (!acct?.walletConfig) return { result: null, error: 'No wallet configured' };
+            const provider = getWalletProvider(acct.id, acct.walletConfig);
+            if (!provider) return { result: null, error: 'Provider not available' };
+            try {
+                if (!provider.isConnected()) await provider.connect();
+                const inv = await provider.makeInvoice(amount, memo);
+                return { result: inv, error: null };
+            } catch (e) {
+                return { result: null, error: (e as Error).message };
             }
         }
 

@@ -50,6 +50,9 @@ export interface Account {
 /** Account without private key — safe to expose */
 export type SafeAccount = Omit<Account, 'privkey' | 'mnemonic' | 'walletConfig'>;
 
+/** Account without private key but with walletConfig — for background wallet handlers */
+export type SafeAccountWithWallet = Omit<Account, 'privkey' | 'mnemonic'>;
+
 /** Account with private key as Uint8Array — used in vault memory only */
 export interface MemoryAccount extends Omit<Account, 'privkey' | 'mnemonic'> {
   privkeyBytes: Uint8Array | null;  // zeroed on lock

@@ -139,4 +139,33 @@ describe('vault -- wallet config storage', () => {
       /Account not found/
     );
   });
+
+  it('getActiveAccountWithWallet returns account with walletConfig', async () => {
+    await vault.create(TEST_PASSWORD, makePayload({ walletConfig: LNBITS_CONFIG }));
+    const acct = vault.getActiveAccountWithWallet();
+    assert.ok(acct);
+    assert.strictEqual(acct!.id, 'acct1');
+    assert.strictEqual(acct!.pubkey, TEST_PUBKEY_HEX);
+    assert.deepStrictEqual(acct!.walletConfig, LNBITS_CONFIG);
+    // Should NOT have privkeyBytes or mnemonicBytes
+    assert.strictEqual((acct as Record<string, unknown>).privkeyBytes, undefined);
+    assert.strictEqual((acct as Record<string, unknown>).mnemonicBytes, undefined);
+    // Should NOT have privkey or mnemonic
+    assert.strictEqual((acct as Record<string, unknown>).privkey, undefined);
+    assert.strictEqual((acct as Record<string, unknown>).mnemonic, undefined);
+  });
+
+  it('getActiveAccountWithWallet returns null when locked', async () => {
+    await vault.create(TEST_PASSWORD, makePayload({ walletConfig: NWC_CONFIG }));
+    vault.lock();
+    const acct = vault.getActiveAccountWithWallet();
+    assert.strictEqual(acct, null);
+  });
+
+  it('getActiveAccountWithWallet returns account without walletConfig when not set', async () => {
+    await vault.create(TEST_PASSWORD, makePayload());
+    const acct = vault.getActiveAccountWithWallet();
+    assert.ok(acct);
+    assert.strictEqual(acct!.walletConfig, undefined);
+  });
 });

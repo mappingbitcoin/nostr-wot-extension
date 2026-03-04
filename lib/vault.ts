@@ -21,7 +21,7 @@
  * @module lib/vault
  */
 
-import type { VaultPayload, Account, SafeAccount, MemoryAccount, MemoryVaultPayload } from './types.ts';
+import type { VaultPayload, Account, SafeAccount, SafeAccountWithWallet, MemoryAccount, MemoryVaultPayload } from './types.ts';
 import browser from './browser.ts';
 
 const STORAGE_KEY = 'keyVault';
@@ -271,6 +271,19 @@ export function getActiveAccountId(): string | null {
  * Get the active account
  */
 export function getActiveAccount(): SafeAccount | null {
+  if (!_decrypted) return null;
+  const acct = _decrypted.accounts.find(a => a.id === _decrypted!.activeAccountId);
+  if (!acct) return null;
+  const { privkeyBytes, mnemonicBytes, ...safe } = acct;
+  return safe;
+}
+
+/**
+ * Get the active account including walletConfig (for background wallet handlers).
+ * Unlike getActiveAccount() which omits walletConfig from its return type,
+ * this includes it for use in wallet/WebLN handler code.
+ */
+export function getActiveAccountWithWallet(): SafeAccountWithWallet | null {
   if (!_decrypted) return null;
   const acct = _decrypted.accounts.find(a => a.id === _decrypted!.activeAccountId);
   if (!acct) return null;
