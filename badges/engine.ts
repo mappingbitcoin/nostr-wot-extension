@@ -93,8 +93,8 @@ function getWotApi(): BadgeWotApi | undefined {
 (function () {
     'use strict';
 
-    const LOG = (...args: unknown[]) => console.log('[WoT Badges]', ...args);
-    const WARN = (...args: unknown[]) => console.warn('[WoT Badges]', ...args);
+    const LOG = (..._args: unknown[]) => {};
+    const WARN = (..._args: unknown[]) => {};
 
     if (window.__wotBadgeEngineRunning) return;
     window.__wotBadgeEngineRunning = true;
