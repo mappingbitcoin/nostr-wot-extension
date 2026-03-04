@@ -1,9 +1,10 @@
 /**
  * content.ts — Message bridge between page context (inject.ts) and background.ts
  *
- * Runs in ISOLATED world. Bridges two message channels:
+ * Runs in ISOLATED world. Bridges three message channels:
  *   - WOT_REQUEST/WOT_RESPONSE: Web of Trust API queries
  *   - NIP07_REQUEST/NIP07_RESPONSE: NIP-07 signer requests (prefixed with nip07_ to background)
+ *   - WEBLN_REQUEST/WEBLN_RESPONSE: WebLN provider requests (prefixed with webln_ to background)
  *
  * Each channel has its own allowlist of permitted methods for security.
  *
@@ -41,6 +42,12 @@ if (window.__nostrWotContentInjected) {
         'getPublicKey', 'signEvent', 'getRelays',
         'nip04Encrypt', 'nip04Decrypt',
         'nip44Encrypt', 'nip44Decrypt'
+    ] as const;
+
+    // ── WebLN methods ──
+
+    const WEBLN_ALLOWED_METHODS = [
+        'enable', 'getInfo', 'sendPayment', 'makeInvoice', 'getBalance'
     ] as const;
 
     // Rate limiting for WoT API calls only (NIP-07 is gated by permissions, not rate limits)
@@ -135,6 +142,50 @@ if (window.__nostrWotContentInjected) {
             } catch {
                 window.postMessage({
                     type: 'NIP07_RESPONSE', id, result: null,
+                    error: 'Extension context invalidated — reload the page'
+                }, window.location.origin);
+            }
+            return;
+        }
+
+        // ── WebLN requests ──
+        if (event.data?.type === 'WEBLN_REQUEST') {
+            const { id, method, params } = event.data;
+
+            // Reject WebLN from insecure HTTP origins (except localhost)
+            if (window.location.protocol === 'http:' &&
+                !['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname)) {
+                window.postMessage({
+                    type: 'WEBLN_RESPONSE', id, result: null,
+                    error: 'WebLN requires a secure (HTTPS) connection'
+                }, window.location.origin);
+                return;
+            }
+
+            if (!(WEBLN_ALLOWED_METHODS as readonly string[]).includes(method)) {
+                window.postMessage({
+                    type: 'WEBLN_RESPONSE', id, result: null,
+                    error: 'Method not allowed'
+                }, window.location.origin);
+                return;
+            }
+
+            // Forward to background with webln_ prefix and origin
+            const origin = window.location.hostname;
+            try {
+                const response = await browser.runtime.sendMessage({
+                    method: 'webln_' + method,
+                    params: { ...params, origin }
+                });
+
+                window.postMessage({
+                    type: 'WEBLN_RESPONSE', id,
+                    result: response.result,
+                    error: response.error
+                }, window.location.origin);
+            } catch {
+                window.postMessage({
+                    type: 'WEBLN_RESPONSE', id, result: null,
                     error: 'Extension context invalidated — reload the page'
                 }, window.location.origin);
             }

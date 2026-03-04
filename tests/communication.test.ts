@@ -25,9 +25,11 @@
  *   Layer 1 — Content Script Validation (pure functions, no browser APIs)
  *     - WoT method allowlist (14 methods)
  *     - NIP-07 method allowlist (7 methods)
+ *     - WebLN method allowlist (5 methods)
  *     - WoT rate limiting (100 req/sec sliding window)
  *     - NIP-07 HTTPS enforcement (exception for localhost/127.0.0.1/[::1])
- *     - Method prefixing: `signEvent` → `nip07_signEvent`
+ *     - WebLN HTTPS enforcement (same rules as NIP-07)
+ *     - Method prefixing: `signEvent` → `nip07_signEvent`, `sendPayment` → `webln_sendPayment`
  *     - Origin injection: hostname appended to params
  *
  *   Layer 2 — Background Handler Validation (pure functions)
@@ -118,6 +120,11 @@ const NIP07_ALLOWED_METHODS = [
   'nip44Encrypt', 'nip44Decrypt'
 ] as const;
 
+// WEBLN_ALLOWED_METHODS: WebLN provider methods exposed via window.webln.
+const WEBLN_ALLOWED_METHODS = [
+  'enable', 'getInfo', 'sendPayment', 'makeInvoice', 'getBalance'
+] as const;
+
 const PRIVILEGED_METHODS = new Set([
   'switchAccount',
   'vault_unlock', 'vault_lock', 'vault_create', 'vault_isLocked', 'vault_exists',
@@ -190,6 +197,30 @@ function simulateContentNip07Request(
   return {
     forwarded: {
       method: 'nip07_' + method,
+      params: { ...params, origin: hostname }
+    }
+  };
+}
+
+/** Simulates content script WEBLN_REQUEST handling */
+function simulateContentWeblnRequest(
+  method: string,
+  params: Record<string, unknown>,
+  protocol: string = 'https:',
+  hostname: string = 'example.com'
+): { error?: string; forwarded?: { method: string; params: Record<string, unknown> } } {
+  // HTTPS check
+  if (protocol === 'http:' && !['localhost', '127.0.0.1', '[::1]'].includes(hostname)) {
+    return { error: 'WebLN requires a secure (HTTPS) connection' };
+  }
+  // Allowlist check
+  if (!(WEBLN_ALLOWED_METHODS as readonly string[]).includes(method)) {
+    return { error: 'Method not allowed' };
+  }
+  // Forward with webln_ prefix and origin
+  return {
+    forwarded: {
+      method: 'webln_' + method,
       params: { ...params, origin: hostname }
     }
   };
@@ -398,6 +429,90 @@ describe('communication: content script — HTTPS enforcement', () => {
   it('blocks HTTP from local-sounding domains', () => {
     const result = simulateContentNip07Request('getPublicKey', {}, 'http:', 'localhost.evil.com');
     assert.strictEqual(result.error, 'NIP-07 requires a secure (HTTPS) connection');
+  });
+});
+
+describe('communication: content script — WebLN allowlist', () => {
+  it('allows all valid WebLN methods', () => {
+    for (const method of WEBLN_ALLOWED_METHODS) {
+      const result = simulateContentWeblnRequest(method, {});
+      assert.ok(result.forwarded, `${method} should be allowed`);
+    }
+  });
+
+  it('rejects unknown WebLN methods', () => {
+    const result = simulateContentWeblnRequest('stealFunds', {});
+    assert.strictEqual(result.error, 'Method not allowed');
+  });
+
+  it('rejects vault methods via WebLN channel', () => {
+    const result = simulateContentWeblnRequest('vault_create', { password: 'test' });
+    assert.strictEqual(result.error, 'Method not allowed');
+  });
+
+  it('rejects NIP-07 methods via WebLN channel', () => {
+    const result = simulateContentWeblnRequest('signEvent', { event: {} });
+    assert.strictEqual(result.error, 'Method not allowed');
+  });
+
+  it('rejects WoT methods via WebLN channel', () => {
+    const result = simulateContentWeblnRequest('getDistance', { target: 'abc' });
+    assert.strictEqual(result.error, 'Method not allowed');
+  });
+});
+
+describe('communication: content script — WebLN prefix and origin', () => {
+  it('prefixes method with webln_', () => {
+    const result = simulateContentWeblnRequest('sendPayment', { paymentRequest: 'lnbc...' });
+    assert.strictEqual(result.forwarded!.method, 'webln_sendPayment');
+  });
+
+  it('adds origin hostname to params', () => {
+    const result = simulateContentWeblnRequest('enable', {}, 'https:', 'zap.store');
+    assert.strictEqual(result.forwarded!.params.origin, 'zap.store');
+  });
+
+  it('preserves original params alongside origin', () => {
+    const result = simulateContentWeblnRequest(
+      'sendPayment',
+      { paymentRequest: 'lnbc1...' },
+      'https:', 'app.example.com'
+    );
+    const params = result.forwarded!.params;
+    assert.strictEqual(params.paymentRequest, 'lnbc1...');
+    assert.strictEqual(params.origin, 'app.example.com');
+  });
+});
+
+describe('communication: content script — WebLN HTTPS enforcement', () => {
+  it('allows HTTPS requests', () => {
+    const result = simulateContentWeblnRequest('enable', {}, 'https:', 'example.com');
+    assert.ok(result.forwarded);
+  });
+
+  it('blocks HTTP requests from non-localhost', () => {
+    const result = simulateContentWeblnRequest('enable', {}, 'http:', 'example.com');
+    assert.strictEqual(result.error, 'WebLN requires a secure (HTTPS) connection');
+  });
+
+  it('allows HTTP from localhost', () => {
+    const result = simulateContentWeblnRequest('enable', {}, 'http:', 'localhost');
+    assert.ok(result.forwarded);
+  });
+
+  it('allows HTTP from 127.0.0.1', () => {
+    const result = simulateContentWeblnRequest('enable', {}, 'http:', '127.0.0.1');
+    assert.ok(result.forwarded);
+  });
+
+  it('allows HTTP from [::1]', () => {
+    const result = simulateContentWeblnRequest('enable', {}, 'http:', '[::1]');
+    assert.ok(result.forwarded);
+  });
+
+  it('blocks HTTP from local-sounding domains', () => {
+    const result = simulateContentWeblnRequest('enable', {}, 'http:', 'localhost.evil.com');
+    assert.strictEqual(result.error, 'WebLN requires a secure (HTTPS) connection');
   });
 });
 
@@ -793,6 +908,32 @@ describe('communication: channel isolation', () => {
     const nip07 = simulateContentNip07Request('signer_resolve', { id: 'x' });
     assert.strictEqual(nip07.error, 'Method not allowed');
   });
+  it('rejects WebLN methods via WoT channel', () => {
+    resetRateLimit();
+    const result = simulateContentWotRequest('sendPayment', { paymentRequest: 'lnbc...' });
+    assert.strictEqual(result.error, 'Method not allowed');
+  });
+
+  it('rejects WebLN methods via NIP-07 channel', () => {
+    const result = simulateContentNip07Request('sendPayment', { paymentRequest: 'lnbc...' });
+    assert.strictEqual(result.error, 'Method not allowed');
+  });
+
+  it('rejects NIP-07 methods via WebLN channel', () => {
+    const result = simulateContentWeblnRequest('signEvent', { event: {} });
+    assert.strictEqual(result.error, 'Method not allowed');
+  });
+
+  it('rejects WoT methods via WebLN channel', () => {
+    const result = simulateContentWeblnRequest('getDistance', { target: 'abc' });
+    assert.strictEqual(result.error, 'Method not allowed');
+  });
+
+  it('rejects privileged methods via WebLN channel', () => {
+    const result = simulateContentWeblnRequest('vault_unlock', { password: 'test' });
+    assert.strictEqual(result.error, 'Method not allowed');
+  });
+
 });
 
 // ═══════════════════════════════════════════════════════
