@@ -397,6 +397,25 @@ export async function updateAccountNip46Keys(accountId: string, localPrivkey: st
 }
 
 /**
+ * Update the wallet config for an account (persists to vault).
+ * Pass null to remove wallet config.
+ */
+export async function updateAccountWalletConfig(
+  accountId: string,
+  walletConfig: Account['walletConfig'] | null,
+): Promise<void> {
+  if (!_decrypted) throw new Error('Vault is locked');
+  const acct = _decrypted.accounts.find(a => a.id === accountId);
+  if (!acct) throw new Error('Account not found');
+  if (walletConfig === null) {
+    delete acct.walletConfig;
+  } else {
+    acct.walletConfig = walletConfig;
+  }
+  await save();
+}
+
+/**
  * Set auto-lock timeout
  * @param ms - milliseconds (0 to disable)
  */
