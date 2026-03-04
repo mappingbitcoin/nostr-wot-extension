@@ -96,7 +96,8 @@ describe('permissions -- save and clear', () => {
     await permissions.save('example.com', 'nip04Encrypt', null, 'deny');
     const perms: any = await permissions.getForDomain('example.com');
     assert.strictEqual(perms['signEvent'], 'allow');
-    assert.strictEqual(perms['nip04Encrypt'], 'deny');
+    // nip04Encrypt maps to logical key 'sendMessages'
+    assert.strictEqual(perms['sendMessages'], 'deny');
   });
 
   it('getForDomain returns empty for unknown domain', async () => {
@@ -202,4 +203,41 @@ describe('permissions -- NIP-07 methods', () => {
       assert.strictEqual(await permissions.check('test.com', method), 'deny');
     });
   }
+});
+
+describe('permissions -- encrypt/decrypt key mapping', () => {
+  beforeEach(() => resetMockStorage());
+
+  it('nip04 and nip44 encrypt share sendMessages key', async () => {
+    await permissions.save('test.com', 'nip04Encrypt', null, 'allow');
+    // nip44Encrypt should also be allowed (same logical key)
+    assert.strictEqual(await permissions.check('test.com', 'nip44Encrypt'), 'allow');
+  });
+
+  it('nip04 and nip44 decrypt share readMessages key', async () => {
+    await permissions.save('test.com', 'nip04Decrypt', null, 'allow');
+    // nip44Decrypt should also be allowed (same logical key)
+    assert.strictEqual(await permissions.check('test.com', 'nip44Decrypt'), 'allow');
+  });
+
+  it('permissionKey maps encrypt methods to sendMessages', () => {
+    assert.strictEqual(permissions.permissionKey('nip04Encrypt'), 'sendMessages');
+    assert.strictEqual(permissions.permissionKey('nip44Encrypt'), 'sendMessages');
+  });
+
+  it('permissionKey maps decrypt methods to readMessages', () => {
+    assert.strictEqual(permissions.permissionKey('nip04Decrypt'), 'readMessages');
+    assert.strictEqual(permissions.permissionKey('nip44Decrypt'), 'readMessages');
+  });
+
+  it('encrypt/decrypt permissions survive migrateToPerKind', async () => {
+    await permissions.save('test.com', 'nip04Decrypt', null, 'allow');
+    await permissions.save('test.com', 'nip44Encrypt', null, 'deny');
+
+    // Migration should NOT delete readMessages/sendMessages keys
+    await permissions.migrateToPerKind();
+
+    assert.strictEqual(await permissions.check('test.com', 'nip04Decrypt'), 'allow');
+    assert.strictEqual(await permissions.check('test.com', 'nip44Encrypt'), 'deny');
+  });
 });

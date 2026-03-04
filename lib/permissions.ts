@@ -47,6 +47,10 @@ export function permissionKey(method: string, kind?: number | null): string {
   if (method === 'signEvent' && kind !== undefined && kind !== null) {
     return `signEvent:${kind}`;
   }
+  // Map encrypt/decrypt wire methods to logical permission groups.
+  // Both NIP-04 and NIP-44 variants share the same permission.
+  if (method === 'nip04Encrypt' || method === 'nip44Encrypt') return 'sendMessages';
+  if (method === 'nip04Decrypt' || method === 'nip44Decrypt') return 'readMessages';
   return method;
 }
 
