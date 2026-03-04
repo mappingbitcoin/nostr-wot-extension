@@ -1,11 +1,12 @@
 /**
  * Signing Permission Policies -- Per-domain, per-account, per-kind
  *
- * Stores and checks user decisions about whether to allow signing requests
+ * Stores and checks user decisions about whether to allow signing and wallet requests
  * from specific web domains. Uses per-kind checks with account dimension:
  *   - signEvent is keyed per-kind: "signEvent:1", "signEvent:0", etc.
  *   - encrypt methods map to "sendMessages"
  *   - decrypt methods map to "readMessages"
+ *   - WebLN methods (webln_ prefix) pass through as-is
  *   - all other methods use their name as-is
  *
  * Storage model:
@@ -44,6 +45,9 @@ const DEFAULT_BUCKET = '_default';
  * @returns permission key or null if unresolvable
  */
 export function permissionKey(method: string, kind?: number | null): string {
+  // WebLN methods — use as-is (already prefixed with webln_)
+  if (method.startsWith('webln_')) return method;
+
   if (method === 'signEvent' && kind !== undefined && kind !== null) {
     return `signEvent:${kind}`;
   }
