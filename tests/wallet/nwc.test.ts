@@ -126,14 +126,17 @@ function buildResponseMessage(
 }
 
 /**
- * Wait for microtasks to flush (allow async sendRequest internals to complete).
+ * Wait for async sendRequest internals to complete.
  * sendRequest does `await encrypt()` and `await signEvent()` before calling ws.send(),
  * so we need to yield to let those resolve.
+ *
+ * Uses setImmediate which runs after ALL pending microtasks are processed,
+ * unlike queueMicrotask which interleaves with chained awaits.
+ * Also avoids interference with mock.timers (which only mocks setTimeout).
  */
 async function flushAsync(): Promise<void> {
-  // Multiple rounds to handle chained awaits
-  for (let i = 0; i < 5; i++) {
-    await new Promise<void>((r) => queueMicrotask(r));
+  for (let i = 0; i < 3; i++) {
+    await new Promise<void>((r) => setImmediate(r));
   }
 }
 
