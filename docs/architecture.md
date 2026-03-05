@@ -74,7 +74,8 @@ Extension popup UI opened when clicking the toolbar icon. React-based with CSS m
 | `src/popup/index.html` | Entry point |
 | `src/popup/main.tsx` | React app mount |
 | `src/popup/PopupApp.tsx` | Root component with tab navigation, overlays, context providers |
-| `src/popup/components/` | Feature components: Home, Settings, Approval, Vault, Wizard, etc. |
+| `src/popup/components/` | Feature components: Home, Settings, Approval, Vault, Wizard, Wallet, etc. |
+| `src/popup/components/Wallet/` | Wallet management UI: setup (NWC/LNbits), status, balance, auto-approve threshold |
 | `src/popup/context/` | React contexts: AccountContext, VaultContext, PermissionsContext, ScoringContext |
 
 ### 2.5 Onboarding -- `src/onboarding/`
@@ -96,6 +97,21 @@ Signing request approval popup. The signer queues pending requests in `browser.s
 | `src/prompt/index.html` | Entry point |
 | `src/prompt/main.tsx` | React app mount |
 | `src/prompt/PromptApp.tsx` | Reads pending requests, sends decisions via RPC |
+
+---
+
+### 2.7 Wallet Provider Layer -- `lib/wallet/`
+
+Abstracts Lightning wallet backends behind a common `WalletProvider` interface. Each provider implements `getInfo()`, `getBalance()`, `payInvoice(bolt11)`, `makeInvoice(amount, memo)`, `connect()`, `disconnect()`, and `isConnected()`.
+
+| File | Purpose |
+|------|---------|
+| `lib/wallet/types.ts` | `WalletConfig` (discriminated union: `nwc` or `lnbits`), `WalletProvider` interface, `SafeWalletInfo` |
+| `lib/wallet/nwc.ts` | NWC (Nostr Wallet Connect / NIP-47) provider — communicates over Nostr relays |
+| `lib/wallet/lnbits.ts` | LNbits provider — communicates over HTTPS REST API |
+| `lib/wallet/index.ts` | Factory + per-account provider cache (`getWalletProvider`, `setWalletProvider`, `clearWalletProviders`) |
+
+Provider instances are cached per account ID in a `Map<string, WalletProvider>`. The cache is cleared on vault lock via `clearWalletProviders()`. LNbits providers are created directly by the factory; NWC providers require crypto dependencies injected at runtime and must be created externally via `createNwcProvider()` then registered with `setWalletProvider()`.
 
 ---
 
@@ -160,3 +176,7 @@ Central type definitions shared across all modules:
 | `RequestDecision` | `{ allow: boolean, remember?: boolean, rememberKind?: boolean, reason?: string }` |
 | `PermissionDecision` | `'allow' \| 'deny' \| 'ask'` |
 | `AccountType` | `'generated' \| 'nsec' \| 'npub' \| 'nip46' \| 'external'` |
+| `WalletConfig` | Discriminated union: `{ type: 'nwc', connectionString }` or `{ type: 'lnbits', instanceUrl, adminKey }` |
+| `WalletProvider` | Interface: `getInfo`, `getBalance`, `payInvoice`, `makeInvoice`, `connect`, `disconnect` |
+| `SafeWalletInfo` | Wallet metadata without secrets: `{ type, connected, alias?, instanceUrl? }` |
+| `SafeAccountWithWallet` | Account without `privkey`/`mnemonic` but with `walletConfig` (for background wallet handlers) |

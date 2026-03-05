@@ -92,3 +92,30 @@ When the active account changes:
 `indexedDB.databases()` is Chrome-only. When listing databases on Firefox, the code falls back to:
 - Returning the currently open database
 - Probing for the legacy `nostr-wot` database by attempting to open it and checking if it contains data
+
+---
+
+## 9. Wallet Storage
+
+### 9.1 Wallet Configuration (Encrypted)
+
+Wallet credentials are stored as `walletConfig` inside the `Account` object, which is encrypted inside the vault (`keyVault` in `browser.storage.local`). This means wallet configs are protected by the same AES-256-GCM + PBKDF2 encryption as private keys and mnemonics.
+
+```ts
+// Part of Account in lib/types.ts
+walletConfig?: WalletConfig;
+
+// WalletConfig is a discriminated union:
+type WalletConfig =
+  | { type: 'nwc'; connectionString: string; relay?: string }
+  | { type: 'lnbits'; instanceUrl: string; adminKey: string; walletId?: string };
+```
+
+### 9.2 Auto-Approve Threshold (`browser.storage.local`)
+
+| Key | Value | Purpose |
+|-----|-------|---------|
+| `walletThreshold_{accountId}` | `number` (sats) | Per-account payment auto-approve threshold. Payments at or below this amount skip the approval prompt. Default: `0` (all payments require approval). |
+
+Managed by privileged methods `wallet_setAutoApproveThreshold` and `wallet_getAutoApproveThreshold`.
+

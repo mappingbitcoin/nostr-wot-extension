@@ -115,6 +115,38 @@ All gated by: `sender.id === browser.runtime.id && sender.url.startsWith(extensi
 
 ---
 
+## 8b. Wallet Credential Storage
+
+Wallet credentials are stored encrypted inside the vault as part of the `Account` object:
+
+| Config type | Sensitive field | Storage |
+|-------------|----------------|---------|
+| NWC | `connectionString` (contains secret key) | `account.walletConfig.connectionString` inside AES-256-GCM vault |
+| LNbits | `adminKey` (full access token) | `account.walletConfig.adminKey` inside AES-256-GCM vault |
+
+Both values are encrypted at rest (same PBKDF2 + AES-256-GCM scheme as private keys). The `walletConfig` field is stripped from `SafeAccount` (used by public APIs) -- only `SafeAccountWithWallet` retains it, and that type is restricted to internal background wallet handlers.
+
+The LNbits admin key grants full wallet control (send, receive, read balance) and is treated with the same sensitivity as private keys. It is never exposed to content scripts or page context.
+
+---
+
+## 8c. Payment Authorization Flow
+
+When a page calls `window.webln.sendPayment(bolt11)`:
+
+1. **Vault lock check** -- request is rejected if the vault is locked.
+2. **Wallet config check** -- request is rejected if no `walletConfig` exists on the active account.
+3. **Permission check** -- `signerPermissions.check(origin, 'webln_sendPayment')`:
+   - `'deny'` -- immediately rejected.
+   - `'allow'` -- proceeds to payment.
+   - `'ask'` -- queues a prompt via `signer.queueRequest()` with `type: 'webln_sendPayment'`. The user sees an approval popup and can approve/deny, optionally with "remember" to save the decision for future requests from that origin.
+4. **Provider connection** -- if the provider is not connected, `connect()` is called.
+5. **Payment execution** -- `provider.payInvoice(bolt11)` sends the payment.
+
+The auto-approve threshold (`walletThreshold_{accountId}`) is stored in `browser.storage.local` and managed via `wallet_setAutoApproveThreshold` / `wallet_getAutoApproveThreshold` privileged methods.
+
+---
+
 ## 9. Rate Limiting
 
 `RATE_LIMITED_METHODS` covers WoT computation methods only (50 req/sec per method). `vault_unlock` is protected by the privilege gate (only callable from extension pages) and PBKDF2's 210,000 iterations which make brute-force impractical (~200ms per attempt).
