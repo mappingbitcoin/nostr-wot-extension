@@ -26,3 +26,4 @@ export { default as IconCloud } from './IconCloud';
 export { default as IconMerge } from './IconMerge';
 export { default as IconPencil } from './IconPencil';
 export { default as IconInfo } from './IconInfo';
+export { default as IconZap } from './IconZap';
