@@ -72,22 +72,16 @@ export default function MenuOverlay({ visible, onClose, initialSection }: MenuOv
 
   const menuItems: MenuItem[] = [
     {
-      id: 'key-backup',
-      label: t('security.keyBackup'),
-      desc: t('security.keyBackupDesc'),
-      icon: <IconKey />,
+      id: 'security',
+      label: t('settings.security'),
+      desc: t('settings.securityDesc'),
+      icon: <IconLock />,
     },
     {
       id: 'site-permissions',
       label: t('security.permissions'),
       desc: t('security.permissionsDesc'),
       icon: <IconShield />,
-    },
-    {
-      id: 'security',
-      label: t('settings.autoLockPassword'),
-      desc: t('settings.autoLockPasswordDesc'),
-      icon: <IconLock />,
     },
     {
       id: 'wallet',
@@ -110,11 +104,10 @@ export default function MenuOverlay({ visible, onClose, initialSection }: MenuOv
   ];
 
   const sectionTitles: Record<string, string> = {
-    security: t('settings.autoLockPassword'),
+    security: t('settings.security'),
     wot: t('settings.webOfTrust'),
     network: t('settings.network'),
     wallet: t('wallet.title'),
-    'key-backup': t('security.keyBackup'),
     'site-permissions': permDetailDomain || t('security.permissions'),
     'wot-injection': t('wot.badges'),
     'badge-detail': badgeDetailDomain || t('wot.badges'),
@@ -161,32 +154,33 @@ export default function MenuOverlay({ visible, onClose, initialSection }: MenuOv
     switch (currentSection) {
       case 'security':
         return (
-          <SecuritySection
-            onChangePassword={() => setKeyAction('changePassword')}
-          />
-        );
-      case 'key-backup':
-        return (
           <MenuSection>
-            <NavItem
-              icon={<IconKey />}
-              label={t('key.exportNsec')}
-              desc={t('key.exportNsecDesc')}
-              onClick={() => setKeyAction('nsec')}
+            <SecuritySection
+              onChangePassword={() => setKeyAction('changePassword')}
             />
-            <NavItem
-              icon={<IconLock />}
-              label={t('key.exportNcryptsec')}
-              desc={t('key.exportNcryptsecDesc')}
-              onClick={() => setKeyAction('ncryptsec')}
-            />
-            {vault.isGenerated && (
-              <NavItem
-                icon={<IconDownload />}
-                label={t('key.exportSeed')}
-                desc={t('key.exportSeedDesc')}
-                onClick={() => setKeyAction('seed')}
-              />
+            {!isReadOnly && active?.type !== 'nip46' && (
+              <>
+                <NavItem
+                  icon={<IconKey />}
+                  label={t('key.exportNsec')}
+                  desc={t('key.exportNsecDesc')}
+                  onClick={() => setKeyAction('nsec')}
+                />
+                <NavItem
+                  icon={<IconLock />}
+                  label={t('key.exportNcryptsec')}
+                  desc={t('key.exportNcryptsecDesc')}
+                  onClick={() => setKeyAction('ncryptsec')}
+                />
+                {vault.isGenerated && (
+                  <NavItem
+                    icon={<IconDownload />}
+                    label={t('key.exportSeed')}
+                    desc={t('key.exportSeedDesc')}
+                    onClick={() => setKeyAction('seed')}
+                  />
+                )}
+              </>
             )}
           </MenuSection>
         );
@@ -229,7 +223,6 @@ export default function MenuOverlay({ visible, onClose, initialSection }: MenuOv
             <div className={styles.items}>
               {menuItems.map((item) => {
                 if (item.id === 'nip46' && !vault.isNip46) return null;
-                if (item.id === 'key-backup' && (isReadOnly || active?.type === 'nip46')) return null;
                 return (
                   <NavItem
                     key={item.id}

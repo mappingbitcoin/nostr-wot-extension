@@ -10,10 +10,16 @@ import { SectionLabel, SectionHint } from '@components/SectionLabel/SectionLabel
 import styles from './Wallet.module.css';
 
 interface WalletProps {
+  providerType: string;
   onDisconnected: () => void;
 }
 
-export default function Wallet({ onDisconnected }: WalletProps) {
+const PROVIDER_LABELS: Record<string, string> = {
+  nwc: 'Nostr Wallet Connect',
+  lnbits: 'LNbits',
+};
+
+export default function Wallet({ providerType, onDisconnected }: WalletProps) {
   const [balance, setBalance] = useState<number | null>(null);
   const [balanceLoading, setBalanceLoading] = useState<boolean>(true);
   const [balanceError, setBalanceError] = useState<string>('');
@@ -110,8 +116,29 @@ export default function Wallet({ onDisconnected }: WalletProps) {
     fetchBalance();
   };
 
+  const providerLabel = PROVIDER_LABELS[providerType] ?? providerType;
+
   return (
     <div className={styles.section}>
+      {/* Provider info header */}
+      <Card className={styles.providerCard}>
+        <div className={styles.providerRow}>
+          <div className={styles.providerInfo}>
+            <span className={styles.providerLabel}>{providerLabel}</span>
+            <span className={styles.providerStatus}>{t('wallet.connected')}</span>
+          </div>
+          <Button
+            small
+            variant="danger"
+            onClick={handleDisconnect}
+            disabled={disconnecting}
+          >
+            {disconnecting ? t('common.loading') : t('common.disconnect')}
+          </Button>
+        </div>
+      </Card>
+
+      {/* Balance */}
       <Card className={styles.balanceCard}>
         <span className={styles.balanceLabel}>{t('wallet.balance')}</span>
         {balanceLoading ? (
@@ -119,7 +146,12 @@ export default function Wallet({ onDisconnected }: WalletProps) {
             <div className={styles.spinner} />
           </div>
         ) : balanceError ? (
-          <div className={styles.error}>{balanceError}</div>
+          <div className={styles.balanceErrorWrap}>
+            <div className={styles.error}>{balanceError}</div>
+            <Button small variant="secondary" onClick={fetchBalance}>
+              {t('common.retry')}
+            </Button>
+          </div>
         ) : (
           <div>
             <span className={styles.balanceValue}>
@@ -193,18 +225,6 @@ export default function Wallet({ onDisconnected }: WalletProps) {
           />
         </div>
       </Card>
-
-      {/* Disconnect */}
-      <div className={styles.formActions}>
-        <Button
-          small
-          variant="danger"
-          onClick={handleDisconnect}
-          disabled={disconnecting}
-        >
-          {disconnecting ? t('common.loading') : t('common.disconnect')}
-        </Button>
-      </div>
     </div>
   );
 }

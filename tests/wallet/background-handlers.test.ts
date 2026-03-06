@@ -22,7 +22,7 @@ import * as vault from '../../lib/vault.ts';
 import * as permissions from '../../lib/permissions.ts';
 import {
   getWalletProvider, setWalletProvider, removeWalletProvider,
-  hasWalletConfig, clearWalletProviders,
+  clearWalletProviders,
 } from '../../lib/wallet/index.ts';
 import type { WalletProvider, WalletProviderInfo, WalletConfig } from '../../lib/wallet/types.ts';
 import type { VaultPayload } from '../../lib/types.ts';
@@ -176,7 +176,8 @@ async function handleWeblnMakeInvoice(params: {
 function handleWalletHasConfig(): HandlerResult {
   if (vault.isLocked()) return { result: false, error: null };
   const acct = vault.getActiveAccountWithWallet();
-  return { result: hasWalletConfig(acct?.walletConfig), error: null };
+  // Return the provider type string (truthy) or false
+  return { result: acct?.walletConfig?.type ?? false, error: null };
 }
 
 async function handleWalletGetInfo(): Promise<HandlerResult> {
@@ -513,10 +514,10 @@ describe('wallet handlers: wallet_hasConfig', () => {
     vault.lock();
   });
 
-  it('returns true when wallet is configured', async () => {
+  it('returns provider type when wallet is configured', async () => {
     await vault.create(TEST_PASSWORD, makePayloadWithWallet());
     const r = handleWalletHasConfig();
-    assert.strictEqual(r.result, true);
+    assert.strictEqual(r.result, 'lnbits');
     assert.strictEqual(r.error, null);
   });
 

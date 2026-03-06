@@ -48,6 +48,9 @@ export function WotSyncDetail({ item, onBack }: WotSyncDetailProps) {
   const [detailStats, setDetailStats] = useState<DatabaseStats | null>(null);
   const [syncDepth, setSyncDepth] = useState<number>(3);
   const [syncState, setSyncState] = useState<SyncState | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState<boolean>(false);
+
+  const isSyncing = syncState?.inProgress || (syncState?.syncing && syncState?.accountId === item.accountId);
 
   const loadStats = useCallback(async () => {
     try {
@@ -65,6 +68,25 @@ export function WotSyncDetail({ item, onBack }: WotSyncDetailProps) {
 
   useEffect(() => { loadStats(); }, [loadStats]);
 
+  // Poll sync state while syncing
+  useEffect(() => {
+    if (!isSyncing) return;
+    const interval = setInterval(async () => {
+      try {
+        const [stats, state] = await Promise.all([
+          rpc<DatabaseStats | null>('getDatabaseStats', { accountId: item.accountId }),
+          rpc<SyncState | null>('getSyncState'),
+        ]);
+        setDetailStats(stats);
+        setSyncState(state);
+        if (!state?.inProgress && !state?.syncing) {
+          loadStats();
+        }
+      } catch { /* ignore */ }
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [isSyncing, item.accountId, loadStats]);
+
   const handleDelete = async () => {
     await rpc('deleteAccountDatabase', { accountId: item.accountId });
     onBack();
@@ -72,9 +94,8 @@ export function WotSyncDetail({ item, onBack }: WotSyncDetailProps) {
 
   const handleResync = () => {
     rpcNotify('syncGraph', { depth: syncDepth });
+    setSyncState({ inProgress: true });
   };
-
-  const isSyncing = syncState?.inProgress || (syncState?.syncing && syncState?.accountId === item.accountId);
 
   const getStatusLabel = (): string => {
     if (isSyncing) return t('sync.syncing');
@@ -82,7 +103,14 @@ export function WotSyncDetail({ item, onBack }: WotSyncDetailProps) {
     return t('sync.notSynced');
   };
 
+  const getStatusColor = (): string => {
+    if (isSyncing) return 'var(--warning)';
+    if (detailStats?.nodes && detailStats.nodes > 0) return 'var(--success, #16a34a)';
+    return 'var(--text-muted)';
+  };
+
   const depthStats = detailStats?.nodesPerDepth || {};
+  const hasData = detailStats?.nodes && detailStats.nodes > 0;
 
   return (
     <div className={styles.section}>
@@ -92,11 +120,20 @@ export function WotSyncDetail({ item, onBack }: WotSyncDetailProps) {
         </div>
       )}
 
+      {/* Status + last sync */}
+      <div className={styles.detailStatus}>
+        <span className={styles.detailStatusDot} style={{ background: getStatusColor() }} />
+        <span className={styles.detailStatusLabel} style={{ color: getStatusColor() }}>
+          {getStatusLabel()}
+        </span>
+        {isSyncing && <span className={styles.detailSyncSpinner} />}
+        <span className={styles.detailLastSync}>
+          {detailStats?.lastSync ? formatTimeAgo(detailStats.lastSync) : t('sync.neverSynced')}
+        </span>
+      </div>
+
+      {/* Stats grid */}
       <div className={styles.statGrid}>
-        <div className={styles.statCard}>
-          <div className={styles.statValue}>{getStatusLabel()}</div>
-          <div className={styles.statLabel}>{t('sync.status')}</div>
-        </div>
         <div className={styles.statCard}>
           <div className={styles.statValue}>{detailStats?.nodes?.toLocaleString() || '0'}</div>
           <div className={styles.statLabel}>{t('sync.nodes')}</div>
@@ -111,6 +148,7 @@ export function WotSyncDetail({ item, onBack }: WotSyncDetailProps) {
         </div>
       </div>
 
+      {/* Nodes per depth */}
       {Object.keys(depthStats).length > 0 && (
         <>
           <SectionLabel>{t('sync.nodesPerDepth')}</SectionLabel>
@@ -124,6 +162,7 @@ export function WotSyncDetail({ item, onBack }: WotSyncDetailProps) {
         </>
       )}
 
+      {/* Sync depth selector */}
       <SectionLabel>{t('sync.syncDepth')}</SectionLabel>
       <div className={styles.modeRow}>
         {SYNC_DEPTHS.map((d) => (
@@ -142,13 +181,31 @@ export function WotSyncDetail({ item, onBack }: WotSyncDetailProps) {
         </div>
       )}
 
+      {/* Actions */}
       <div className={styles.detailActions}>
-        {detailStats?.nodes && detailStats.nodes > 0 && (
-          <Button variant="danger" small onClick={handleDelete}>{t('sync.deleteData')}</Button>
+        {hasData && !confirmingDelete && (
+          <Button variant="danger" small onClick={() => setConfirmingDelete(true)}>
+            {t('sync.deleteData')}
+          </Button>
         )}
-        <Button small onClick={handleResync} disabled={!!isSyncing}>
-          {isSyncing ? t('sync.syncing') : t('sync.syncNow')}
-        </Button>
+        {confirmingDelete && (
+          <div className={styles.confirmDeleteRow}>
+            <span className={styles.confirmDeleteMsg}>{t('sync.deleteConfirm')}</span>
+            <div className={styles.confirmDeleteBtns}>
+              <Button variant="secondary" small onClick={() => setConfirmingDelete(false)}>
+                {t('common.cancel')}
+              </Button>
+              <Button variant="danger" small onClick={handleDelete}>
+                {t('common.confirm')}
+              </Button>
+            </div>
+          </div>
+        )}
+        {!confirmingDelete && (
+          <Button small onClick={handleResync} disabled={!!isSyncing}>
+            {isSyncing ? t('sync.syncing') : t('sync.syncNow')}
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -181,18 +238,23 @@ export default function WotSyncSection({ onOpenDetail }: WotSyncSectionProps) {
     const allAccounts: any[] = accounts.accounts || [];
     const vAccounts: any[] = vaultAccounts || [];
 
+    // Build set of existing DB account IDs
+    const dbAccountIds = new Set<string>((dbList || []).map((db: any) => db.accountId || db.name));
+
+    // Merge all accounts from storage and vault
+    const accountMap = new Map<string, any>();
+    for (const a of allAccounts) accountMap.set(a.id, a);
+    for (const a of vAccounts) if (!accountMap.has(a.id)) accountMap.set(a.id, a);
+
     const items: SyncItem[] = [];
-    const dbs: any[] = dbList || [];
 
-    for (const db of dbs) {
-      const accountId = db.accountId || db.name;
-      const account = allAccounts.find((a) => a.id === accountId) || vAccounts.find((a) => a.id === accountId);
-      const isActive = accountId === activeId;
-
+    // Add all known accounts (with or without a DB)
+    for (const [accountId, account] of accountMap) {
+      const hasDb = dbAccountIds.has(accountId);
       let stats: DatabaseStats | null = null;
-      try {
-        stats = await rpc('getDatabaseStats', { accountId });
-      } catch { /* ignore */ }
+      if (hasDb) {
+        try { stats = await rpc('getDatabaseStats', { accountId }); } catch { /* ignore */ }
+      }
 
       let displayName = account?.name || truncateNpub(account?.pubkey || accountId);
       try {
@@ -200,7 +262,17 @@ export default function WotSyncSection({ onOpenDetail }: WotSyncSectionProps) {
         if (meta?.name) displayName = meta.name;
       } catch { /* ignore */ }
 
-      items.push({ accountId, displayName, isActive, stats, pubkey: account?.pubkey });
+      items.push({ accountId, displayName, isActive: accountId === activeId, stats, pubkey: account?.pubkey });
+    }
+
+    // Also include orphaned DBs (database exists but account was removed)
+    for (const db of (dbList || [])) {
+      const id = db.accountId || db.name;
+      if (!accountMap.has(id)) {
+        let stats: DatabaseStats | null = null;
+        try { stats = await rpc('getDatabaseStats', { accountId: id }); } catch { /* ignore */ }
+        items.push({ accountId: id, displayName: t('sync.accountRemoved'), isActive: false, stats });
+      }
     }
 
     items.sort((a, b) => (b.isActive ? 1 : 0) - (a.isActive ? 1 : 0));
@@ -212,6 +284,7 @@ export default function WotSyncSection({ onOpenDetail }: WotSyncSectionProps) {
 
   const getSyncStatus = (item: SyncItem): string => {
     if (syncState?.syncing && syncState?.accountId === item.accountId) return 'syncing';
+    if (syncState?.inProgress && item.isActive) return 'syncing';
     if (item.stats?.nodes && item.stats.nodes > 0) return 'synced';
     return 'not-synced';
   };

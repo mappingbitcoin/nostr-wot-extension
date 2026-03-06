@@ -8,18 +8,19 @@ import styles from './Wallet.module.css';
 /**
  * Wallet section for the settings menu.
  *
- * Checks `wallet_hasConfig` on mount to decide between
- * showing WalletSetup (connect form) or Wallet (status display).
+ * Checks `wallet_hasConfig` on mount — returns the provider type string
+ * (truthy) or false. Shows WalletSetup or Wallet accordingly.
  */
 export default function WalletSection() {
-  const [hasConfig, setHasConfig] = useState<boolean | null>(null);
+  // null = loading, false = no config, string = provider type
+  const [configType, setConfigType] = useState<string | false | null>(null);
 
   const checkConfig = useCallback(async () => {
     try {
-      const result = await rpc<boolean>('wallet_hasConfig');
-      setHasConfig(!!result);
+      const result = await rpc<string | false>('wallet_hasConfig');
+      setConfigType(result || false);
     } catch {
-      setHasConfig(false);
+      setConfigType(false);
     }
   }, []);
 
@@ -27,7 +28,7 @@ export default function WalletSection() {
     checkConfig();
   }, [checkConfig]);
 
-  if (hasConfig === null) {
+  if (configType === null) {
     return (
       <div className={styles.loading}>
         <div className={styles.spinner} />
@@ -35,9 +36,9 @@ export default function WalletSection() {
     );
   }
 
-  if (!hasConfig) {
-    return <WalletSetup onConnected={() => setHasConfig(true)} />;
+  if (!configType) {
+    return <WalletSetup onConnected={() => checkConfig()} />;
   }
 
-  return <Wallet onDisconnected={() => setHasConfig(false)} />;
+  return <Wallet providerType={configType} onDisconnected={() => setConfigType(false)} />;
 }

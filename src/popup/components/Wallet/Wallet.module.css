@@ -55,6 +55,37 @@
   margin-top: 4px;
 }
 
+/* ── Provider header ── */
+
+.providerCard {
+  padding: 10px 12px;
+}
+
+.providerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.providerInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.providerLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.providerStatus {
+  font-size: 11px;
+  color: var(--success);
+  font-weight: 500;
+}
+
 /* ── Status display ── */
 
 .balanceCard {
@@ -86,14 +117,12 @@
   margin-left: 4px;
 }
 
-.actions {
+.balanceErrorWrap {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 8px;
-  margin-top: 4px;
-}
-
-.actions > * {
-  flex: 1;
+  padding: 4px 0;
 }
 
 /* ── Threshold row ── */

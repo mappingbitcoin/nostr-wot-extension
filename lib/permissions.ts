@@ -35,6 +35,16 @@ const STORAGE_KEY = 'signerPermissions';
 const GLOBAL_DEFAULTS_KEY = 'signerUseGlobalDefaults';
 const DEFAULT_BUCKET = '_default';
 
+// Mutex for storage writes (prevents concurrent read-modify-write races)
+let _storageLock: Promise<void> = Promise.resolve();
+async function withStorageLock<T>(fn: () => Promise<T>): Promise<T> {
+  const prev = _storageLock;
+  let release!: () => void;
+  _storageLock = new Promise(r => release = r);
+  await prev;
+  try { return await fn(); } finally { release(); }
+}
+
 // Decisions: "allow" | "deny" | "ask"
 
 /**
@@ -85,16 +95,19 @@ export async function check(domain: string, method: string, kind?: number, accou
 
   // 1. Kind-specific (e.g. "signEvent:1") — only when kind is provided
   if (kindKey !== methodKey && data[kindKey]) {
+    if (data[kindKey] === 'deny') console.warn('[PERMISSIONS] deny:', domain, kindKey, 'bucket:', bucket);
     return data[kindKey];
   }
 
   // 2. Method-level (e.g. "signEvent")
   if (data[methodKey]) {
+    if (data[methodKey] === 'deny') console.warn('[PERMISSIONS] deny:', domain, methodKey, 'bucket:', bucket);
     return data[methodKey];
   }
 
   // 3. Wildcard
   if (data['*']) {
+    if (data['*'] === 'deny') console.warn('[PERMISSIONS] deny:', domain, '*', 'bucket:', bucket);
     return data['*'];
   }
 
@@ -110,17 +123,18 @@ export async function check(domain: string, method: string, kind?: number, accou
  * @param accountId - account ID (uses _default if omitted)
  */
 export async function save(domain: string, method: string, kind: number | null, decision: PermissionDecision, accountId?: string): Promise<void> {
-  const perms = await load();
-  const useDefaults = await getUseGlobalDefaults();
-  // In global mode, always write to _default regardless of accountId
-  const bucket = useDefaults ? DEFAULT_BUCKET : (accountId || DEFAULT_BUCKET);
-  if (!perms[domain]) perms[domain] = {};
-  if (!perms[domain][bucket]) perms[domain][bucket] = {};
+  await withStorageLock(async () => {
+    const perms = await load();
+    const useDefaults = await getUseGlobalDefaults();
+    const bucket = useDefaults ? DEFAULT_BUCKET : (accountId || DEFAULT_BUCKET);
+    if (!perms[domain]) perms[domain] = {};
+    if (!perms[domain][bucket]) perms[domain][bucket] = {};
 
-  const key = permissionKey(method, kind);
-  perms[domain][bucket][key] = decision;
+    const key = permissionKey(method, kind);
+    perms[domain][bucket][key] = decision;
 
-  await browser.storage.local.set({ [STORAGE_KEY]: perms });
+    await browser.storage.local.set({ [STORAGE_KEY]: perms });
+  });
 }
 
 /**
@@ -131,14 +145,15 @@ export async function save(domain: string, method: string, kind: number | null, 
  * @param accountId - account ID (uses _default if omitted)
  */
 export async function saveDirect(domain: string, key: string, decision: PermissionDecision, accountId?: string): Promise<void> {
-  const perms = await load();
-  const useDefaults = await getUseGlobalDefaults();
-  // In global mode, always write to _default regardless of accountId
-  const bucket = useDefaults ? DEFAULT_BUCKET : (accountId || DEFAULT_BUCKET);
-  if (!perms[domain]) perms[domain] = {};
-  if (!perms[domain][bucket]) perms[domain][bucket] = {};
-  perms[domain][bucket][key] = decision;
-  await browser.storage.local.set({ [STORAGE_KEY]: perms });
+  await withStorageLock(async () => {
+    const perms = await load();
+    const useDefaults = await getUseGlobalDefaults();
+    const bucket = useDefaults ? DEFAULT_BUCKET : (accountId || DEFAULT_BUCKET);
+    if (!perms[domain]) perms[domain] = {};
+    if (!perms[domain][bucket]) perms[domain][bucket] = {};
+    perms[domain][bucket][key] = decision;
+    await browser.storage.local.set({ [STORAGE_KEY]: perms });
+  });
 }
 
 /**
@@ -147,42 +162,41 @@ export async function saveDirect(domain: string, key: string, decision: Permissi
  * they are no longer meaningful in the per-kind model.
  */
 export async function migrateToPerKind(): Promise<void> {
-  const perms = await load();
-  let changed = false;
-  const OLD_KEYS = ['signEvent', 'nip04Encrypt', 'nip04Decrypt', 'nip44Encrypt', 'nip44Decrypt', '*'];
-  for (const domain of Object.keys(perms)) {
-    const target = perms[domain];
-    // Handle both old flat format and new bucketed format
-    if (target[DEFAULT_BUCKET]) {
-      // Already migrated to per-account -- clean old keys from each bucket
-      for (const bucket of Object.keys(target)) {
-        if (typeof target[bucket] !== 'object') continue;
+  await withStorageLock(async () => {
+    const perms = await load();
+    let changed = false;
+    const OLD_KEYS = ['signEvent', 'nip04Encrypt', 'nip04Decrypt', 'nip44Encrypt', 'nip44Decrypt', '*'];
+    for (const domain of Object.keys(perms)) {
+      const target = perms[domain];
+      if (target[DEFAULT_BUCKET]) {
+        for (const bucket of Object.keys(target)) {
+          if (typeof target[bucket] !== 'object') continue;
+          for (const key of OLD_KEYS) {
+            if ((target[bucket] as PermissionBucket)[key]) {
+              delete (target[bucket] as PermissionBucket)[key];
+              changed = true;
+            }
+          }
+          if (Object.keys(target[bucket] as PermissionBucket).length === 0) {
+            delete target[bucket];
+          }
+        }
+      } else {
         for (const key of OLD_KEYS) {
-          if ((target[bucket] as PermissionBucket)[key]) {
-            delete (target[bucket] as PermissionBucket)[key];
+          if ((target as Record<string, unknown>)[key]) {
+            delete (target as Record<string, unknown>)[key];
             changed = true;
           }
         }
-        if (Object.keys(target[bucket] as PermissionBucket).length === 0) {
-          delete target[bucket];
-        }
       }
-    } else {
-      // Old flat format
-      for (const key of OLD_KEYS) {
-        if ((target as Record<string, unknown>)[key]) {
-          delete (target as Record<string, unknown>)[key];
-          changed = true;
-        }
+      if (Object.keys(perms[domain]).length === 0) {
+        delete perms[domain];
       }
     }
-    if (Object.keys(perms[domain]).length === 0) {
-      delete perms[domain];
+    if (changed) {
+      await browser.storage.local.set({ [STORAGE_KEY]: perms });
     }
-  }
-  if (changed) {
-    await browser.storage.local.set({ [STORAGE_KEY]: perms });
-  }
+  });
 }
 
 /**
@@ -191,29 +205,28 @@ export async function migrateToPerKind(): Promise<void> {
  * Safe to call multiple times -- skips already-migrated domains.
  */
 export async function migrateToPerAccount(): Promise<void> {
-  const perms = await load();
-  let changed = false;
-  for (const domain of Object.keys(perms)) {
-    const domainData = perms[domain];
-    // Already migrated if it has _default bucket
-    if (domainData[DEFAULT_BUCKET]) continue;
-    // Check if this is a flat format (values are strings like "allow"/"deny")
-    const hasFlat = Object.values(domainData).some(v => typeof v === 'string');
-    if (!hasFlat) continue;
-    // Move flat entries under _default
-    const flat: PermissionBucket = {};
-    for (const [key, val] of Object.entries(domainData)) {
-      if (typeof val === 'string') {
-        flat[key] = val as PermissionDecision;
-        delete (domainData as Record<string, unknown>)[key];
+  await withStorageLock(async () => {
+    const perms = await load();
+    let changed = false;
+    for (const domain of Object.keys(perms)) {
+      const domainData = perms[domain];
+      if (domainData[DEFAULT_BUCKET]) continue;
+      const hasFlat = Object.values(domainData).some(v => typeof v === 'string');
+      if (!hasFlat) continue;
+      const flat: PermissionBucket = {};
+      for (const [key, val] of Object.entries(domainData)) {
+        if (typeof val === 'string') {
+          flat[key] = val as PermissionDecision;
+          delete (domainData as Record<string, unknown>)[key];
+        }
       }
+      domainData[DEFAULT_BUCKET] = flat;
+      changed = true;
     }
-    domainData[DEFAULT_BUCKET] = flat;
-    changed = true;
-  }
-  if (changed) {
-    await browser.storage.local.set({ [STORAGE_KEY]: perms });
-  }
+    if (changed) {
+      await browser.storage.local.set({ [STORAGE_KEY]: perms });
+    }
+  });
 }
 
 /**
@@ -222,22 +235,24 @@ export async function migrateToPerAccount(): Promise<void> {
  * Now permissions are account-type-agnostic; "ask" is the conservative default.
  */
 export async function migrateForwardToAsk(): Promise<void> {
-  const perms = await load();
-  let changed = false;
-  for (const domain of Object.keys(perms)) {
-    for (const bucket of Object.keys(perms[domain])) {
-      if (typeof perms[domain][bucket] !== 'object') continue;
-      for (const key of Object.keys(perms[domain][bucket] as PermissionBucket)) {
-        if ((perms[domain][bucket] as PermissionBucket)[key] === ('forward' as PermissionDecision)) {
-          (perms[domain][bucket] as PermissionBucket)[key] = 'ask';
-          changed = true;
+  await withStorageLock(async () => {
+    const perms = await load();
+    let changed = false;
+    for (const domain of Object.keys(perms)) {
+      for (const bucket of Object.keys(perms[domain])) {
+        if (typeof perms[domain][bucket] !== 'object') continue;
+        for (const key of Object.keys(perms[domain][bucket] as PermissionBucket)) {
+          if ((perms[domain][bucket] as PermissionBucket)[key] === ('forward' as PermissionDecision)) {
+            (perms[domain][bucket] as PermissionBucket)[key] = 'ask';
+            changed = true;
+          }
         }
       }
     }
-  }
-  if (changed) {
-    await browser.storage.local.set({ [STORAGE_KEY]: perms });
-  }
+    if (changed) {
+      await browser.storage.local.set({ [STORAGE_KEY]: perms });
+    }
+  });
 }
 
 /**
@@ -250,18 +265,19 @@ export async function clear(domain?: string, accountId?: string): Promise<void> 
     await browser.storage.local.remove(STORAGE_KEY);
     return;
   }
-  const perms = await load();
-  if (!perms[domain]) return;
+  await withStorageLock(async () => {
+    const perms = await load();
+    if (!perms[domain]) return;
 
-  // Use the same mode-aware bucket resolution as save() and check()
-  const useDefaults = await getUseGlobalDefaults();
-  const bucket = useDefaults ? DEFAULT_BUCKET : (accountId || DEFAULT_BUCKET);
+    const useDefaults = await getUseGlobalDefaults();
+    const bucket = useDefaults ? DEFAULT_BUCKET : (accountId || DEFAULT_BUCKET);
 
-  delete perms[domain][bucket];
-  if (Object.keys(perms[domain]).length === 0) {
-    delete perms[domain];
-  }
-  await browser.storage.local.set({ [STORAGE_KEY]: perms });
+    delete perms[domain][bucket];
+    if (Object.keys(perms[domain]).length === 0) {
+      delete perms[domain];
+    }
+    await browser.storage.local.set({ [STORAGE_KEY]: perms });
+  });
 }
 
 /**
@@ -271,20 +287,22 @@ export async function clear(domain?: string, accountId?: string): Promise<void> 
  */
 export async function clearForAccount(accountId: string): Promise<void> {
   if (!accountId || accountId === DEFAULT_BUCKET) return;
-  const perms = await load();
-  let changed = false;
-  for (const domain of Object.keys(perms)) {
-    if (perms[domain][accountId]) {
-      delete perms[domain][accountId];
-      changed = true;
-      if (Object.keys(perms[domain]).length === 0) {
-        delete perms[domain];
+  await withStorageLock(async () => {
+    const perms = await load();
+    let changed = false;
+    for (const domain of Object.keys(perms)) {
+      if (perms[domain][accountId]) {
+        delete perms[domain][accountId];
+        changed = true;
+        if (Object.keys(perms[domain]).length === 0) {
+          delete perms[domain];
+        }
       }
     }
-  }
-  if (changed) {
-    await browser.storage.local.set({ [STORAGE_KEY]: perms });
-  }
+    if (changed) {
+      await browser.storage.local.set({ [STORAGE_KEY]: perms });
+    }
+  });
 }
 
 /**
@@ -294,19 +312,21 @@ export async function clearForAccount(accountId: string): Promise<void> {
  */
 export async function copyPermissions(fromAccountId: string | null, toAccountId: string): Promise<void> {
   if (!toAccountId) return;
-  const from = fromAccountId || DEFAULT_BUCKET;
-  const perms = await load();
-  let changed = false;
-  for (const domain of Object.keys(perms)) {
-    const source = perms[domain][from];
-    if (source && Object.keys(source).length > 0) {
-      perms[domain][toAccountId] = { ...source };
-      changed = true;
+  await withStorageLock(async () => {
+    const from = fromAccountId || DEFAULT_BUCKET;
+    const perms = await load();
+    let changed = false;
+    for (const domain of Object.keys(perms)) {
+      const source = perms[domain][from];
+      if (source && Object.keys(source).length > 0) {
+        perms[domain][toAccountId] = { ...source };
+        changed = true;
+      }
     }
-  }
-  if (changed) {
-    await browser.storage.local.set({ [STORAGE_KEY]: perms });
-  }
+    if (changed) {
+      await browser.storage.local.set({ [STORAGE_KEY]: perms });
+    }
+  });
 }
 
 /**

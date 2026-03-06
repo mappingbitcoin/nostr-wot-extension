@@ -20,6 +20,7 @@ interface HomeTabProps {
   onManageFilters: () => void;
   onManageBadges: () => void;
   onEditProfile: () => void;
+  onManageScoring: () => void;
 }
 
 interface SyncStaleInfo {
@@ -27,7 +28,7 @@ interface SyncStaleInfo {
   dismissed?: boolean;
 }
 
-export default function HomeTab({ onViewAllActivity, onManagePermissions, onManageFilters, onManageBadges, onEditProfile }: HomeTabProps) {
+export default function HomeTab({ onViewAllActivity, onManagePermissions, onManageFilters, onManageBadges, onEditProfile, onManageScoring }: HomeTabProps) {
   const { active, cachedProfile, isReadOnly, isNip46 } = useAccount();
   const [domain, setDomain] = useState<string | null>(null);
   const [siteState, setSiteState] = useState<string | null>(null); // null = loading, 'empty' | 'notConnected' | 'connected'
@@ -263,7 +264,7 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
         onManageBadges={onManageBadges}
         onRecentActivity={() => onViewAllActivity(domain)}
       >
-        <ScoringCard />
+        <ScoringCard onOpen={onManageScoring} />
       </SiteControls>
     </>
   );

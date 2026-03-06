@@ -17,6 +17,7 @@ import ActivityModal from './components/Activity/ActivityModal';
 import ApprovalOverlay from './components/Approval/ApprovalOverlay';
 import WizardOverlay from './components/Wizard/WizardOverlay';
 import EditProfileOverlay from './components/EditProfile/EditProfileOverlay';
+import ScoringModal from './components/Home/ScoringModal';
 import PermissionsSection from './components/Settings/PermissionsSection';
 import OverlayPanel from '@components/OverlayPanel/OverlayPanel';
 import UnlockModal from './components/Vault/UnlockModal';
@@ -33,6 +34,7 @@ function PopupInner() {
   const [wizardOpen, setWizardOpen] = useState<boolean>(false);
   const [editProfileOpen, setEditProfileOpen] = useState<boolean>(false);
   const [permsDomain, setPermsDomain] = useState<string | null>(null);
+  const [scoringOpen, setScoringOpen] = useState<boolean>(false);
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const account = useAccount();
 
@@ -97,6 +99,7 @@ function PopupInner() {
             onManageFilters={() => setFiltersOpen(true)}
             onManageBadges={() => { setMenuSection('wot-injection'); setMenuOpen(true); }}
             onEditProfile={() => setEditProfileOpen(true)}
+            onManageScoring={() => setScoringOpen(true)}
           />
         </div>
 
@@ -133,6 +136,10 @@ function PopupInner() {
           visible={editProfileOpen}
           onClose={() => setEditProfileOpen(false)}
         />
+
+        {scoringOpen && (
+          <ScoringModal onClose={() => setScoringOpen(false)} />
+        )}
 
         {permsDomain && (
           <OverlayPanel

@@ -19,7 +19,7 @@ import { BunkerSigner, createNostrConnectURI } from 'nostr-tools/nip46';
 import { generateSecretKey, getPublicKey as ntGetPublicKey } from 'nostr-tools/pure';
 import {
   getWalletProvider, removeWalletProvider,
-  clearWalletProviders, hasWalletConfig
+  clearWalletProviders
 } from './lib/wallet/index.ts';
 import type { WalletConfig } from './lib/wallet/types.ts';
 import type { Account, SignedEvent, ScoringConfig, UnsignedEvent, VaultPayload } from './lib/types.ts';
@@ -178,9 +178,22 @@ loadConfig();
 // Clean up stale signer pending requests once on cold start
 // (resolvers are lost when service worker restarts, so stale entries can never resolve)
 signer.cleanupStale();
-signerPermissions.migrateToPerKind();
-signerPermissions.migrateToPerAccount();
-signerPermissions.migrateForwardToAsk();
+
+// Run permission migrations sequentially (they share the same storage key).
+// Guarded by a version flag so they only run once per schema version.
+(async () => {
+    try {
+        const data = await browser.storage.local.get('_permMigrationVersion');
+        if ((data as Record<string, unknown>)._permMigrationVersion !== 3) {
+            await signerPermissions.migrateToPerKind();
+            await signerPermissions.migrateToPerAccount();
+            await signerPermissions.migrateForwardToAsk();
+            await browser.storage.local.set({ _permMigrationVersion: 3 });
+        }
+    } catch (e: unknown) {
+        console.warn('[PERMISSIONS] Migration failed:', (e as Error).message);
+    }
+})();
 
 // Auto-unlock vault when auto-lock is "Never" (empty password).
 // Service worker restarts clear in-memory state, so re-unlock automatically.
@@ -1447,7 +1460,8 @@ async function handleRequest({ method, params }: { method: string; params: Recor
         case 'wallet_hasConfig': {
             if (vault.isLocked()) return { result: false, error: null };
             const acct = vault.getActiveAccountWithWallet();
-            return { result: hasWalletConfig(acct?.walletConfig), error: null };
+            // Return the provider type string (truthy) or false
+            return { result: acct?.walletConfig?.type ?? false, error: null };
         }
 
         case 'wallet_getInfo': {

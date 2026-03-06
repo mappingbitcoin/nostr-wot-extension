@@ -15,24 +15,6 @@
   gap: 8px;
 }
 
-.advancedToggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-  padding: 8px 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  cursor: pointer;
-  margin-bottom: 4px;
-}
-
-.advancedToggle:hover {
-  color: var(--text-heading);
-}
-
 .footer {
   display: flex;
   gap: 8px;
@@ -40,4 +22,40 @@
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--card-border);
+}
+
+/* Info tooltip */
+.infoTip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: help;
+  color: var(--text-muted);
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.infoTipText {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-card);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-body);
+  line-height: 1.4;
+  width: max-content;
+  max-width: 220px;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+}
+
+.infoTip:hover .infoTipText {
+  display: block;
 }

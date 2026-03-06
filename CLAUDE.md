@@ -1,3 +1,7 @@
+# Workflow Rules
+
+**NEVER use git worktrees.** Always work directly on the main repo. The extension is loaded from the main repo's `dist/` — worktree builds go to a different directory and changes are invisible.
+
 # Self-Review Checklist
 
 Every code change must pass through these gates. No exceptions, no shortcuts.
