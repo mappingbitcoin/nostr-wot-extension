@@ -879,5 +879,24 @@
   "approval.appliesToAllAccounts": "Permission applies to all accounts",
   "approval.awaitingSigner": "Awaiting remote signer...",
   "approval.pendingSignature": "Pending signature",
-  "approval.cancelNip46": "Cancel"
+  "approval.cancelNip46": "Cancel",
+
+  "wallet.title": "Wallet",
+  "wallet.connectWallet": "Connect wallet",
+  "wallet.connectHint": "Connect a Lightning wallet to send and receive zaps.",
+  "wallet.invalidNwc": "Must start with nostr+walletconnect://",
+  "wallet.fillAllFields": "Please fill in all fields",
+  "wallet.instanceUrl": "Instance URL",
+  "wallet.adminKey": "Admin Key",
+  "wallet.balance": "Balance",
+  "wallet.deposit": "Deposit",
+  "wallet.amountSats": "Amount in sats",
+  "wallet.createInvoice": "Create invoice",
+  "wallet.payInvoice": "Pay this invoice",
+  "wallet.autoApprove": "Auto-approve zaps",
+  "wallet.autoApproveHint": "Automatically approve zap requests up to this amount without prompting.",
+  "wallet.maxSats": "Max sats",
+  "wallet.noWallet": "No wallet connected",
+  "wallet.noWalletHint": "Connect a Lightning wallet to enable zaps.",
+  "wallet.setupWallet": "Set up wallet"
 }

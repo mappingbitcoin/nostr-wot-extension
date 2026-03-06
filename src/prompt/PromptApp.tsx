@@ -24,6 +24,7 @@ interface PendingPrompt {
   theirPubkey?: string;
   vaultLocked?: boolean;
   needsPermission?: boolean;
+  walletAmount?: number;
 }
 
 interface FollowDiff {
@@ -104,17 +105,32 @@ export default function PromptApp() {
         <span className={styles.originDomain}>{prompt.origin}</span>
       </div>
 
-      <div className={styles.requestType}>
-        {formatLabel(prompt.type || '')}
-      </div>
+      {prompt.type?.startsWith('webln_') ? (
+        <>
+          <div className={styles.requestType}>
+            {prompt.type === 'webln_sendPayment' ? 'Lightning Payment' : 'Lightning Request'}
+          </div>
+          {prompt.walletAmount !== undefined && prompt.walletAmount > 0 && (
+            <div className={styles.paymentAmount}>
+              {prompt.walletAmount.toLocaleString()} sats
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className={styles.requestType}>
+            {formatLabel(prompt.type || '')}
+          </div>
 
-      <EventPreview
-        type={prompt.type || null}
-        event={prompt.event}
-        theirPubkey={prompt.theirPubkey}
-        followDiff={followDiff}
-        className={styles.eventPreview}
-      />
+          <EventPreview
+            type={prompt.type || null}
+            event={prompt.event}
+            theirPubkey={prompt.theirPubkey}
+            followDiff={followDiff}
+            className={styles.eventPreview}
+          />
+        </>
+      )}
 
       {vaultLocked && (
         <UnlockSection onUnlocked={handleUnlocked} />

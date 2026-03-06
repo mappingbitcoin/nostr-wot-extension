@@ -21,7 +21,7 @@
  * @module lib/vault
  */
 
-import type { VaultPayload, Account, SafeAccount, MemoryAccount, MemoryVaultPayload } from './types.ts';
+import type { VaultPayload, Account, SafeAccount, SafeAccountWithWallet, MemoryAccount, MemoryVaultPayload } from './types.ts';
 import browser from './browser.ts';
 
 const STORAGE_KEY = 'keyVault';
@@ -279,6 +279,19 @@ export function getActiveAccount(): SafeAccount | null {
 }
 
 /**
+ * Get the active account including walletConfig (for background wallet handlers).
+ * Unlike getActiveAccount() which omits walletConfig from its return type,
+ * this includes it for use in wallet/WebLN handler code.
+ */
+export function getActiveAccountWithWallet(): SafeAccountWithWallet | null {
+  if (!_decrypted) return null;
+  const acct = _decrypted.accounts.find(a => a.id === _decrypted!.activeAccountId);
+  if (!acct) return null;
+  const { privkeyBytes, mnemonicBytes, ...safe } = acct;
+  return safe;
+}
+
+/**
  * Get a deep copy of the decrypted vault payload
  * @throws {Error} if vault is locked
  */
@@ -393,6 +406,25 @@ export async function updateAccountNip46Keys(accountId: string, localPrivkey: st
   const acct = _decrypted.accounts.find(a => a.id === accountId);
   if (!acct || !acct.nip46Config) throw new Error('Account not found or not NIP-46');
   acct.nip46Config = { ...acct.nip46Config, localPrivkey, localPubkey };
+  await save();
+}
+
+/**
+ * Update the wallet config for an account (persists to vault).
+ * Pass null to remove wallet config.
+ */
+export async function updateAccountWalletConfig(
+  accountId: string,
+  walletConfig: Account['walletConfig'] | null,
+): Promise<void> {
+  if (!_decrypted) throw new Error('Vault is locked');
+  const acct = _decrypted.accounts.find(a => a.id === accountId);
+  if (!acct) throw new Error('Account not found');
+  if (walletConfig === null) {
+    delete acct.walletConfig;
+  } else {
+    acct.walletConfig = walletConfig;
+  }
   await save();
 }
 

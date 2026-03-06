@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, ReactNode } from 'react';
 import { t, getSupportedLanguages, getLanguage, setLanguage } from '@lib/i18n.js';
-import { IconLock, IconShield, IconUsers, IconGlobe, IconKey, IconDownload } from '@assets';
+import { IconLock, IconShield, IconUsers, IconGlobe, IconKey, IconDownload, IconZap } from '@assets';
 import iconBaseSvg from '/icons/icon-base.svg';
 import OverlayPanel from '@components/OverlayPanel/OverlayPanel';
 import ScrollWheelPicker from '@components/ScrollWheelPicker/ScrollWheelPicker';
@@ -12,6 +12,7 @@ import NetworkSection from '../Settings/NetworkSection';
 import WotModeSection from '../Settings/WotModeSection';
 import WotInjectionSection, { WotInjectionDetail } from '../Settings/WotInjectionSection';
 import WotSyncSection, { WotSyncDetail } from '../Settings/WotSyncSection';
+import WalletSection from '../Wallet/WalletSection';
 import KeyActionModal from '../Vault/KeyActionModal';
 import NavItem from '@components/NavItem/NavItem';
 import { useVault } from '../../context/VaultContext';
@@ -89,6 +90,12 @@ export default function MenuOverlay({ visible, onClose, initialSection }: MenuOv
       icon: <IconLock />,
     },
     {
+      id: 'wallet',
+      label: t('wallet.title'),
+      desc: t('wallet.connectHint'),
+      icon: <IconZap />,
+    },
+    {
       id: 'wot',
       label: t('settings.webOfTrust'),
       desc: t('settings.webOfTrustDesc'),
@@ -106,6 +113,7 @@ export default function MenuOverlay({ visible, onClose, initialSection }: MenuOv
     security: t('settings.autoLockPassword'),
     wot: t('settings.webOfTrust'),
     network: t('settings.network'),
+    wallet: t('wallet.title'),
     'key-backup': t('security.keyBackup'),
     'site-permissions': permDetailDomain || t('security.permissions'),
     'wot-injection': t('wot.badges'),
@@ -184,6 +192,8 @@ export default function MenuOverlay({ visible, onClose, initialSection }: MenuOv
         );
       case 'site-permissions':
         return <PermissionsSection ref={permsSectionRef} onDetailChange={setPermDetailDomain} />;
+      case 'wallet':
+        return <WalletSection />;
       case 'wot':
         return (
           <WotModeSection

@@ -3,6 +3,8 @@
  * @module lib/types
  */
 
+import type { WalletConfig } from './wallet/types.ts';
+
 // ── Nostr Events ──
 
 export interface UnsignedEvent {
@@ -42,10 +44,14 @@ export interface Account {
   readOnly: boolean;
   createdAt: number;
   derivationIndex?: number;
+  walletConfig?: WalletConfig;
 }
 
 /** Account without private key — safe to expose */
-export type SafeAccount = Omit<Account, 'privkey' | 'mnemonic'>;
+export type SafeAccount = Omit<Account, 'privkey' | 'mnemonic' | 'walletConfig'>;
+
+/** Account without private key but with walletConfig — for background wallet handlers */
+export type SafeAccountWithWallet = Omit<Account, 'privkey' | 'mnemonic'>;
 
 /** Account with private key as Uint8Array — used in vault memory only */
 export interface MemoryAccount extends Omit<Account, 'privkey' | 'mnemonic'> {
@@ -101,6 +107,7 @@ export interface PendingRequest {
   waitingForUnlock?: boolean;
   nip46InFlight?: boolean;
   accountId?: string | null;
+  walletAmount?: number;
   timestamp: number;
 }
 
@@ -197,7 +204,9 @@ export type MessageType =
   | 'WOT_REQUEST'
   | 'WOT_RESPONSE'
   | 'NIP07_REQUEST'
-  | 'NIP07_RESPONSE';
+  | 'NIP07_RESPONSE'
+  | 'WEBLN_REQUEST'
+  | 'WEBLN_RESPONSE';
 
 export interface ExtensionMessage {
   type: string;
