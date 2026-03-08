@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-03-08
+
+### Added
+- **Lightning Wallet (WebLN)** — built-in Lightning wallet support with WebLN provider (`window.webln`) for sending and receiving zaps directly from Nostr clients
+- **Quick Wallet Setup** — one-click wallet provisioning via zaps.nostr-wot.com with challenge-response authentication; no account registration needed
+- **LNbits manual connect** — connect your own LNbits instance with admin key
+- **NWC connect** — connect any Nostr Wallet Connect compatible wallet
+- **NWC auto-provisioning** — provisioned wallets automatically get an NWC connection URI for use in other apps
+- **Wallet UI** — balance display, deposit invoices with QR codes, auto-approve threshold for zaps
+- **WebLN permission system** — per-domain approval for `sendPayment` with remember option
+- **Payment approval overlay** — pending zap requests shown in popup with approve/deny actions
+
+### Changed
+- **WebLN `enable()` always succeeds** — apps that call `enable()` on page load (like Primal) no longer get permanently locked out when the vault is locked
+- **Version moved to single source of truth** — extension version is read from the manifest at runtime instead of being duplicated across locale files
+
+### Fixed
+- **WebLN payment approval was invisible** — `webln_sendPayment` requests were missing `needsPermission: true`, making them appear in the badge count but not in the approval overlay
+- Removed stale debug `console.log` statements from NIP-07 and WebLN handlers
+
 ## [0.2.0] - 2025-02-24
 
 ### Added

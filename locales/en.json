@@ -512,7 +512,6 @@
   "status.syncFailed": "Sync failed",
 
   "about.name": "Nostr WoT Extension",
-  "about.version": "v0.2.2",
 
   "onboarding.title": "Nostr WoT Extension",
   "onboarding.subtitle": "Identity & Web of Trust",
@@ -906,5 +905,13 @@
   "wallet.maxSats": "Max sats",
   "wallet.noWallet": "No wallet connected",
   "wallet.noWalletHint": "Connect a Lightning wallet to enable zaps.",
-  "wallet.setupWallet": "Set up wallet"
+  "wallet.setupWallet": "Set up wallet",
+  "wallet.quickSetup": "Quick Setup",
+  "wallet.quickSetupHint": "Create a Lightning wallet instantly. No account needed.",
+  "wallet.createWallet": "Create Wallet",
+  "wallet.advancedSettings": "Advanced",
+  "wallet.lnbitsUrl": "Server URL",
+  "wallet.nwcUri": "NWC Connection",
+  "wallet.copyNwc": "Copy",
+  "wallet.nwcCopied": "Copied!"
 }

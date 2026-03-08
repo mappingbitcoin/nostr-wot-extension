@@ -55,6 +55,21 @@
   margin-top: 4px;
 }
 
+.advancedToggle {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 4px 0;
+  text-align: left;
+  font-family: inherit;
+}
+
+.advancedToggle:hover {
+  color: var(--text-secondary);
+}
+
 /* ── Provider header ── */
 
 .providerCard {
@@ -84,6 +99,25 @@
   font-size: 11px;
   color: var(--success);
   font-weight: 500;
+}
+
+/* ── NWC URI row ── */
+
+.nwcRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.nwcUri {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
 }
 
 /* ── Status display ── */

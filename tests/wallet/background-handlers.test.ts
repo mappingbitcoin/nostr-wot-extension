@@ -26,6 +26,7 @@ import {
 } from '../../lib/wallet/index.ts';
 import type { WalletProvider, WalletProviderInfo, WalletConfig } from '../../lib/wallet/types.ts';
 import type { VaultPayload } from '../../lib/types.ts';
+import { npubEncode } from '../../lib/crypto/bech32.ts';
 
 // ── Test Constants ──
 
@@ -94,9 +95,7 @@ function makePayloadNoWallet(): VaultPayload {
 type HandlerResult = { result: unknown; error: string | null };
 
 function handleWeblnEnable(): HandlerResult {
-  if (vault.isLocked()) return { result: null, error: 'Vault is locked' };
-  const acct = vault.getActiveAccountWithWallet();
-  if (!acct || !acct.walletConfig) return { result: null, error: 'No wallet configured' };
+  // Always succeed — vault/wallet checks happen in individual methods.
   return { result: true, error: null };
 }
 
@@ -269,6 +268,57 @@ async function handleWalletMakeInvoice(params: {
   }
 }
 
+function handleWalletGetNwcUri(): HandlerResult {
+  if (vault.isLocked()) return { result: null, error: 'Vault is locked' };
+  const acct = vault.getActiveAccountWithWallet();
+  if (!acct?.walletConfig || acct.walletConfig.type !== 'lnbits') return { result: null, error: null };
+  return { result: (acct.walletConfig as { nwcUri?: string }).nwcUri ?? null, error: null };
+}
+
+async function handleWalletProvision(params: {
+  instanceUrl?: string;
+}): Promise<unknown> {
+  if (vault.isLocked()) throw new Error('Vault is locked');
+  const acctId = vault.getActiveAccountId();
+  if (!acctId) throw new Error('No active account');
+  const acct = vault.getActiveAccountWithWallet();
+  if (!acct) throw new Error('No active account');
+
+  const { provisionLnbitsWallet, DEFAULT_LNBITS_URL } = await import('../../lib/wallet/lnbits-provision.ts');
+  const url = params.instanceUrl?.trim() || DEFAULT_LNBITS_URL;
+  const npub = npubEncode(acct.pubkey);
+  const walletName = `WoT:${npub.slice(0, 16)}`;
+
+  // Mock signFn — returns a fake signed event (real handler uses vault.getPrivkey + signEvent)
+  const signFn = async (challenge: string) => ({
+    id: 'test-event-id',
+    pubkey: acct.pubkey,
+    created_at: Math.floor(Date.now() / 1000),
+    kind: 27235 as const,
+    tags: [['challenge', challenge], ['u', url]],
+    content: '',
+    sig: 'test-sig',
+  });
+
+  // Mock fetch — returns challenge on GET, provision response on POST
+  const mockFetch = async (_url: string, init?: RequestInit) => {
+    if (!init?.method || init.method === 'GET') {
+      return new Response(JSON.stringify({ challenge: 'test-challenge-hex' }), { status: 200 });
+    }
+    return new Response(JSON.stringify({
+      id: 'prov-wallet-id', adminkey: 'prov-admin-key', inkey: 'prov-inkey',
+      name: 'WoT Wallet', balance_msat: 0, user: 'prov-user',
+      nwcUri: 'nostr+walletconnect://test-pubkey?relay=wss://relay.test&secret=test-secret',
+    }), { status: 201 });
+  };
+
+  const { adminKey, nwcUri } = await provisionLnbitsWallet(url, walletName, signFn, mockFetch as typeof fetch);
+
+  const walletConfig = { type: 'lnbits' as const, instanceUrl: url, adminKey, nwcUri };
+  await vault.updateAccountWalletConfig(acctId, walletConfig);
+  return true;
+}
+
 // ═══════════════════════════════════════════════════════
 // WebLN Handlers (from web pages, non-privileged)
 // ═══════════════════════════════════════════════════════
@@ -287,19 +337,19 @@ describe('wallet handlers: webln_enable', () => {
     assert.strictEqual(r.error, null);
   });
 
-  it('returns error when vault is locked', () => {
+  it('returns true even when vault is locked', () => {
     vault.lock();
     const r = handleWeblnEnable();
-    assert.strictEqual(r.result, null);
-    assert.strictEqual(r.error, 'Vault is locked');
+    assert.strictEqual(r.result, true);
+    assert.strictEqual(r.error, null);
   });
 
-  it('returns error when no wallet configured', async () => {
+  it('returns true even when no wallet configured', async () => {
     vault.lock();
     await vault.create(TEST_PASSWORD, makePayloadNoWallet());
     const r = handleWeblnEnable();
-    assert.strictEqual(r.result, null);
-    assert.strictEqual(r.error, 'No wallet configured');
+    assert.strictEqual(r.result, true);
+    assert.strictEqual(r.error, null);
   });
 });
 
@@ -795,5 +845,101 @@ describe('wallet handlers: wallet_makeInvoice', () => {
     const r = await handleWalletMakeInvoice({ amount: 999999999 });
     assert.strictEqual(r.result, null);
     assert.strictEqual(r.error, 'Amount too large');
+  });
+});
+
+describe('wallet handlers: wallet_getNwcUri', () => {
+  beforeEach(async () => {
+    resetMockStorage();
+    clearWalletProviders();
+    vault.lock();
+    await vault.create(TEST_PASSWORD, makePayloadWithWallet());
+  });
+
+  it('returns nwcUri when lnbits wallet has one', async () => {
+    const nwcConfig: WalletConfig = {
+      type: 'lnbits', instanceUrl: 'https://legend.lnbits.com',
+      adminKey: 'testapikey123', nwcUri: 'nostr+walletconnect://test',
+    };
+    await vault.updateAccountWalletConfig('acct1', nwcConfig);
+    const r = handleWalletGetNwcUri();
+    assert.strictEqual(r.result, 'nostr+walletconnect://test');
+    assert.strictEqual(r.error, null);
+  });
+
+  it('returns null when lnbits wallet has no nwcUri', () => {
+    const r = handleWalletGetNwcUri();
+    assert.strictEqual(r.result, null);
+    assert.strictEqual(r.error, null);
+  });
+
+  it('returns null when no wallet configured', async () => {
+    vault.lock();
+    await vault.create(TEST_PASSWORD, makePayloadNoWallet());
+    const r = handleWalletGetNwcUri();
+    assert.strictEqual(r.result, null);
+    assert.strictEqual(r.error, null);
+  });
+
+  it('returns error when vault is locked', () => {
+    vault.lock();
+    const r = handleWalletGetNwcUri();
+    assert.strictEqual(r.result, null);
+    assert.strictEqual(r.error, 'Vault is locked');
+  });
+});
+
+describe('wallet handlers: wallet_provision', () => {
+  beforeEach(async () => {
+    resetMockStorage();
+    clearWalletProviders();
+    vault.lock();
+    await vault.create(TEST_PASSWORD, makePayloadNoWallet());
+  });
+
+  it('provisions wallet and stores lnbits config with nwcUri', async () => {
+    // Pre-set mock provider so getWalletProvider returns it instead of
+    // creating a real LnbitsProvider that tries HTTP on connect()
+    setWalletProvider('acct1', createMockProvider());
+
+    const r = await handleWalletProvision({ instanceUrl: 'https://zaps.test.com' });
+    assert.strictEqual(r, true);
+
+    const acct = vault.getActiveAccountWithWallet();
+    assert.ok(acct?.walletConfig);
+    assert.strictEqual(acct.walletConfig.type, 'lnbits');
+    assert.strictEqual((acct.walletConfig as { adminKey: string }).adminKey, 'prov-admin-key');
+    assert.strictEqual((acct.walletConfig as { instanceUrl: string }).instanceUrl, 'https://zaps.test.com');
+    assert.strictEqual(
+      (acct.walletConfig as { nwcUri?: string }).nwcUri,
+      'nostr+walletconnect://test-pubkey?relay=wss://relay.test&secret=test-secret',
+    );
+  });
+
+  it('uses DEFAULT_LNBITS_URL when no instanceUrl provided', async () => {
+    setWalletProvider('acct1', createMockProvider());
+
+    const r = await handleWalletProvision({});
+    assert.strictEqual(r, true);
+
+    const acct = vault.getActiveAccountWithWallet();
+    assert.ok(acct?.walletConfig);
+    assert.strictEqual(acct.walletConfig.type, 'lnbits');
+  });
+
+  it('throws when vault is locked', async () => {
+    vault.lock();
+    await assert.rejects(
+      () => handleWalletProvision({}),
+      { message: 'Vault is locked' },
+    );
+  });
+
+  it('throws when no active account', async () => {
+    vault.clearActiveAccount();
+    await assert.rejects(
+      () => handleWalletProvision({}),
+      { message: 'No active account' },
+    );
   });
 });

@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/nostr-wot/nostr-wot-extension/actions/workflows/tests.yml/badge.svg)](https://github.com/nostr-wot/nostr-wot-extension/actions/workflows/tests.yml)
 
-Query Nostr Web of Trust distance between pubkeys, and optionally manage your Nostr identity — all in one extension.
+Query Nostr Web of Trust distance between pubkeys, manage your Nostr identity, and send zaps with a built-in Lightning wallet — all in one extension.
 
 ## What It Does
 
@@ -130,6 +130,40 @@ const plaintext = await window.nostr.nip44.decrypt(theirPubkey, ciphertext);
 ```
 
 Signing requests show a permission prompt. You can grant persistent permissions per-domain, per-method, or per-event-kind.
+
+## Lightning Wallet & Zaps
+
+The extension includes a built-in Lightning wallet for sending and receiving zaps on Nostr.
+
+### Quick Setup
+
+Click **Wallet > Quick Setup** to instantly provision a Lightning wallet via [zaps.nostr-wot.com](https://zaps.nostr-wot.com). No account registration required — the extension authenticates with your Nostr identity using a signed challenge.
+
+### Manual Setup
+
+You can also connect your own wallet:
+
+| Method | Description |
+|--------|-------------|
+| **NWC** | Paste a `nostr+walletconnect://` URI from any NWC-compatible wallet |
+| **LNbits** | Enter your LNbits instance URL and admin key |
+
+### WebLN Provider
+
+When a wallet is connected, the extension exposes the standard `window.webln` API:
+
+```javascript
+await window.webln.enable();
+await window.webln.sendPayment(bolt11Invoice);
+await window.webln.makeInvoice({ amount: 1000 });
+const balance = await window.webln.getBalance();
+```
+
+Nostr clients that support WebLN (like Primal) can use this directly for zaps. Payment requests trigger a permission prompt — you can approve once or set an auto-approve threshold for small amounts.
+
+### NWC Connection
+
+Provisioned wallets automatically receive an NWC connection URI. Copy it from the wallet UI to use in any NWC-compatible app.
 
 ## For Web Developers
 

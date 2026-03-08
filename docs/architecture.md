@@ -109,6 +109,7 @@ Abstracts Lightning wallet backends behind a common `WalletProvider` interface. 
 | `lib/wallet/types.ts` | `WalletConfig` (discriminated union: `nwc` or `lnbits`), `WalletProvider` interface, `SafeWalletInfo` |
 | `lib/wallet/nwc.ts` | NWC (Nostr Wallet Connect / NIP-47) provider — communicates over Nostr relays |
 | `lib/wallet/lnbits.ts` | LNbits provider — communicates over HTTPS REST API |
+| `lib/wallet/lnbits-provision.ts` | Auto-provisioning: creates a new LNbits wallet via `POST /api/provision` on a proxy server |
 | `lib/wallet/index.ts` | Factory + per-account provider cache (`getWalletProvider`, `setWalletProvider`, `clearWalletProviders`) |
 
 Provider instances are cached per account ID in a `Map<string, WalletProvider>`. The cache is cleared on vault lock via `clearWalletProviders()`. LNbits providers are created directly by the factory; NWC providers require crypto dependencies injected at runtime and must be created externally via `createNwcProvider()` then registered with `setWalletProvider()`.

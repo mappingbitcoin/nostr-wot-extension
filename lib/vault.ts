@@ -140,6 +140,10 @@ function resetAutoLock(): void {
   if (_autoLockTimer) clearTimeout(_autoLockTimer);
   if (_cryptoKey && _autoLockMs > 0) {
     _autoLockTimer = setTimeout(() => lock(), _autoLockMs);
+    // Don't keep Node.js process alive just for auto-lock (matters in tests)
+    if (typeof _autoLockTimer === 'object' && 'unref' in _autoLockTimer) {
+      (_autoLockTimer as NodeJS.Timeout).unref();
+    }
   }
 }
 

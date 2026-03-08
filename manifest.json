@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Nostr WoT",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "browser_specific_settings": {
     "gecko": {
       "id": "nostr-wot@dandelionlabs.io",

@@ -14,10 +14,11 @@ describe('wallet payment approval', () => {
     await signer.cleanupStale();
   });
 
-  it('queues a payment request with walletAmount', async () => {
+  it('queues a payment request with walletAmount and needsPermission', async () => {
     const promise = signer.queueRequest({
       type: 'webln_sendPayment',
       origin: 'primal.net',
+      needsPermission: true,
       walletAmount: 1000,
     });
 
@@ -28,6 +29,7 @@ describe('wallet payment approval', () => {
     assert.equal(pending[0].type, 'webln_sendPayment');
     assert.equal(pending[0].walletAmount, 1000);
     assert.equal(pending[0].origin, 'primal.net');
+    assert.equal(pending[0].needsPermission, true);
 
     // Resolve it
     signer.resolveRequest(pending[0].id, { allow: true });

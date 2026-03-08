@@ -7,7 +7,7 @@
 
 export type WalletConfig =
   | { type: 'nwc'; connectionString: string; relay?: string }
-  | { type: 'lnbits'; instanceUrl: string; adminKey: string; walletId?: string };
+  | { type: 'lnbits'; instanceUrl: string; adminKey: string; walletId?: string; nwcUri?: string };
 
 // ── Wallet Provider ──
 

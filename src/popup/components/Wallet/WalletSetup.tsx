@@ -12,13 +12,15 @@ interface WalletSetupProps {
   onConnected: () => void;
 }
 
-type ProviderTab = 'nwc' | 'lnbits';
+type ProviderTab = 'quick' | 'nwc' | 'lnbits';
 
 export default function WalletSetup({ onConnected }: WalletSetupProps) {
-  const [tab, setTab] = useState<ProviderTab>('nwc');
+  const [tab, setTab] = useState<ProviderTab>('quick');
   const [nwcString, setNwcString] = useState<string>('');
   const [lnbitsUrl, setLnbitsUrl] = useState<string>('');
   const [lnbitsKey, setLnbitsKey] = useState<string>('');
+  const [provisionUrl, setProvisionUrl] = useState<string>('');
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
@@ -26,7 +28,11 @@ export default function WalletSetup({ onConnected }: WalletSetupProps) {
     setError('');
     setLoading(true);
     try {
-      if (tab === 'nwc') {
+      if (tab === 'quick') {
+        await rpc('wallet_provision', {
+          instanceUrl: provisionUrl.trim() || undefined,
+        });
+      } else if (tab === 'nwc') {
         const trimmed = nwcString.trim();
         if (!trimmed.startsWith('nostr+walletconnect://')) {
           setError(t('wallet.invalidNwc'));
@@ -57,7 +63,10 @@ export default function WalletSetup({ onConnected }: WalletSetupProps) {
 
   const nwcReady = nwcString.trim().length > 0;
   const lnbitsReady = lnbitsUrl.trim().length > 0 && lnbitsKey.trim().length > 0;
-  const canConnect = tab === 'nwc' ? nwcReady : lnbitsReady;
+  const canConnect =
+    tab === 'quick' ? true :
+    tab === 'nwc' ? nwcReady :
+    lnbitsReady;
 
   return (
     <div className={styles.section}>
@@ -66,6 +75,12 @@ export default function WalletSetup({ onConnected }: WalletSetupProps) {
         <SectionHint>{t('wallet.connectHint')}</SectionHint>
 
         <div className={styles.tabs}>
+          <button
+            className={`${styles.tab} ${tab === 'quick' ? styles.tabActive : ''}`}
+            onClick={() => { setTab('quick'); setError(''); }}
+          >
+            {t('wallet.quickSetup')}
+          </button>
           <button
             className={`${styles.tab} ${tab === 'nwc' ? styles.tabActive : ''}`}
             onClick={() => { setTab('nwc'); setError(''); }}
@@ -81,7 +96,26 @@ export default function WalletSetup({ onConnected }: WalletSetupProps) {
         </div>
 
         <div className={styles.form}>
-          {tab === 'nwc' ? (
+          {tab === 'quick' ? (
+            <>
+              <SectionHint>{t('wallet.quickSetupHint')}</SectionHint>
+              <button
+                className={styles.advancedToggle}
+                onClick={() => setShowAdvanced(!showAdvanced)}
+              >
+                {t('wallet.advancedSettings')} {showAdvanced ? '\u25B2' : '\u25BC'}
+              </button>
+              {showAdvanced && (
+                <Input
+                  type="text"
+                  placeholder="https://zaps.nostr-wot.com"
+                  value={provisionUrl}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => { setProvisionUrl(e.target.value); setError(''); }}
+                  label={t('wallet.lnbitsUrl')}
+                />
+              )}
+            </>
+          ) : tab === 'nwc' ? (
             <Input
               type="text"
               mono
@@ -113,7 +147,7 @@ export default function WalletSetup({ onConnected }: WalletSetupProps) {
 
           <div className={styles.formActions}>
             <Button small onClick={handleConnect} disabled={loading || !canConnect}>
-              {loading ? t('common.loading') : t('common.connect')}
+              {loading ? t('common.loading') : tab === 'quick' ? t('wallet.createWallet') : t('common.connect')}
             </Button>
           </div>
         </div>

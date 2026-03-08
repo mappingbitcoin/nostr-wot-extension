@@ -505,7 +505,6 @@
   "status.syncFailed": "Sincronización fallida",
 
   "about.name": "Nostr WoT Extension",
-  "about.version": "v0.2.2",
 
   "onboarding.title": "Nostr WoT Extension",
   "onboarding.subtitle": "Identidad y red de confianza",

@@ -27,6 +27,10 @@ export default function Wallet({ providerType, onDisconnected }: WalletProps) {
   const [thresholdDraft, setThresholdDraft] = useState<string>('0');
   const [disconnecting, setDisconnecting] = useState<boolean>(false);
 
+  // NWC URI
+  const [nwcUri, setNwcUri] = useState<string | null>(null);
+  const [nwcCopied, setNwcCopied] = useState<boolean>(false);
+
   // Deposit flow
   const [depositAmount, setDepositAmount] = useState<string>('');
   const [depositLoading, setDepositLoading] = useState<boolean>(false);
@@ -57,10 +61,20 @@ export default function Wallet({ providerType, onDisconnected }: WalletProps) {
     }
   }, []);
 
+  const fetchNwcUri = useCallback(async () => {
+    try {
+      const uri = await rpc<string | null>('wallet_getNwcUri');
+      setNwcUri(uri);
+    } catch {
+      // ignore — not all wallets have NWC
+    }
+  }, []);
+
   useEffect(() => {
     fetchBalance();
     fetchThreshold();
-  }, [fetchBalance, fetchThreshold]);
+    fetchNwcUri();
+  }, [fetchBalance, fetchThreshold, fetchNwcUri]);
 
   const handleDisconnect = async () => {
     setDisconnecting(true);
@@ -97,6 +111,17 @@ export default function Wallet({ providerType, onDisconnected }: WalletProps) {
       setDepositError((e as Error).message);
     }
     setDepositLoading(false);
+  };
+
+  const handleCopyNwc = async () => {
+    if (!nwcUri) return;
+    try {
+      await navigator.clipboard.writeText(nwcUri);
+      setNwcCopied(true);
+      setTimeout(() => setNwcCopied(false), 2000);
+    } catch {
+      // ignore
+    }
   };
 
   const handleCopyBolt11 = async () => {
@@ -137,6 +162,18 @@ export default function Wallet({ providerType, onDisconnected }: WalletProps) {
           </Button>
         </div>
       </Card>
+
+      {/* NWC URI (if available) */}
+      {nwcUri && (
+        <Card>
+          <div className={styles.nwcRow}>
+            <span className={styles.nwcUri} title={nwcUri}>{t('wallet.nwcUri')}</span>
+            <Button small variant="secondary" onClick={handleCopyNwc}>
+              {nwcCopied ? t('wallet.nwcCopied') : t('wallet.copyNwc')}
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Balance */}
       <Card className={styles.balanceCard}>
