@@ -16,6 +16,10 @@ node --import tsx --import ./tests/helpers/register-mocks.ts --test tests/vault.
 
 # Badge engine tests (pure functions, no browser mock needed)
 node --import tsx --test tests/badges/engine.test.ts
+
+# Wallet tests (mix of pure functions and browser-mocked tests)
+node --import tsx --test tests/wallet/bolt11.test.ts
+node --import tsx --import ./tests/helpers/register-mocks.ts --test tests/wallet/nwc.test.ts tests/wallet/lnbits.test.ts tests/wallet/lnbits-provision.test.ts tests/wallet/background-handlers.test.ts tests/wallet/permissions.test.ts tests/wallet/approval.test.ts tests/wallet/types.test.ts tests/wallet/index.test.ts
 ```
 
 ---
@@ -41,6 +45,15 @@ node --import tsx --test tests/badges/engine.test.ts
 | `tests/security-hardening.test.ts` | NIP-49 zeroing, NIP-04 error normalization, vault reEncrypt, lock zeroing, batch 1-2 regression |
 | `tests/communication.test.ts` | Full communication test suite (see below) |
 | `tests/badges/engine.test.ts` | Badge engine pure functions: bech32 validation, hexToNpub, normalizePubkey, normalizeConfig, scoreToColor, buildCustomAdapters, build output validation |
+| `tests/wallet/nwc.test.ts` | NWC provider: connection, balance, pay, make invoice |
+| `tests/wallet/lnbits.test.ts` | LNbits provider: REST API calls, error handling |
+| `tests/wallet/lnbits-provision.test.ts` | Auto-provisioning: challenge-response flow |
+| `tests/wallet/bolt11.test.ts` | BOLT11 decoder: amount parsing, descriptions, expiry, networks |
+| `tests/wallet/background-handlers.test.ts` | Wallet background RPC handlers |
+| `tests/wallet/permissions.test.ts` | Wallet permission checks |
+| `tests/wallet/approval.test.ts` | Payment approval flow |
+| `tests/wallet/types.test.ts` | WalletConfig type guards |
+| `tests/wallet/index.test.ts` | Provider factory and caching |
 
 ---
 

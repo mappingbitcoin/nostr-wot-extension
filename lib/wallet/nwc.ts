@@ -10,7 +10,7 @@
  */
 
 import type { UnsignedEvent, SignedEvent } from '../types.ts';
-import type { WalletProvider, WalletProviderInfo } from './types.ts';
+import type { WalletProvider, WalletProviderInfo, Transaction } from './types.ts';
 
 // ── Parsed URI ──
 
@@ -148,6 +148,37 @@ export class NwcProvider implements WalletProvider {
       payment_hash: string;
     };
     return { bolt11: result.invoice, paymentHash: result.payment_hash };
+  }
+
+  async listTransactions(limit = 20, offset = 0): Promise<Transaction[]> {
+    const result = await this.sendRequest('list_transactions', {
+      limit,
+      offset,
+      unpaid: false,
+    }) as { transactions?: Array<{
+      type: string;
+      invoice: string;
+      amount: number;      // msats
+      fees_paid: number;   // msats
+      description: string;
+      settled_at: number;
+      created_at: number;
+      payment_hash: string;
+      preimage: string;
+    }> };
+
+    return (result.transactions ?? []).map(tx => ({
+      paymentHash: tx.payment_hash,
+      bolt11: tx.invoice,
+      amount: tx.type === 'incoming'
+        ? Math.round(tx.amount / 1000)
+        : -Math.round(tx.amount / 1000),
+      fee: Math.round((tx.fees_paid || 0) / 1000),
+      memo: tx.description || undefined,
+      status: 'settled' as const,
+      createdAt: tx.settled_at || tx.created_at,
+      preimage: tx.preimage || undefined,
+    }));
   }
 
   async connect(): Promise<void> {

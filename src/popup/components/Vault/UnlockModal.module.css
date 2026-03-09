@@ -98,6 +98,60 @@
   margin-top: 4px;
 }
 
+.waitingEvents {
+  width: 100%;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.waitingLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.waitingEvent {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: rgba(99, 102, 241, 0.04);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.waitingEventLabel {
+  font-weight: 500;
+  color: var(--text-heading);
+}
+
+.waitingEventOrigin {
+  color: var(--text-muted);
+  flex: 1;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.waitingEventDismiss {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+  line-height: 1;
+}
+
+.waitingEventDismiss:hover {
+  color: var(--error);
+}
+
 .actions {
   display: flex;
   gap: 8px;

@@ -3,7 +3,7 @@
  * @module lib/wallet/lnbits
  */
 
-import type { WalletProvider, WalletProviderInfo } from './types.ts';
+import type { WalletProvider, WalletProviderInfo, Transaction } from './types.ts';
 
 type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -73,6 +73,31 @@ export class LnbitsProvider implements WalletProvider {
       { out: false, amount, memo },
     );
     return { bolt11: data.payment_request, paymentHash: data.payment_hash };
+  }
+
+  async listTransactions(limit = 20, offset = 0): Promise<Transaction[]> {
+    const data = await this.request<Array<{
+      checking_id: string;
+      payment_hash: string;
+      bolt11: string;
+      amount: number;       // msats in LNbits
+      fee: number;          // msats
+      memo: string;
+      status: string;
+      time: number;
+      preimage: string;
+    }>>('GET', `/api/v1/payments?limit=${limit}&offset=${offset}`);
+
+    return data.map(p => ({
+      paymentHash: p.payment_hash,
+      bolt11: p.bolt11,
+      amount: Math.round(p.amount / 1000),   // msats → sats
+      fee: Math.round((p.fee || 0) / 1000),
+      memo: p.memo || undefined,
+      status: p.status === 'success' ? 'settled' as const : p.status === 'pending' ? 'pending' as const : 'failed' as const,
+      createdAt: p.time,
+      preimage: p.preimage || undefined,
+    }));
   }
 
   async connect(): Promise<void> {

@@ -22,7 +22,7 @@ import {
   clearWalletProviders
 } from './lib/wallet/index.ts';
 import type { WalletConfig } from './lib/wallet/types.ts';
-import { provisionLnbitsWallet, DEFAULT_LNBITS_URL } from './lib/wallet/lnbits-provision.ts';
+import { provisionLnbitsWallet, claimLightningAddress, getLightningAddress, releaseLightningAddress, DEFAULT_LNBITS_URL } from './lib/wallet/lnbits-provision.ts';
 import type { Account, SignedEvent, ScoringConfig, UnsignedEvent, VaultPayload } from './lib/types.ts';
 
 // Sanitize user-provided CSS to prevent data exfiltration via url(), @import, etc.
@@ -75,6 +75,7 @@ const PRIVILEGED_METHODS = new Set([
     'signer_getPermissionsRaw', 'signer_getPermissionsForDomainRaw',
     'signer_copyPermissions', 'signer_getUseGlobalDefaults', 'signer_setUseGlobalDefaults',
     'signer_getPending', 'signer_resolve', 'signer_resolveBatch', 'signer_cancelNip46',
+    'signer_cancelUnlockWaiters', 'signer_cancelUnlockWaiter',
     'onboarding_validateNsec', 'onboarding_validateNcryptsec', 'onboarding_validateMnemonic', 'onboarding_validateNpub', 'onboarding_connectNip46',
     'onboarding_generateAccount', 'onboarding_checkExistingSeed', 'onboarding_generateSubAccount',
     'onboarding_exportNcryptsec', 'onboarding_saveReadOnly', 'onboarding_createVault', 'onboarding_addToVault',
@@ -97,7 +98,9 @@ const PRIVILEGED_METHODS = new Set([
     'getSyncState', 'hasHostPermission', 'getProfileMetadata', 'getProfileMetadataBatch',
     'wallet_getInfo', 'wallet_getBalance', 'wallet_connect', 'wallet_disconnect',
     'wallet_setAutoApproveThreshold', 'wallet_getAutoApproveThreshold',
-    'wallet_makeInvoice', 'wallet_hasConfig', 'wallet_provision', 'wallet_getNwcUri',
+    'wallet_makeInvoice', 'wallet_getTransactions', 'wallet_payInvoice',
+    'wallet_hasConfig', 'wallet_provision', 'wallet_getNwcUri',
+    'wallet_claimLightningAddress', 'wallet_getLightningAddress', 'wallet_releaseLightningAddress',
 ]);
 
 function checkRateLimit(method: string): boolean {
@@ -700,6 +703,39 @@ browser.runtime.onMessage.addListener((request: Record<string, unknown>, sender:
             sendResponse({ error: (error as Error).message || (error as { name?: string }).name || 'Unknown error' });
         });
     return true; // Async response
+});
+
+// Port-based handler for NIP-07 and WebLN requests from content scripts.
+// Port connections keep the service worker alive during long operations
+// (vault unlock prompts, NIP-46 remote signing, payment approvals).
+browser.runtime.onConnect.addListener((port: chrome.runtime.Port) => {
+    if (port.name !== 'nip07' && port.name !== 'webln') return;
+
+    port.onMessage.addListener(async (request: Record<string, unknown>) => {
+        const method = request.method as string;
+
+        // Defense-in-depth: derive origin from browser-verified sender info
+        if (method?.startsWith('nip07_') || method?.startsWith('webln_')) {
+            const originUrl = port.sender?.frameId === 0
+                ? port.sender?.tab?.url
+                : (port.sender?.url || port.sender?.tab?.url);
+            if (!originUrl) {
+                try { port.postMessage({ error: 'Cannot determine request origin' }); } catch {}
+                return;
+            }
+            (request.params as Record<string, unknown>).origin = new URL(originUrl).hostname;
+        }
+
+        try {
+            console.log('[PORT]', port.name, 'request:', method);
+            const result = await handleRequest(request as { method: string; params: Record<string, unknown> });
+            console.log('[PORT]', port.name, 'success:', method);
+            try { port.postMessage({ result }); } catch {}
+        } catch (error) {
+            console.error('[PORT]', port.name, 'error:', method, (error as Error).message);
+            try { port.postMessage({ error: (error as Error).message || 'Unknown error' }); } catch {}
+        }
+    });
 });
 
 // npub→hex using shared bech32 decoder (returns null on invalid input)
@@ -1518,6 +1554,28 @@ async function handleRequest({ method, params }: { method: string; params: Recor
             return await provider.makeInvoice(amount, memo);
         }
 
+        case 'wallet_getTransactions': {
+            const { limit, offset } = params as { limit?: number; offset?: number };
+            if (vault.isLocked()) throw new Error('Vault is locked');
+            const acct = vault.getActiveAccountWithWallet();
+            if (!acct?.walletConfig) throw new Error('No wallet configured');
+            const provider = getWalletProvider(acct.id, acct.walletConfig);
+            if (!provider) throw new Error('Provider not available');
+            if (!provider.isConnected()) await provider.connect();
+            return await provider.listTransactions(limit ?? 10, offset ?? 0);
+        }
+
+        case 'wallet_payInvoice': {
+            const { bolt11 } = params as { bolt11: string };
+            if (vault.isLocked()) throw new Error('Vault is locked');
+            const acct = vault.getActiveAccountWithWallet();
+            if (!acct?.walletConfig) throw new Error('No wallet configured');
+            const provider = getWalletProvider(acct.id, acct.walletConfig);
+            if (!provider) throw new Error('Provider not available');
+            if (!provider.isConnected()) await provider.connect();
+            return await provider.payInvoice(bolt11);
+        }
+
         case 'wallet_provision': {
             if (vault.isLocked()) throw new Error('Vault is locked');
             const acctId = vault.getActiveAccountId();
@@ -1557,6 +1615,69 @@ async function handleRequest({ method, params }: { method: string; params: Recor
             const acct = vault.getActiveAccountWithWallet();
             if (!acct?.walletConfig || acct.walletConfig.type !== 'lnbits') return null;
             return acct.walletConfig.nwcUri ?? null;
+        }
+
+        case 'wallet_claimLightningAddress': {
+            if (vault.isLocked()) throw new Error('Vault is locked');
+            const acctId = vault.getActiveAccountId();
+            if (!acctId) throw new Error('No active account');
+            const acct = vault.getActiveAccountWithWallet();
+            if (!acct?.walletConfig || acct.walletConfig.type !== 'lnbits') {
+                throw new Error('No LNbits wallet configured');
+            }
+            const url = acct.walletConfig.instanceUrl;
+            const signFn = async (challenge: string): Promise<SignedEvent> => {
+                const privkeyBytes = vault.getPrivkey(acctId);
+                if (!privkeyBytes) throw new Error('No private key available');
+                try {
+                    return await signEvent({
+                        kind: 27235,
+                        created_at: Math.floor(Date.now() / 1000),
+                        tags: [['challenge', challenge], ['u', url]],
+                        content: '',
+                    }, privkeyBytes);
+                } finally {
+                    privkeyBytes.fill(0);
+                }
+            };
+            return await claimLightningAddress(url, params.username as string, signFn);
+        }
+
+        case 'wallet_getLightningAddress': {
+            if (vault.isLocked()) throw new Error('Vault is locked');
+            const acct = vault.getActiveAccountWithWallet();
+            if (!acct?.walletConfig || acct.walletConfig.type !== 'lnbits') {
+                return { address: null };
+            }
+            const address = await getLightningAddress(acct.walletConfig.instanceUrl, acct.pubkey);
+            return { address };
+        }
+
+        case 'wallet_releaseLightningAddress': {
+            if (vault.isLocked()) throw new Error('Vault is locked');
+            const acctId = vault.getActiveAccountId();
+            if (!acctId) throw new Error('No active account');
+            const acct = vault.getActiveAccountWithWallet();
+            if (!acct?.walletConfig || acct.walletConfig.type !== 'lnbits') {
+                throw new Error('No LNbits wallet configured');
+            }
+            const url = acct.walletConfig.instanceUrl;
+            const signFn = async (challenge: string): Promise<SignedEvent> => {
+                const privkeyBytes = vault.getPrivkey(acctId);
+                if (!privkeyBytes) throw new Error('No private key available');
+                try {
+                    return await signEvent({
+                        kind: 27235,
+                        created_at: Math.floor(Date.now() / 1000),
+                        tags: [['challenge', challenge], ['u', url]],
+                        content: '',
+                    }, privkeyBytes);
+                } finally {
+                    privkeyBytes.fill(0);
+                }
+            };
+            await releaseLightningAddress(url, signFn);
+            return { ok: true };
         }
 
         // === Signer permission management ===
@@ -1608,6 +1729,14 @@ async function handleRequest({ method, params }: { method: string; params: Recor
 
         case 'signer_cancelNip46':
             await signer.cancelNip46InFlight(params.id as string);
+            return { ok: true };
+
+        case 'signer_cancelUnlockWaiters':
+            await signer.cancelAllUnlockWaiters();
+            return { ok: true };
+
+        case 'signer_cancelUnlockWaiter':
+            await signer.cancelUnlockWaiter(params.id as string);
             return { ok: true };
 
         // === Onboarding methods ===

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, ReactNode } from 'react';
 import { t, getSupportedLanguages, getLanguage, setLanguage } from '@lib/i18n.js';
 import { IconLock, IconShield, IconUsers, IconGlobe, IconKey, IconDownload, IconZap } from '@assets';
 import iconBaseSvg from '/icons/icon-base.svg';
+import { version as appVersion } from '../../../../package.json';
 import OverlayPanel from '@components/OverlayPanel/OverlayPanel';
 import ScrollWheelPicker from '@components/ScrollWheelPicker/ScrollWheelPicker';
 import Button from '@components/Button/Button';
@@ -58,7 +59,7 @@ export default function MenuOverlay({ visible, onClose, initialSection }: MenuOv
   const [permDetailDomain, setPermDetailDomain] = useState<string | null>(null);
   const permsSectionRef = useRef<any>(null);
   const vault = useVault();
-  const { isReadOnly, active } = useAccount();
+  const { isReadOnly, isNip46, active } = useAccount();
   const { shouldRender, animating } = useAnimatedVisible(visible);
   const languages: Language[] = getSupportedLanguages();
 
@@ -126,6 +127,11 @@ export default function MenuOverlay({ visible, onClose, initialSection }: MenuOv
   const popSection = () => {
     // Let child sections handle back internally first
     if (currentSection === 'site-permissions' && permsSectionRef.current?.goBack()) return;
+    // If we're at the initial deep-linked section, close the entire overlay
+    if (initialSection && navStack.length === 1 && navStack[0] === initialSection) {
+      handleClose();
+      return;
+    }
     setNavStack((s) => s.slice(0, -1));
   };
   const handleClose = () => { setNavStack([]); onClose(); };
@@ -223,6 +229,7 @@ export default function MenuOverlay({ visible, onClose, initialSection }: MenuOv
             <div className={styles.items}>
               {menuItems.map((item) => {
                 if (item.id === 'nip46' && !vault.isNip46) return null;
+                if (item.id === 'wallet' && (isReadOnly || isNip46 || vault.locked)) return null;
                 return (
                   <NavItem
                     key={item.id}
@@ -252,7 +259,7 @@ export default function MenuOverlay({ visible, onClose, initialSection }: MenuOv
           <div className={styles.aboutFooter}>
             <img src={iconBaseSvg} className={styles.aboutLogo} alt="" />
             <span className={styles.aboutName}>Nostr WoT Extension</span>
-            <span className={styles.aboutVersion}>v0.2.1</span>
+            <span className={styles.aboutVersion}>v{appVersion}</span>
           </div>
         </div>
       </div>

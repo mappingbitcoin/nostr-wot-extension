@@ -126,19 +126,34 @@ if (window.__nostrWotContentInjected) {
                 return;
             }
 
-            // Forward to background with nip07_ prefix and origin
+            // Forward to background via port connection (keeps service worker alive
+            // during long operations like vault unlock prompts, NIP-46 remote signing)
             const origin = window.location.hostname;
             try {
-                const response = await browser.runtime.sendMessage({
+                const port = browser.runtime.connect({ name: 'nip07' });
+                let responded = false;
+
+                const sendResult = (result: unknown, error: unknown) => {
+                    if (responded) return;
+                    responded = true;
+                    window.postMessage({
+                        type: 'NIP07_RESPONSE', id, result, error
+                    }, window.location.origin);
+                };
+
+                port.onMessage.addListener((response: Record<string, unknown>) => {
+                    sendResult(response.result, response.error);
+                    try { port.disconnect(); } catch {}
+                });
+
+                port.onDisconnect.addListener(() => {
+                    sendResult(null, 'Extension context invalidated — reload the page');
+                });
+
+                port.postMessage({
                     method: 'nip07_' + method,
                     params: { ...params, origin }
                 });
-
-                window.postMessage({
-                    type: 'NIP07_RESPONSE', id,
-                    result: response.result,
-                    error: response.error
-                }, window.location.origin);
             } catch {
                 window.postMessage({
                     type: 'NIP07_RESPONSE', id, result: null,
@@ -170,19 +185,33 @@ if (window.__nostrWotContentInjected) {
                 return;
             }
 
-            // Forward to background with webln_ prefix and origin
+            // Forward to background via port connection (keeps service worker alive)
             const origin = window.location.hostname;
             try {
-                const response = await browser.runtime.sendMessage({
+                const port = browser.runtime.connect({ name: 'webln' });
+                let responded = false;
+
+                const sendResult = (result: unknown, error: unknown) => {
+                    if (responded) return;
+                    responded = true;
+                    window.postMessage({
+                        type: 'WEBLN_RESPONSE', id, result, error
+                    }, window.location.origin);
+                };
+
+                port.onMessage.addListener((response: Record<string, unknown>) => {
+                    sendResult(response.result, response.error);
+                    try { port.disconnect(); } catch {}
+                });
+
+                port.onDisconnect.addListener(() => {
+                    sendResult(null, 'Extension context invalidated — reload the page');
+                });
+
+                port.postMessage({
                     method: 'webln_' + method,
                     params: { ...params, origin }
                 });
-
-                window.postMessage({
-                    type: 'WEBLN_RESPONSE', id,
-                    result: response.result,
-                    error: response.error
-                }, window.location.origin);
             } catch {
                 window.postMessage({
                     type: 'WEBLN_RESPONSE', id, result: null,

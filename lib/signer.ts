@@ -44,6 +44,9 @@ let _requestCounter: number = 0;
 const REQUEST_TIMEOUT_MS = 120_000;
 const _timeoutTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
+// Vault unlock waiters -- independent of _pendingResolvers for resilience
+const _unlockWaiters: Map<string, { resolve: () => void; reject: (err: Error) => void }> = new Map();
+
 // Mutex for session storage writes (prevents concurrent read-modify-write races)
 let _storageLock: Promise<void> = Promise.resolve();
 async function withStorageLock<T>(fn: () => Promise<T>): Promise<T> {
@@ -177,7 +180,9 @@ export async function queueRequest(request: QueueRequestInput): Promise<RequestD
           await browser.action.openPopup();
         }
       }
-    } catch {}
+    } catch (e) {
+      console.warn('[SIGNER] openPopup failed:', (e as Error).message);
+    }
   }
 
   // Return promise that resolves when popup decides (not used for nip46InFlight)
@@ -315,6 +320,13 @@ export async function getPending(): Promise<PendingRequest[]> {
  * Resolves all pending requests that were waiting for unlock only.
  */
 export async function onVaultUnlocked(): Promise<void> {
+  // Resolve direct unlock waiters (from waitForVaultUnlock)
+  for (const [, waiter] of _unlockWaiters) {
+    waiter.resolve();
+  }
+  _unlockWaiters.clear();
+
+  // Also resolve any legacy queueRequest-based unlock waiters
   let hadWaiters = false;
   await withStorageLock(async () => {
     const data = await browser.storage.session.get('signerPending');
@@ -349,6 +361,7 @@ export async function cleanupStale(): Promise<void> {
   for (const timer of _timeoutTimers.values()) clearTimeout(timer);
   _timeoutTimers.clear();
   _pendingResolvers.clear();
+  _unlockWaiters.clear();
   await withStorageLock(async () => {
     await browser.storage.session.set({ signerPending: [] });
     await updateBadge(0);
@@ -380,6 +393,112 @@ export async function rejectPendingForAccount(accountId: string): Promise<void> 
     await updateBadge(remaining.filter(r => !r.nip46InFlight).length);
   });
   browser.runtime.sendMessage({ type: 'signerPendingUpdated' }).catch(() => {});
+}
+
+/**
+ * Cancel all unlock waiters and remove them from storage.
+ * Called when user clicks Cancel on the unlock modal.
+ */
+export async function cancelAllUnlockWaiters(): Promise<void> {
+  const error = new Error('Cancelled by user');
+  for (const [, waiter] of _unlockWaiters) {
+    waiter.reject(error);
+  }
+  _unlockWaiters.clear();
+  await withStorageLock(async () => {
+    const data = await browser.storage.session.get('signerPending');
+    const pending: PendingRequest[] = ((data.signerPending as PendingRequest[] | undefined) || [])
+      .filter((r: PendingRequest) => !r.waitingForUnlock);
+    await browser.storage.session.set({ signerPending: pending });
+    await updateBadge(pending.filter(r => !r.nip46InFlight).length);
+  });
+  browser.runtime.sendMessage({ type: 'signerPendingUpdated' }).catch(() => {});
+}
+
+/**
+ * Cancel a single unlock waiter by marker ID.
+ */
+export async function cancelUnlockWaiter(markerId: string): Promise<void> {
+  const waiter = _unlockWaiters.get(markerId);
+  if (waiter) {
+    waiter.reject(new Error('Cancelled by user'));
+    _unlockWaiters.delete(markerId);
+  }
+  await removePendingFromStorage(markerId);
+}
+
+/**
+ * Wait for the vault to be unlocked.
+ * Adds a marker to session storage so the popup knows to show the unlock modal,
+ * then blocks until onVaultUnlocked() fires OR vault.isLocked() returns false.
+ * Independent of _pendingResolvers -- survives service worker state changes.
+ */
+async function waitForVaultUnlock(origin: string, type: string, accountId: string | null): Promise<void> {
+  if (!vault.isLocked()) return;
+
+  const markerId = `unlock_${crypto.randomUUID()}`;
+  const marker: PendingRequest = {
+    id: markerId,
+    type,
+    origin,
+    waitingForUnlock: true,
+    needsPermission: false,
+    accountId,
+    timestamp: Date.now(),
+  };
+
+  // Add unlock marker to session storage so popup shows unlock modal
+  await withStorageLock(async () => {
+    const data = await browser.storage.session.get('signerPending');
+    const pending: PendingRequest[] = (data.signerPending as PendingRequest[] | undefined) || [];
+    pending.push(marker);
+    await browser.storage.session.set({ signerPending: pending });
+  });
+  browser.runtime.sendMessage({ type: 'signerPendingUpdated' }).catch(() => {});
+
+  // Try to open/focus the popup so the user sees the unlock modal
+  try { await browser.action.openPopup(); } catch {}
+
+  try {
+    // Wait for unlock via direct callback OR polling fallback
+    await new Promise<void>((resolve, reject) => {
+      // Primary: resolved by onVaultUnlocked() or cancelled by cancelUnlockWaiter()
+      const done = () => {
+        _unlockWaiters.delete(markerId);
+        clearTimeout(timer);
+        clearInterval(poller);
+        resolve();
+      };
+      const fail = (err: Error) => {
+        _unlockWaiters.delete(markerId);
+        clearTimeout(timer);
+        clearInterval(poller);
+        reject(err);
+      };
+      _unlockWaiters.set(markerId, { resolve: done, reject: fail });
+
+      // Fallback: poll vault.isLocked() every 500ms
+      const poller = setInterval(() => {
+        if (!vault.isLocked()) done();
+      }, 500);
+
+      // Timeout after 2 minutes
+      const timer = setTimeout(() => {
+        _unlockWaiters.delete(markerId);
+        clearInterval(poller);
+        reject(new Error('Vault unlock timed out'));
+      }, REQUEST_TIMEOUT_MS);
+    });
+  } finally {
+    // Remove marker from session storage
+    await withStorageLock(async () => {
+      const data = await browser.storage.session.get('signerPending');
+      const pending: PendingRequest[] = ((data.signerPending as PendingRequest[] | undefined) || []).filter((r: PendingRequest) => r.id !== markerId);
+      await browser.storage.session.set({ signerPending: pending });
+      await updateBadge(pending.filter(r => !r.nip46InFlight).length);
+    });
+    browser.runtime.sendMessage({ type: 'signerPendingUpdated' }).catch(() => {});
+  }
 }
 
 // -- NIP-07 Request Handlers --
@@ -429,9 +548,9 @@ export async function handleSignEvent(event: UnsignedEvent, origin: string): Pro
   if (accountType === 'nip46') {
     // NIP-46 needs vault unlocked to read nip46Config
     if (vault.isLocked()) {
-      const pubkey = await getActivePublicKey();
-      await queueRequest({ type: 'signEvent', origin, pubkey: pubkey ?? undefined, waitingForUnlock: true, needsPermission: false, accountId });
+      await waitForVaultUnlock(origin, 'signEvent', accountId);
     }
+    if (vault.isLocked()) throw new Error('Vault is locked');
     const acct = vault.getAccountById(accountId!);
     if (!acct || acct.type !== 'nip46') throw new Error('No NIP-46 account active');
     const nip46ReqId = await queueNip46InFlight({ type: 'signEvent', origin, accountId });
@@ -447,15 +566,7 @@ export async function handleSignEvent(event: UnsignedEvent, origin: string): Pro
 
   // Local signing -- wait for vault unlock if needed
   if (vault.isLocked()) {
-    const pubkey = await getActivePublicKey();
-    await queueRequest({
-      type: 'signEvent',
-      origin,
-      pubkey: pubkey ?? undefined,
-      waitingForUnlock: true,
-      needsPermission: false,
-      accountId,
-    });
+    await waitForVaultUnlock(origin, 'signEvent', accountId);
   }
 
   if (vault.isLocked()) throw new Error('Vault is locked');
@@ -499,9 +610,9 @@ export async function handleNip04Encrypt(theirPubkey: string, plaintext: string,
 
   if (accountType === 'nip46') {
     if (vault.isLocked()) {
-      const pubkey = await getActivePublicKey();
-      await queueRequest({ type: 'nip04Encrypt', origin, pubkey: pubkey ?? undefined, waitingForUnlock: true, needsPermission: false, accountId });
+      await waitForVaultUnlock(origin, 'nip04Encrypt', accountId);
     }
+    if (vault.isLocked()) throw new Error('Vault is locked');
     const acct = vault.getAccountById(accountId!);
     if (!acct || acct.type !== 'nip46') throw new Error('No NIP-46 account active');
     const nip46ReqId = await queueNip46InFlight({ type: 'nip04Encrypt', origin, accountId });
@@ -516,15 +627,7 @@ export async function handleNip04Encrypt(theirPubkey: string, plaintext: string,
   }
 
   if (vault.isLocked()) {
-    const pubkey = await getActivePublicKey();
-    await queueRequest({
-      type: 'nip04Encrypt',
-      origin,
-      pubkey: pubkey ?? undefined,
-      waitingForUnlock: true,
-      needsPermission: false,
-      accountId,
-    });
+    await waitForVaultUnlock(origin, 'nip04Encrypt', accountId);
   }
 
   if (vault.isLocked()) throw new Error('Vault is locked');
@@ -567,9 +670,9 @@ export async function handleNip04Decrypt(theirPubkey: string, ciphertext: string
 
   if (accountType === 'nip46') {
     if (vault.isLocked()) {
-      const pubkey = await getActivePublicKey();
-      await queueRequest({ type: 'nip04Decrypt', origin, pubkey: pubkey ?? undefined, waitingForUnlock: true, needsPermission: false, accountId });
+      await waitForVaultUnlock(origin, 'nip04Decrypt', accountId);
     }
+    if (vault.isLocked()) throw new Error('Vault is locked');
     const acct = vault.getAccountById(accountId!);
     if (!acct || acct.type !== 'nip46') throw new Error('No NIP-46 account active');
     const nip46ReqId = await queueNip46InFlight({ type: 'nip04Decrypt', origin, accountId });
@@ -584,15 +687,7 @@ export async function handleNip04Decrypt(theirPubkey: string, ciphertext: string
   }
 
   if (vault.isLocked()) {
-    const pubkey = await getActivePublicKey();
-    await queueRequest({
-      type: 'nip04Decrypt',
-      origin,
-      pubkey: pubkey ?? undefined,
-      waitingForUnlock: true,
-      needsPermission: false,
-      accountId,
-    });
+    await waitForVaultUnlock(origin, 'nip04Decrypt', accountId);
   }
 
   if (vault.isLocked()) throw new Error('Vault is locked');
@@ -635,9 +730,9 @@ export async function handleNip44Encrypt(theirPubkey: string, plaintext: string,
 
   if (accountType === 'nip46') {
     if (vault.isLocked()) {
-      const pubkey = await getActivePublicKey();
-      await queueRequest({ type: 'nip44Encrypt', origin, pubkey: pubkey ?? undefined, waitingForUnlock: true, needsPermission: false, accountId });
+      await waitForVaultUnlock(origin, 'nip44Encrypt', accountId);
     }
+    if (vault.isLocked()) throw new Error('Vault is locked');
     const acct = vault.getAccountById(accountId!);
     if (!acct || acct.type !== 'nip46') throw new Error('No NIP-46 account active');
     const nip46ReqId = await queueNip46InFlight({ type: 'nip44Encrypt', origin, accountId });
@@ -652,15 +747,7 @@ export async function handleNip44Encrypt(theirPubkey: string, plaintext: string,
   }
 
   if (vault.isLocked()) {
-    const pubkey = await getActivePublicKey();
-    await queueRequest({
-      type: 'nip44Encrypt',
-      origin,
-      pubkey: pubkey ?? undefined,
-      waitingForUnlock: true,
-      needsPermission: false,
-      accountId,
-    });
+    await waitForVaultUnlock(origin, 'nip44Encrypt', accountId);
   }
 
   if (vault.isLocked()) throw new Error('Vault is locked');
@@ -703,9 +790,9 @@ export async function handleNip44Decrypt(theirPubkey: string, ciphertext: string
 
   if (accountType === 'nip46') {
     if (vault.isLocked()) {
-      const pubkey = await getActivePublicKey();
-      await queueRequest({ type: 'nip44Decrypt', origin, pubkey: pubkey ?? undefined, waitingForUnlock: true, needsPermission: false, accountId });
+      await waitForVaultUnlock(origin, 'nip44Decrypt', accountId);
     }
+    if (vault.isLocked()) throw new Error('Vault is locked');
     const acct = vault.getAccountById(accountId!);
     if (!acct || acct.type !== 'nip46') throw new Error('No NIP-46 account active');
     const nip46ReqId = await queueNip46InFlight({ type: 'nip44Decrypt', origin, accountId });
@@ -720,15 +807,7 @@ export async function handleNip44Decrypt(theirPubkey: string, ciphertext: string
   }
 
   if (vault.isLocked()) {
-    const pubkey = await getActivePublicKey();
-    await queueRequest({
-      type: 'nip44Decrypt',
-      origin,
-      pubkey: pubkey ?? undefined,
-      waitingForUnlock: true,
-      needsPermission: false,
-      accountId,
-    });
+    await waitForVaultUnlock(origin, 'nip44Decrypt', accountId);
   }
 
   if (vault.isLocked()) throw new Error('Vault is locked');
@@ -745,30 +824,25 @@ export async function handleNip44Decrypt(theirPubkey: string, ciphertext: string
 // -- NIP-46 Remote Signer (nostr-tools BunkerSigner) --
 
 async function getNip46Client(acct: SafeAccount): Promise<BunkerSigner> {
-  console.log('[NIP-46] getNip46Client for', acct.id, 'cached:', _nip46Clients.has(acct.id));
   if (_nip46Clients.has(acct.id)) {
     return _nip46Clients.get(acct.id)!;
   }
 
   if (!acct.nip46Config) throw new Error('No NIP-46 config');
-  console.log('[NIP-46] bunkerUrl:', acct.nip46Config.bunkerUrl, 'hasLocalKey:', !!acct.nip46Config.localPrivkey);
 
   // Parse bunker URL to get { pubkey, relays, secret }
   const bp = await parseBunkerInput(acct.nip46Config.bunkerUrl);
   if (!bp) throw new Error('Failed to parse bunker URL');
-  console.log('[NIP-46] parsed: pubkey:', bp.pubkey.slice(0, 12), 'relays:', bp.relays, 'hasSecret:', !!bp.secret);
 
   // Restore persisted keypair or generate a new one
   let secretKey: Uint8Array;
   if (acct.nip46Config.localPrivkey) {
     secretKey = hexToBytes(acct.nip46Config.localPrivkey);
-    console.log('[NIP-46] restored persisted keypair');
   } else {
     secretKey = generateSecretKey();
     // Persist the new keypair for reconnection after service worker restart
     const pubkey = bytesToHex(getPublicKey(secretKey));
     const privkeyHex = bytesToHex(secretKey);
-    console.log('[NIP-46] generated new keypair, persisting for', acct.id);
     try {
       await vault.updateAccountNip46Keys(acct.id, privkeyHex, pubkey);
     } catch (e) {
@@ -785,16 +859,13 @@ async function getNip46Client(acct: SafeAccount): Promise<BunkerSigner> {
   });
 
   // Send "connect" RPC to establish session
-  console.log('[NIP-46] connecting...');
   await signer.connect();
-  console.log('[NIP-46] connected to', bp.pubkey.slice(0, 12));
 
   _nip46Clients.set(acct.id, signer);
   return signer;
 }
 
 async function handleNip46Request(acct: SafeAccount, method: string, data: unknown, _origin: string): Promise<any> {
-  console.log('[NIP-46] handleNip46Request:', method, 'for account:', acct.id);
   const signer = await getNip46Client(acct);
 
   switch (method) {

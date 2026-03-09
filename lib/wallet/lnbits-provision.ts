@@ -65,3 +65,67 @@ export async function provisionLnbitsWallet(
   const data = (await res.json()) as ProvisionResponse;
   return { adminKey: data.adminkey, walletId: data.id, nwcUri: data.nwcUri };
 }
+
+/**
+ * Claim a Lightning Address username via the provisioning proxy.
+ *
+ * Uses the same challenge-response auth as provisioning.
+ */
+export async function claimLightningAddress(
+  instanceUrl: string,
+  username: string,
+  signFn: (challenge: string) => Promise<SignedEvent>,
+  fetchFn: typeof fetch = globalThis.fetch.bind(globalThis),
+): Promise<{ address: string }> {
+  const baseUrl = instanceUrl.replace(/\/+$/, '');
+  const challengeRes = await fetchFn(`${baseUrl}/api/provision/challenge`);
+  if (!challengeRes.ok) throw new Error(`Challenge request failed: ${challengeRes.status}`);
+  const { challenge } = (await challengeRes.json()) as { challenge: string };
+  const signedEvent = await signFn(challenge);
+  const res = await fetchFn(`${baseUrl}/api/claim-username`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event: signedEvent, username }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as Record<string, string>).error || `Claim failed: ${res.status}`);
+  }
+  return (await res.json()) as { address: string };
+}
+
+/**
+ * Look up the Lightning Address for a pubkey (public, no auth needed).
+ */
+export async function getLightningAddress(
+  instanceUrl: string,
+  pubkey: string,
+  fetchFn: typeof fetch = globalThis.fetch.bind(globalThis),
+): Promise<string | null> {
+  const baseUrl = instanceUrl.replace(/\/+$/, '');
+  const res = await fetchFn(`${baseUrl}/api/lightning-address?pubkey=${pubkey}`);
+  if (!res.ok) return null;
+  const data = (await res.json()) as { address: string | null };
+  return data.address;
+}
+
+/**
+ * Release a claimed Lightning Address (authenticated).
+ */
+export async function releaseLightningAddress(
+  instanceUrl: string,
+  signFn: (challenge: string) => Promise<SignedEvent>,
+  fetchFn: typeof fetch = globalThis.fetch.bind(globalThis),
+): Promise<void> {
+  const baseUrl = instanceUrl.replace(/\/+$/, '');
+  const challengeRes = await fetchFn(`${baseUrl}/api/provision/challenge`);
+  if (!challengeRes.ok) throw new Error(`Challenge request failed: ${challengeRes.status}`);
+  const { challenge } = (await challengeRes.json()) as { challenge: string };
+  const signedEvent = await signFn(challenge);
+  const res = await fetchFn(`${baseUrl}/api/release-username`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event: signedEvent }),
+  });
+  if (!res.ok) throw new Error(`Release failed: ${res.status}`);
+}

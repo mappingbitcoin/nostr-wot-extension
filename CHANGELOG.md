@@ -2,23 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.3.0] - 2026-03-08
+## [0.3.0] - 2026-03-09
 
 ### Added
 - **Lightning Wallet (WebLN)** — built-in Lightning wallet support with WebLN provider (`window.webln`) for sending and receiving zaps directly from Nostr clients
 - **Quick Wallet Setup** — one-click wallet provisioning via zaps.nostr-wot.com with challenge-response authentication; no account registration needed
+- **Lightning Address** — claim a `username@zaps.nostr-wot.com` address to receive payments; view, copy, add to profile, and unlink from wallet settings
+- **BOLT11 invoice decoder** — lightweight payment request parser for previewing invoice details (amount, description, expiry) before sending
 - **LNbits manual connect** — connect your own LNbits instance with admin key
 - **NWC connect** — connect any Nostr Wallet Connect compatible wallet
 - **NWC auto-provisioning** — provisioned wallets automatically get an NWC connection URI for use in other apps
-- **Wallet UI** — balance display, deposit invoices with QR codes, auto-approve threshold for zaps
+- **Wallet UI** — balance display, deposit invoices with QR codes, send modal with invoice preview, auto-approve threshold for zaps
+- **Wallet balance card** — home screen shows current wallet balance with quick access to wallet settings
 - **WebLN permission system** — per-domain approval for `sendPayment` with remember option
 - **Payment approval overlay** — pending zap requests shown in popup with approve/deny actions
+- **Unlock modal improvements** — shows pending signing requests with per-request cancel and cancel-all options
 
 ### Changed
+- **Port-based messaging** — NIP-07 and WebLN requests use persistent port connections to keep the service worker alive during long operations (vault unlock, NIP-46 remote signing)
 - **WebLN `enable()` always succeeds** — apps that call `enable()` on page load (like Primal) no longer get permanently locked out when the vault is locked
 - **Version moved to single source of truth** — extension version is read from the manifest at runtime instead of being duplicated across locale files
+- Manifest description updated to "Nostr identity provider, NIP-07 signer, and Web of Trust provider"
 
 ### Fixed
+- **Auto-unlock removed** — popup no longer forces vault unlock on every open; unlock only triggered by explicit user action or pending signing requests
+- **Service worker lifetime** — NIP-07 and WebLN operations no longer fail when Chrome suspends the service worker mid-request
 - **WebLN payment approval was invisible** — `webln_sendPayment` requests were missing `needsPermission: true`, making them appear in the badge count but not in the approval overlay
 - Removed stale debug `console.log` statements from NIP-07 and WebLN handlers
 

@@ -373,3 +373,85 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
+
+/* Pending requests card */
+.pendingCard {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  cursor: default;
+}
+
+.pendingInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pendingBadge {
+  background: #f59e0b;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+}
+
+.pendingText {
+  font-size: 13px;
+  color: var(--text-body);
+}
+
+/* Wallet balance card on home */
+.walletCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.walletCard:hover {
+  background: rgba(99, 102, 241, 0.04);
+}
+
+.walletCardInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.walletCardIcon {
+  color: var(--brand);
+  flex-shrink: 0;
+}
+
+.walletCardText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.walletCardText strong {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.walletCardText span {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: 600;
+}

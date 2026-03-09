@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import browser from '@shared/browser.ts';
 import { rpc, rpcNotify } from '@shared/rpc.ts';
 import { getDomainFromUrl } from '@shared/url.ts';
 import { t } from '@lib/i18n.js';
 import { useAccount } from '../../context/AccountContext';
+import { useVault } from '../../context/VaultContext';
 import SiteControls from './SiteControls';
 import ProfileSuggestion from './ProfileSuggestion';
 import SyncReminder from './SyncReminder';
@@ -11,7 +12,7 @@ import ScoringCard from './ScoringCard';
 import Card from '@components/Card/Card';
 import Button from '@components/Button/Button';
 import EmptyState from '@components/EmptyState/EmptyState';
-import { IconGlobe } from '@assets';
+import { IconGlobe, IconZap, IconChevronRight } from '@assets';
 import styles from './HomeTab.module.css';
 
 interface HomeTabProps {
@@ -21,6 +22,7 @@ interface HomeTabProps {
   onManageBadges: () => void;
   onEditProfile: () => void;
   onManageScoring: () => void;
+  onOpenWallet: () => void;
 }
 
 interface SyncStaleInfo {
@@ -28,8 +30,9 @@ interface SyncStaleInfo {
   dismissed?: boolean;
 }
 
-export default function HomeTab({ onViewAllActivity, onManagePermissions, onManageFilters, onManageBadges, onEditProfile, onManageScoring }: HomeTabProps) {
+export default function HomeTab({ onViewAllActivity, onManagePermissions, onManageFilters, onManageBadges, onEditProfile, onManageScoring, onOpenWallet }: HomeTabProps) {
   const { active, cachedProfile, isReadOnly, isNip46 } = useAccount();
+  const { locked } = useVault();
   const [domain, setDomain] = useState<string | null>(null);
   const [siteState, setSiteState] = useState<string | null>(null); // null = loading, 'empty' | 'notConnected' | 'connected'
   const [identityEnabled, setIdentityEnabled] = useState<boolean>(true);
@@ -39,6 +42,13 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [profileDismissed, setProfileDismissed] = useState<boolean>(false);
 
+  // Pending requests count
+  const [pendingCount, setPendingCount] = useState(0);
+
+  // Wallet state: null = loading, false = no wallet, { balance } = has wallet
+  const [walletState, setWalletState] = useState<null | false | { balance: number }>(null);
+  const [walletDismissed, setWalletDismissed] = useState<boolean>(false);
+
   useEffect(() => {
     if (!active?.id) return;
     browser.storage.local.get('profileSuggestionDismissed').then((data) => {
@@ -47,6 +57,49 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
       setProfileDismissed(list.includes(active.id));
     });
   }, [active?.id]);
+
+  // Check wallet config + balance
+  const checkWallet = useCallback(async () => {
+    try {
+      const configType = await rpc<string | false>('wallet_hasConfig');
+      if (!configType) { setWalletState(false); return; }
+      const result = await rpc<{ balance: number }>('wallet_getBalance');
+      setWalletState({ balance: result?.balance ?? 0 });
+    } catch {
+      setWalletState(false);
+    }
+  }, []);
+
+  // Wallet is only available for unlocked signing accounts (generated/nsec)
+  const canUseWallet = active && !isReadOnly && !isNip46 && !locked;
+
+  useEffect(() => {
+    if (!active?.id || !canUseWallet) { setWalletState(null); setWalletDismissed(false); return; }
+    checkWallet();
+    browser.storage.local.get('walletBannerDismissed').then((data) => {
+      const dismissed = (data as Record<string, unknown>).walletBannerDismissed;
+      const list: string[] = Array.isArray(dismissed) ? dismissed : [];
+      setWalletDismissed(list.includes(active.id));
+    });
+  }, [active?.id, canUseWallet, checkWallet]);
+
+  useEffect(() => {
+    async function checkPending() {
+      try {
+        const pending: any[] = await rpc('signer_getPending') || [];
+        const actionable = pending.filter((r: any) => (r.needsPermission || r.waitingForUnlock) && !r.nip46InFlight);
+        setPendingCount(actionable.length);
+      } catch {
+        setPendingCount(0);
+      }
+    }
+    checkPending();
+    const listener = (message: any) => {
+      if (message.type === 'signerPendingUpdated') checkPending();
+    };
+    browser.runtime.onMessage.addListener(listener);
+    return () => browser.runtime.onMessage.removeListener(listener);
+  }, []);
 
   useEffect(() => {
     loadHomeState();
@@ -198,6 +251,20 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
     setSyncStale(null);
   };
 
+  const handleDismissWallet = async () => {
+    if (!active?.id) return;
+    setWalletDismissed(true);
+    const data = await browser.storage.local.get('walletBannerDismissed');
+    const dismissed = (data as Record<string, unknown>).walletBannerDismissed;
+    const list: string[] = Array.isArray(dismissed) ? dismissed : [];
+    if (!list.includes(active.id)) list.push(active.id);
+    await browser.storage.local.set({ walletBannerDismissed: list });
+  };
+
+  // Show wallet setup banner only after profile + sync banners are gone, and only for signing accounts
+  const showWalletBanner = canUseWallet && walletState === false && !walletDismissed
+    && !showProfileSuggestion && !syncStale && !isSyncing;
+
   if (siteState === 'empty') {
     return (
       <div className={styles.centerWrap}>
@@ -234,6 +301,14 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
 
   return (
     <>
+      {pendingCount > 0 && (
+        <Card className={styles.pendingCard}>
+          <div className={styles.pendingInfo}>
+            <span className={styles.pendingBadge}>{pendingCount}</span>
+            <span className={styles.pendingText}>{t('unlock.pendingCount', { count: pendingCount })}</span>
+          </div>
+        </Card>
+      )}
       {showProfileSuggestion && <ProfileSuggestion onEdit={onEditProfile} onDismiss={handleDismissProfile} />}
       {isSyncing && (
         <SyncReminder syncing onDismiss={() => setIsSyncing(false)} />
@@ -252,6 +327,37 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
           }}
         />
       )}
+      {/* Wallet balance card (when wallet exists) */}
+      {walletState && typeof walletState === 'object' && (
+        <Card className={styles.walletCard} onClick={onOpenWallet}>
+          <div className={styles.walletCardInfo}>
+            <IconZap size={14} className={styles.walletCardIcon} />
+            <div className={styles.walletCardText}>
+              <strong>{walletState.balance.toLocaleString()} sats</strong>
+              <span>{t('wallet.balance')}</span>
+            </div>
+          </div>
+          <IconChevronRight size={16} />
+        </Card>
+      )}
+
+      {/* Wallet setup banner (when no wallet, after profile + sync banners gone) */}
+      {showWalletBanner && (
+        <Card className={styles.profileSuggestion}>
+          <div className={styles.profileSuggestionContent}>
+            <IconZap size={14} className={styles.profileSuggestionIcon} />
+            <div className={styles.profileSuggestionText}>
+              <strong>{t('wallet.setupBanner')}</strong>
+              <span>{t('wallet.setupBannerHint')}</span>
+            </div>
+          </div>
+          <div className={styles.profileSuggestionActions}>
+            <Button small onClick={onOpenWallet}>{t('home.setupProfileButton')}</Button>
+            <button className={styles.profileDismiss} onClick={handleDismissWallet}>{t('home.skip')}</button>
+          </div>
+        </Card>
+      )}
+
       <SiteControls
         identityEnabled={identityEnabled}
         wotEnabled={wotEnabled}

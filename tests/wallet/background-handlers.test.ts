@@ -54,6 +54,12 @@ function createMockProvider(overrides?: Partial<WalletProvider>): WalletProvider
     async makeInvoice(_amount: number, _memo?: string) {
       return { bolt11: 'lnbc1...', paymentHash: 'hash123' };
     },
+    async listTransactions(_limit?: number, _offset?: number) {
+      return [
+        { paymentHash: 'hash1', amount: 1000, status: 'settled' as const, createdAt: 1700000000, memo: 'Test deposit' },
+        { paymentHash: 'hash2', amount: -500, fee: 1, status: 'settled' as const, createdAt: 1700000100, memo: 'Test payment' },
+      ];
+    },
     async connect() { connected = true; },
     disconnect() { connected = false; },
     isConnected() { return connected; },
@@ -886,6 +892,145 @@ describe('wallet handlers: wallet_getNwcUri', () => {
     const r = handleWalletGetNwcUri();
     assert.strictEqual(r.result, null);
     assert.strictEqual(r.error, 'Vault is locked');
+  });
+});
+
+// ── New handler simulations: wallet_getTransactions and wallet_payInvoice ──
+
+async function handleWalletGetTransactions(params: {
+  limit?: number;
+  offset?: number;
+}): Promise<HandlerResult> {
+  const { limit, offset } = params;
+  if (vault.isLocked()) return { result: null, error: 'Vault is locked' };
+  const acct = vault.getActiveAccountWithWallet();
+  if (!acct?.walletConfig) return { result: null, error: 'No wallet configured' };
+  const provider = getWalletProvider(acct.id, acct.walletConfig);
+  if (!provider) return { result: null, error: 'Provider not available' };
+  try {
+    if (!provider.isConnected()) await provider.connect();
+    return { result: await provider.listTransactions(limit ?? 10, offset ?? 0), error: null };
+  } catch (e) {
+    return { result: null, error: (e as Error).message };
+  }
+}
+
+async function handleWalletPayInvoice(params: {
+  bolt11: string;
+}): Promise<HandlerResult> {
+  const { bolt11 } = params;
+  if (vault.isLocked()) return { result: null, error: 'Vault is locked' };
+  const acct = vault.getActiveAccountWithWallet();
+  if (!acct?.walletConfig) return { result: null, error: 'No wallet configured' };
+  const provider = getWalletProvider(acct.id, acct.walletConfig);
+  if (!provider) return { result: null, error: 'Provider not available' };
+  try {
+    if (!provider.isConnected()) await provider.connect();
+    return { result: await provider.payInvoice(bolt11), error: null };
+  } catch (e) {
+    return { result: null, error: (e as Error).message };
+  }
+}
+
+describe('wallet handlers: wallet_getTransactions', () => {
+  beforeEach(async () => {
+    resetMockStorage();
+    clearWalletProviders();
+    vault.lock();
+    await vault.create(TEST_PASSWORD, makePayloadWithWallet());
+    setWalletProvider('acct1', createMockProvider());
+  });
+
+  it('returns transactions array on success', async () => {
+    const r = await handleWalletGetTransactions({});
+    assert.strictEqual(r.error, null);
+    const txs = r.result as Array<{ paymentHash: string; amount: number }>;
+    assert.strictEqual(txs.length, 2);
+    assert.strictEqual(txs[0].paymentHash, 'hash1');
+    assert.strictEqual(txs[0].amount, 1000);
+    assert.strictEqual(txs[1].amount, -500);
+  });
+
+  it('respects limit and offset parameters', async () => {
+    let receivedLimit = 0;
+    let receivedOffset = 0;
+    setWalletProvider('acct1', createMockProvider({
+      async listTransactions(limit?: number, offset?: number) {
+        receivedLimit = limit ?? 0;
+        receivedOffset = offset ?? 0;
+        return [];
+      },
+      isConnected() { return true; },
+    }));
+    await handleWalletGetTransactions({ limit: 5, offset: 10 });
+    assert.strictEqual(receivedLimit, 5);
+    assert.strictEqual(receivedOffset, 10);
+  });
+
+  it('returns error when vault is locked', async () => {
+    vault.lock();
+    const r = await handleWalletGetTransactions({});
+    assert.strictEqual(r.result, null);
+    assert.strictEqual(r.error, 'Vault is locked');
+  });
+
+  it('returns error when no wallet configured', async () => {
+    vault.lock();
+    await vault.create(TEST_PASSWORD, makePayloadNoWallet());
+    const r = await handleWalletGetTransactions({});
+    assert.strictEqual(r.result, null);
+    assert.strictEqual(r.error, 'No wallet configured');
+  });
+
+  it('returns error when provider throws', async () => {
+    setWalletProvider('acct1', createMockProvider({
+      async listTransactions() { throw new Error('API error'); },
+      isConnected() { return true; },
+    }));
+    const r = await handleWalletGetTransactions({});
+    assert.strictEqual(r.result, null);
+    assert.strictEqual(r.error, 'API error');
+  });
+});
+
+describe('wallet handlers: wallet_payInvoice', () => {
+  beforeEach(async () => {
+    resetMockStorage();
+    clearWalletProviders();
+    vault.lock();
+    await vault.create(TEST_PASSWORD, makePayloadWithWallet());
+    setWalletProvider('acct1', createMockProvider());
+  });
+
+  it('pays invoice and returns preimage on success', async () => {
+    const r = await handleWalletPayInvoice({ bolt11: 'lnbc1...' });
+    assert.deepStrictEqual(r.result, { preimage: 'abc123' });
+    assert.strictEqual(r.error, null);
+  });
+
+  it('returns error when vault is locked', async () => {
+    vault.lock();
+    const r = await handleWalletPayInvoice({ bolt11: 'lnbc1...' });
+    assert.strictEqual(r.result, null);
+    assert.strictEqual(r.error, 'Vault is locked');
+  });
+
+  it('returns error when no wallet configured', async () => {
+    vault.lock();
+    await vault.create(TEST_PASSWORD, makePayloadNoWallet());
+    const r = await handleWalletPayInvoice({ bolt11: 'lnbc1...' });
+    assert.strictEqual(r.result, null);
+    assert.strictEqual(r.error, 'No wallet configured');
+  });
+
+  it('returns error when provider throws on payInvoice', async () => {
+    setWalletProvider('acct1', createMockProvider({
+      async payInvoice() { throw new Error('Insufficient balance'); },
+      isConnected() { return true; },
+    }));
+    const r = await handleWalletPayInvoice({ bolt11: 'lnbc1...' });
+    assert.strictEqual(r.result, null);
+    assert.strictEqual(r.error, 'Insufficient balance');
   });
 });
 

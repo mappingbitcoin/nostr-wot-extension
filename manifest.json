@@ -11,7 +11,7 @@
       }
     }
   },
-  "description": "Nostr identity provider, NIP-07 signer, and Web of Trust distance checker.",
+  "description": "Nostr identity provider, NIP-07 signer, and Web of Trust provider.",
   "permissions": [
     "storage",
     "scripting",

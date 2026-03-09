@@ -22,9 +22,23 @@ export interface WalletProvider {
   getBalance(): Promise<{ balance: number }>;
   payInvoice(bolt11: string): Promise<{ preimage: string }>;
   makeInvoice(amount: number, memo?: string): Promise<{ bolt11: string; paymentHash: string }>;
+  listTransactions(limit?: number, offset?: number): Promise<Transaction[]>;
   connect(): Promise<void>;
   disconnect(): void;
   isConnected(): boolean;
+}
+
+// ── Transaction ──
+
+export interface Transaction {
+  paymentHash: string;
+  bolt11?: string;
+  amount: number;        // sats, positive = incoming, negative = outgoing
+  fee?: number;          // sats
+  memo?: string;
+  status: 'settled' | 'pending' | 'failed';
+  createdAt: number;     // unix timestamp
+  preimage?: string;
 }
 
 // ── Safe Wallet Info (no secrets) ──

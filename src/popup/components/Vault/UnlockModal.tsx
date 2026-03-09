@@ -8,14 +8,34 @@ import { useAnimatedVisible } from '@shared/hooks/useAnimatedVisible.js';
 import Button from '@components/Button/Button';
 import styles from './UnlockModal.module.css';
 
+interface WaiterInfo {
+  id: string;
+  type: string;
+  origin: string;
+  [key: string]: any;
+}
+
 interface UnlockModalProps {
   visible: boolean;
   message?: string;
+  unlockWaiters?: WaiterInfo[];
   onUnlocked?: () => void;
   onCancel?: () => void;
 }
 
-export default function UnlockModal({ visible, message, onUnlocked, onCancel }: UnlockModalProps) {
+function getEventLabel(type: string): string {
+  const labels: Record<string, string> = {
+    signEvent: t('approval.signEvent'),
+    nip04Encrypt: t('approval.nip04Encrypt'),
+    nip04Decrypt: t('approval.nip04Decrypt'),
+    nip44Encrypt: t('approval.nip44Encrypt'),
+    nip44Decrypt: t('approval.nip44Decrypt'),
+    getPublicKey: t('activity.getPublicKey'),
+  };
+  return labels[type] || type;
+}
+
+export default function UnlockModal({ visible, message, unlockWaiters, onUnlocked, onCancel }: UnlockModalProps) {
   const { displayName, avatarUrl, initial } = useAccount();
   const vault = useVault();
 
@@ -51,6 +71,16 @@ export default function UnlockModal({ visible, message, onUnlocked, onCancel }: 
     }
   }, [visible, reset, focus]);
 
+  const handleCancelAll = async () => {
+    await rpc('signer_cancelUnlockWaiters');
+    reset();
+    onCancel?.();
+  };
+
+  const handleCancelOne = async (id: string) => {
+    await rpc('signer_cancelUnlockWaiter', { id });
+  };
+
   if (!shouldRender) return null;
 
   return (
@@ -76,14 +106,27 @@ export default function UnlockModal({ visible, message, onUnlocked, onCancel }: 
           autoComplete="off"
         />
         {error && <div className={styles.error}>{error}</div>}
+        {unlockWaiters && unlockWaiters.length > 0 && (
+          <div className={styles.waitingEvents}>
+            <div className={styles.waitingLabel}>{t('unlock.pendingEvents')}</div>
+            {unlockWaiters.map((w) => (
+              <div key={w.id} className={styles.waitingEvent}>
+                <span className={styles.waitingEventLabel}>{getEventLabel(w.type)}</span>
+                <span className={styles.waitingEventOrigin}>{w.origin}</span>
+                <button className={styles.waitingEventDismiss} onClick={() => handleCancelOne(w.id)}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className={styles.actions}>
           <Button
             variant="secondary"
             small
-            onClick={() => {
-              reset();
-              onCancel?.();
-            }}
+            onClick={handleCancelAll}
           >
             {t('common.cancel')}
           </Button>

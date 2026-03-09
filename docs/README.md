@@ -33,6 +33,12 @@ The Nostr WoT Extension is a Manifest V3 browser extension that combines an **NI
 | [Badges](badges.md) | WoT badge injection, site adapters, rendering pipeline |
 | [Adding Badge Support](add_badge.md) | How to write a site adapter for badge injection |
 
+### Lightning Wallet
+
+| Document | Description |
+|----------|-------------|
+| [Wallet](wallet.md) | Providers (NWC/LNbits), auto-provisioning, WebLN API, permissions, BOLT11 decoder, UI |
+
 ### Configuration & Infrastructure
 
 | Document | Description |
@@ -61,6 +67,7 @@ The Nostr WoT Extension is a Manifest V3 browser extension that combines an **NI
 - `lib/permissions.ts` -- permission cascade
 - `lib/storage.ts` -- IndexedDB + graph cache
 - `lib/graph.ts` -- BFS distance queries
+- `lib/wallet/` -- wallet providers (NWC, LNbits), auto-provisioning, BOLT11 decoder
 - `lib/types.ts` -- shared TypeScript interfaces
 
 **Path aliases** (configured in `vite.config.ts`):

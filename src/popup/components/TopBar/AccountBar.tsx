@@ -8,9 +8,10 @@ import styles from './TopBar.module.css';
 interface AccountBarProps {
   dropdownOpen: boolean;
   onToggleDropdown: () => void;
+  onRequestUnlock?: () => void;
 }
 
-export default function AccountBar({ dropdownOpen, onToggleDropdown }: AccountBarProps) {
+export default function AccountBar({ dropdownOpen, onToggleDropdown, onRequestUnlock }: AccountBarProps) {
   const { displayName, displaySub, avatarUrl, initial, isReadOnly, active } = useAccount();
   const vault = useVault();
   const [imgError, setImgError] = useState<boolean>(false);
@@ -49,7 +50,7 @@ export default function AccountBar({ dropdownOpen, onToggleDropdown }: AccountBa
           title={vault.locked ? t('topbar.vaultLocked') : t('topbar.vaultUnlocked')}
           onClick={(e) => {
             e.stopPropagation();
-            vault.locked ? null : vault.lock(); // unlock handled by UnlockModal
+            vault.locked ? onRequestUnlock?.() : vault.lock();
           }}
         >
           {vault.locked ? (

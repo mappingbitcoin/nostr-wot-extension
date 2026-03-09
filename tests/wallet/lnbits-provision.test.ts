@@ -12,7 +12,10 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { provisionLnbitsWallet, DEFAULT_LNBITS_URL } from '../../lib/wallet/lnbits-provision.ts';
+import {
+  provisionLnbitsWallet, claimLightningAddress, getLightningAddress,
+  releaseLightningAddress, DEFAULT_LNBITS_URL,
+} from '../../lib/wallet/lnbits-provision.ts';
 import type { SignedEvent } from '../../lib/types.ts';
 
 const FAKE_CHALLENGE = 'a1b2c3d4e5f6';
@@ -183,5 +186,125 @@ describe('provisionLnbitsWallet', () => {
   it('exports DEFAULT_LNBITS_URL pointing to zaps.nostr-wot.com', () => {
     assert.strictEqual(typeof DEFAULT_LNBITS_URL, 'string');
     assert.strictEqual(DEFAULT_LNBITS_URL, 'https://zaps.nostr-wot.com');
+  });
+});
+
+describe('claimLightningAddress', () => {
+  it('fetches challenge, signs, sends POST with username and event', async () => {
+    const { signFn, wasCalled } = createMockSignFn(FAKE_CHALLENGE);
+    let postBody: Record<string, unknown> | null = null;
+
+    const mockFetch = async (url: string, init?: RequestInit) => {
+      if (!init?.method || init.method === 'GET') {
+        return new Response(JSON.stringify({ challenge: FAKE_CHALLENGE }), { status: 200 });
+      }
+      assert.strictEqual(url, 'https://zaps.example.com/api/claim-username');
+      postBody = JSON.parse(init.body as string);
+      return new Response(JSON.stringify({ address: 'alice@zaps.nostr-wot.com' }), { status: 200 });
+    };
+
+    const result = await claimLightningAddress(
+      'https://zaps.example.com', 'alice', signFn, mockFetch as typeof fetch,
+    );
+    assert.strictEqual(result.address, 'alice@zaps.nostr-wot.com');
+    assert.strictEqual(wasCalled(), true);
+    assert.ok(postBody);
+    assert.strictEqual((postBody as Record<string, unknown>).username, 'alice');
+    assert.deepStrictEqual((postBody as Record<string, unknown>).event, FAKE_SIGNED_EVENT);
+  });
+
+  it('throws server error message when claim fails', async () => {
+    const { signFn } = createMockSignFn();
+    const mockFetch = async (_url: string, init?: RequestInit) => {
+      if (!init?.method || init.method === 'GET') {
+        return new Response(JSON.stringify({ challenge: FAKE_CHALLENGE }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ error: 'Username already taken' }), { status: 409 });
+    };
+    await assert.rejects(
+      () => claimLightningAddress('https://zaps.example.com', 'alice', signFn, mockFetch as typeof fetch),
+      (err: Error) => err.message === 'Username already taken',
+    );
+  });
+
+  it('throws generic error when claim response has no error field', async () => {
+    const { signFn } = createMockSignFn();
+    const mockFetch = async (_url: string, init?: RequestInit) => {
+      if (!init?.method || init.method === 'GET') {
+        return new Response(JSON.stringify({ challenge: FAKE_CHALLENGE }), { status: 200 });
+      }
+      return new Response('Bad Request', { status: 400 });
+    };
+    await assert.rejects(
+      () => claimLightningAddress('https://zaps.example.com', 'alice', signFn, mockFetch as typeof fetch),
+      (err: Error) => err.message === 'Claim failed: 400',
+    );
+  });
+
+  it('throws on challenge failure', async () => {
+    const { signFn } = createMockSignFn();
+    const mockFetch = async () => new Response('Down', { status: 503 });
+    await assert.rejects(
+      () => claimLightningAddress('https://zaps.example.com', 'alice', signFn, mockFetch as typeof fetch),
+      (err: Error) => err.message.includes('Challenge request failed: 503'),
+    );
+  });
+});
+
+describe('getLightningAddress', () => {
+  it('returns address when found', async () => {
+    const mockFetch = async (url: string) => {
+      assert.ok(url.includes('pubkey=abc123'));
+      return new Response(JSON.stringify({ address: 'bob@zaps.nostr-wot.com' }), { status: 200 });
+    };
+    const result = await getLightningAddress('https://zaps.example.com', 'abc123', mockFetch as typeof fetch);
+    assert.strictEqual(result, 'bob@zaps.nostr-wot.com');
+  });
+
+  it('returns null when no address exists', async () => {
+    const mockFetch = async () => {
+      return new Response(JSON.stringify({ address: null }), { status: 200 });
+    };
+    const result = await getLightningAddress('https://zaps.example.com', 'abc123', mockFetch as typeof fetch);
+    assert.strictEqual(result, null);
+  });
+
+  it('returns null on server error', async () => {
+    const mockFetch = async () => new Response('Error', { status: 500 });
+    const result = await getLightningAddress('https://zaps.example.com', 'abc123', mockFetch as typeof fetch);
+    assert.strictEqual(result, null);
+  });
+});
+
+describe('releaseLightningAddress', () => {
+  it('fetches challenge, signs, sends POST to release endpoint', async () => {
+    const { signFn, wasCalled } = createMockSignFn(FAKE_CHALLENGE);
+    let postUrl = '';
+
+    const mockFetch = async (url: string, init?: RequestInit) => {
+      if (!init?.method || init.method === 'GET') {
+        return new Response(JSON.stringify({ challenge: FAKE_CHALLENGE }), { status: 200 });
+      }
+      postUrl = url;
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    };
+
+    await releaseLightningAddress('https://zaps.example.com', signFn, mockFetch as typeof fetch);
+    assert.strictEqual(wasCalled(), true);
+    assert.strictEqual(postUrl, 'https://zaps.example.com/api/release-username');
+  });
+
+  it('throws on release failure', async () => {
+    const { signFn } = createMockSignFn();
+    const mockFetch = async (_url: string, init?: RequestInit) => {
+      if (!init?.method || init.method === 'GET') {
+        return new Response(JSON.stringify({ challenge: FAKE_CHALLENGE }), { status: 200 });
+      }
+      return new Response('Not Found', { status: 404 });
+    };
+    await assert.rejects(
+      () => releaseLightningAddress('https://zaps.example.com', signFn, mockFetch as typeof fetch),
+      (err: Error) => err.message === 'Release failed: 404',
+    );
   });
 });

@@ -14,7 +14,7 @@
 import type { WalletConfig, WalletProvider } from './types.ts';
 import { LnbitsProvider } from './lnbits.ts';
 
-export type { WalletConfig, WalletProvider, WalletProviderInfo, SafeWalletInfo } from './types.ts';
+export type { WalletConfig, WalletProvider, WalletProviderInfo, SafeWalletInfo, Transaction } from './types.ts';
 
 // ── Per-account provider cache ──
 

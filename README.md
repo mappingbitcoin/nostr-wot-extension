@@ -161,6 +161,10 @@ const balance = await window.webln.getBalance();
 
 Nostr clients that support WebLN (like Primal) can use this directly for zaps. Payment requests trigger a permission prompt — you can approve once or set an auto-approve threshold for small amounts.
 
+### Lightning Address
+
+After provisioning a wallet, claim a Lightning Address like `alice@zaps.nostr-wot.com` from the wallet settings. This creates an lnurlp pay link so others can send you payments. You can also add the address to your Nostr profile (`lud16`) with one click.
+
 ### NWC Connection
 
 Provisioned wallets automatically receive an NWC connection URI. Copy it from the wallet UI to use in any NWC-compatible app.
@@ -276,6 +280,7 @@ Visit the [Nostr WoT Playground](https://nostr-wot.com/playground) to test the e
 ## Documentation
 
 - [Architecture Reference](docs/architecture.md) - Technical deep dive into the extension's internals
+- [Wallet & Lightning](docs/wallet.md) - Wallet providers, WebLN API, auto-provisioning, permissions
 - [Adding Badge Support](docs/add_badge.md) - Guide for contributing badge adapters for new Nostr clients
 - [Contributing](CONTRIBUTING.md) - How to contribute to the project
 - [Security](SECURITY.md) - Security model and vulnerability reporting

@@ -4,7 +4,7 @@ import { rpcNotify } from '@shared/rpc.ts';
 import '@shared/theme.css';
 import styles from './PopupApp.module.css';
 import { AccountProvider, useAccount } from './context/AccountContext';
-import { VaultProvider } from './context/VaultContext';
+import { VaultProvider, useVault } from './context/VaultContext';
 import { ScoringProvider } from './context/ScoringContext';
 import { PermissionsProvider } from './context/PermissionsContext';
 import TopoBg from '@components/TopoBg/TopoBg';
@@ -26,6 +26,7 @@ import { t } from '@lib/i18n.js';
 function PopupInner() {
   const [splashVisible, setSplashVisible] = useState<boolean>(true);
   const [unlockVisible, setUnlockVisible] = useState<boolean>(false);
+  const [unlockWaiters, setUnlockWaiters] = useState<any[]>([]);
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
   const [menuSection, setMenuSection] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState<boolean>(false);
@@ -37,6 +38,7 @@ function PopupInner() {
   const [scoringOpen, setScoringOpen] = useState<boolean>(false);
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const account = useAccount();
+  const vault = useVault();
 
   // Capture active tab screenshot for backdrop
   useEffect(() => {
@@ -70,6 +72,10 @@ function PopupInner() {
       .catch(() => {});
   }, []);
 
+  // Unlock modal is shown only when:
+  // 1. There are pending signer requests waiting for unlock (ApprovalOverlay)
+  // 2. The user clicks the lock icon in TopBar
+
   const handleWizardComplete = () => {
     setWizardOpen(false);
     account.reload();
@@ -90,6 +96,7 @@ function PopupInner() {
           onMenuOpen={() => setMenuOpen(true)}
           onAddAccount={() => setWizardOpen(true)}
           onEditProfile={() => setEditProfileOpen(true)}
+          onRequestUnlock={() => setUnlockVisible(true)}
         />
 
         <div className={styles.scrollArea}>
@@ -100,11 +107,13 @@ function PopupInner() {
             onManageBadges={() => { setMenuSection('wot-injection'); setMenuOpen(true); }}
             onEditProfile={() => setEditProfileOpen(true)}
             onManageScoring={() => setScoringOpen(true)}
+            onOpenWallet={() => { setMenuSection('wallet'); setMenuOpen(true); }}
           />
         </div>
 
         <ApprovalOverlay
           onRequestUnlock={() => setUnlockVisible(true)}
+          onUnlockWaitersChange={setUnlockWaiters}
         />
 
         <MenuOverlay
@@ -154,6 +163,7 @@ function PopupInner() {
 
         <UnlockModal
           visible={unlockVisible}
+          unlockWaiters={unlockWaiters}
           onUnlocked={() => setUnlockVisible(false)}
           onCancel={() => setUnlockVisible(false)}
         />

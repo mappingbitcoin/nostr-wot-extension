@@ -12,6 +12,7 @@ import styles from './ApprovalOverlay.module.css';
 
 interface ApprovalOverlayProps {
   onRequestUnlock?: () => void;
+  onUnlockWaitersChange?: (waiters: PendingRequest[]) => void;
 }
 
 interface PendingRequest {
@@ -35,7 +36,7 @@ interface ApprovalGroup {
   requests: PendingRequest[];
 }
 
-export default function ApprovalOverlay({ onRequestUnlock }: ApprovalOverlayProps) {
+export default function ApprovalOverlay({ onRequestUnlock, onUnlockWaitersChange }: ApprovalOverlayProps) {
   const [groups, setGroups] = useState<ApprovalGroup[]>([]);
   const [nip46Groups, setNip46Groups] = useState<ApprovalGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<ApprovalGroup | null>(null);
@@ -63,6 +64,7 @@ export default function ApprovalOverlay({ onRequestUnlock }: ApprovalOverlayProp
     const nip46InFlight = filtered.filter((r) => r.nip46InFlight);
     const unlockWaiters = filtered.filter((r) => r.waitingForUnlock);
 
+    onUnlockWaitersChange?.(unlockWaiters);
     if (unlockWaiters.length > 0 && vault.locked) {
       onRequestUnlock?.();
     }

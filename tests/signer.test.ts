@@ -485,6 +485,106 @@ describe('signer -- cancelNip46InFlight', () => {
   });
 });
 
+// -- Cancel Unlock Waiter Tests --
+
+describe('signer -- cancelAllUnlockWaiters', () => {
+  beforeEach(async () => {
+    resetMockStorage();
+    vault.lock();
+    await signer.cleanupStale();
+  });
+
+  it('cancelAllUnlockWaiters rejects all waiters and clears storage', async () => {
+    await setupVault();
+    await permissions.save('test.com', 'signEvent', null, 'allow');
+    vault.lock();
+
+    // Start two sign requests that will waitForVaultUnlock
+    const p1 = signer.handleSignEvent(
+      { kind: 1, content: 'msg1', tags: [], created_at: Math.floor(Date.now() / 1000) },
+      'test.com'
+    );
+    const p2 = signer.handleSignEvent(
+      { kind: 1, content: 'msg2', tags: [], created_at: Math.floor(Date.now() / 1000) },
+      'test.com'
+    );
+
+    await new Promise<void>(r => setTimeout(r, 100));
+
+    // Verify unlock markers are in storage
+    const pending = await signer.getPending();
+    const unlockWaiters = pending.filter(r => r.waitingForUnlock);
+    assert.ok(unlockWaiters.length >= 2, `Should have >=2 unlock waiters, got ${unlockWaiters.length}`);
+
+    // Cancel all
+    await signer.cancelAllUnlockWaiters();
+
+    // Both promises should reject with 'Cancelled by user'
+    await assert.rejects(p1, /Cancelled by user/);
+    await assert.rejects(p2, /Cancelled by user/);
+
+    // Storage should have no unlock waiters left
+    const afterCancel = await signer.getPending();
+    const remainingUnlock = afterCancel.filter(r => r.waitingForUnlock);
+    assert.strictEqual(remainingUnlock.length, 0, 'No unlock waiters should remain');
+  });
+
+  it('cancelUnlockWaiter rejects specific waiter, leaves others', async () => {
+    await setupVault();
+    await permissions.save('test.com', 'signEvent', null, 'allow');
+    vault.lock();
+
+    // Start two sign requests
+    const p1 = signer.handleSignEvent(
+      { kind: 1, content: 'msg1', tags: [], created_at: Math.floor(Date.now() / 1000) },
+      'test.com'
+    );
+    const p2 = signer.handleSignEvent(
+      { kind: 1, content: 'msg2', tags: [], created_at: Math.floor(Date.now() / 1000) },
+      'test.com'
+    );
+
+    await new Promise<void>(r => setTimeout(r, 100));
+
+    const pending = await signer.getPending();
+    const unlockWaiters = pending.filter(r => r.waitingForUnlock);
+    assert.ok(unlockWaiters.length >= 2, `Should have >=2 unlock waiters, got ${unlockWaiters.length}`);
+
+    // Cancel only the first one
+    await signer.cancelUnlockWaiter(unlockWaiters[0].id);
+
+    // First should reject
+    await assert.rejects(p1, /Cancelled by user/);
+
+    // Second should still be pending — unlock vault to resolve it
+    await vault.unlock(TEST_PASSWORD);
+    await signer.onVaultUnlocked();
+
+    const signed = await p2;
+    assert.ok(signed.sig, 'Second request should sign after unlock');
+  });
+
+  it('onVaultUnlocked still resolves remaining waiters after individual cancel', async () => {
+    await setupVault();
+    await permissions.save('test.com', 'signEvent', null, 'allow');
+    vault.lock();
+
+    const p1 = signer.handleSignEvent(
+      { kind: 1, content: 'msg1', tags: [], created_at: Math.floor(Date.now() / 1000) },
+      'test.com'
+    );
+
+    await new Promise<void>(r => setTimeout(r, 100));
+
+    // Unlock vault and fire onVaultUnlocked
+    await vault.unlock(TEST_PASSWORD);
+    await signer.onVaultUnlocked();
+
+    const signed = await p1;
+    assert.ok(signed.sig, 'Request should sign after vault unlock');
+  });
+});
+
 // -- Edge Cases --
 
 describe('signer -- edge cases', () => {
@@ -543,17 +643,10 @@ describe('signer -- edge cases', () => {
     // Approve permission, but vault is still locked
     signer.resolveRequest(pending[0].id, { allow: true, remember: false });
 
-    // Now it will queue for unlock. Deny the unlock by resolving with allow:false
-    // Actually, the vault unlock waiter resolves automatically via onVaultUnlocked.
-    // If we never unlock, the handler will be stuck. Let's resolve the unlock waiter
-    // with deny to simulate user closing popup without unlocking.
+    // waitForVaultUnlock is now active -- fire onVaultUnlocked WITHOUT actually unlocking.
+    // This simulates the edge case where the callback fires but vault state isn't updated.
     await new Promise<void>(r => setTimeout(r, 50));
-
-    const pending2: any[] = await signer.getPending();
-    if (pending2.length > 0) {
-      // Force-resolve the waiting request (simulates clearing pending without unlock)
-      signer.resolveRequest(pending2[0].id, { allow: true, remember: false });
-    }
+    await signer.onVaultUnlocked();
 
     // Vault is still locked, so should throw
     await assert.rejects(signPromise, /Vault is locked/);
