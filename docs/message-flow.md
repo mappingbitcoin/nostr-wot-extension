@@ -66,6 +66,12 @@ NIP-07 and WebLN methods are blocked on `http:` origins, preventing key material
 
 ---
 
+## 4b. WebLN Domain Gating
+
+All WebLN methods except `webln_enable` are gated behind the same domain allowlist used for NIP-07. A site must be connected (approved by the user) before it can call `getInfo`, `getBalance`, `sendPayment`, or `makeInvoice`. The `webln_enable` method is exempt because apps call it on page load before the user has had a chance to approve the site, and it always succeeds -- vault/wallet checks happen in individual methods.
+
+---
+
 ## 5. Privileged Methods
 
 Methods in `PRIVILEGED_METHODS` are gated to internal extension senders only. The check:

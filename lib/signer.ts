@@ -582,243 +582,91 @@ export async function handleSignEvent(event: UnsignedEvent, origin: string): Pro
 }
 
 /**
- * Handle NIP-04 encrypt request
+ * Shared handler for NIP-04/NIP-44 encrypt/decrypt requests.
+ * All four operations follow the same flow: permission check → NIP-46 routing → local crypto.
  */
+async function handleCryptoRequest(
+  method: 'nip04Encrypt' | 'nip04Decrypt' | 'nip44Encrypt' | 'nip44Decrypt',
+  theirPubkey: string,
+  payload: string,
+  origin: string,
+  nip46Data: Record<string, string>,
+  cryptoFn: (payload: string, privkey: Uint8Array, theirPubkeyBytes: Uint8Array) => Promise<string>,
+  denyMessage: string,
+): Promise<string> {
+  const { accountId, accountType } = await getActiveAccountInfo();
+
+  if (!(await vault.exists()) && accountType !== 'nip46') throw new Error('No signing key available');
+
+  if (accountType !== 'nip46') {
+    const decision = await permissions.check(origin, method, undefined, accountId ?? undefined);
+    if (decision === 'deny') throw new Error('Permission denied');
+
+    if (decision === 'ask') {
+      const pubkey = await getActivePublicKey();
+      const approved = await queueRequest({
+        type: method,
+        origin,
+        theirPubkey,
+        pubkey: pubkey ?? undefined,
+        permKey: permissions.permissionKey(method),
+        needsPermission: true,
+        accountId,
+      });
+      if (!approved.allow) throw new Error(denyMessage);
+    }
+  }
+
+  if (accountType === 'nip46') {
+    if (vault.isLocked()) {
+      await waitForVaultUnlock(origin, method, accountId);
+    }
+    if (vault.isLocked()) throw new Error('Vault is locked');
+    const acct = vault.getAccountById(accountId!);
+    if (!acct || acct.type !== 'nip46') throw new Error('No NIP-46 account active');
+    const nip46ReqId = await queueNip46InFlight({ type: method, origin, accountId });
+    const ac = new AbortController();
+    _nip46Aborts.set(nip46ReqId, ac);
+    try {
+      return await raceAbort(ac.signal, handleNip46Request(acct, method, nip46Data, origin));
+    } finally {
+      _nip46Aborts.delete(nip46ReqId);
+      await removeNip46InFlight(nip46ReqId);
+    }
+  }
+
+  if (vault.isLocked()) {
+    await waitForVaultUnlock(origin, method, accountId);
+  }
+  if (vault.isLocked()) throw new Error('Vault is locked');
+
+  const privkey = vault.getPrivkey(accountId ?? undefined);
+  if (!privkey) throw new Error('No private key for active account');
+  try {
+    return await cryptoFn(payload, privkey, hexToBytes(theirPubkey));
+  } finally {
+    privkey.fill(0);
+  }
+}
+
 export async function handleNip04Encrypt(theirPubkey: string, plaintext: string, origin: string): Promise<string> {
-  const { accountId, accountType } = await getActiveAccountInfo();
-
-  if (!(await vault.exists()) && accountType !== 'nip46') throw new Error('No signing key available');
-
-  if (accountType !== 'nip46') {
-    const decision = await permissions.check(origin, 'nip04Encrypt', undefined, accountId ?? undefined);
-    if (decision === 'deny') throw new Error('Permission denied');
-
-    if (decision === 'ask') {
-      const pubkey = await getActivePublicKey();
-      const approved = await queueRequest({
-        type: 'nip04Encrypt',
-        origin,
-        theirPubkey,
-        pubkey: pubkey ?? undefined,
-        permKey: permissions.permissionKey('nip04Encrypt'),
-        needsPermission: true,
-        accountId,
-      });
-      if (!approved.allow) throw new Error('User denied encryption');
-    }
-  }
-
-  if (accountType === 'nip46') {
-    if (vault.isLocked()) {
-      await waitForVaultUnlock(origin, 'nip04Encrypt', accountId);
-    }
-    if (vault.isLocked()) throw new Error('Vault is locked');
-    const acct = vault.getAccountById(accountId!);
-    if (!acct || acct.type !== 'nip46') throw new Error('No NIP-46 account active');
-    const nip46ReqId = await queueNip46InFlight({ type: 'nip04Encrypt', origin, accountId });
-    const ac = new AbortController();
-    _nip46Aborts.set(nip46ReqId, ac);
-    try {
-      return await raceAbort(ac.signal, handleNip46Request(acct, 'nip04Encrypt', { pubkey: theirPubkey, plaintext }, origin));
-    } finally {
-      _nip46Aborts.delete(nip46ReqId);
-      await removeNip46InFlight(nip46ReqId);
-    }
-  }
-
-  if (vault.isLocked()) {
-    await waitForVaultUnlock(origin, 'nip04Encrypt', accountId);
-  }
-
-  if (vault.isLocked()) throw new Error('Vault is locked');
-
-  const privkey = vault.getPrivkey(accountId ?? undefined);
-  if (!privkey) throw new Error('No private key for active account');
-  try {
-    return await nip04Encrypt(plaintext, privkey, hexToBytes(theirPubkey));
-  } finally {
-    privkey.fill(0);
-  }
+  return handleCryptoRequest('nip04Encrypt', theirPubkey, plaintext, origin,
+    { pubkey: theirPubkey, plaintext }, nip04Encrypt, 'User denied encryption');
 }
 
-/**
- * Handle NIP-04 decrypt request
- */
 export async function handleNip04Decrypt(theirPubkey: string, ciphertext: string, origin: string): Promise<string> {
-  const { accountId, accountType } = await getActiveAccountInfo();
-
-  if (!(await vault.exists()) && accountType !== 'nip46') throw new Error('No signing key available');
-
-  if (accountType !== 'nip46') {
-    const decision = await permissions.check(origin, 'nip04Decrypt', undefined, accountId ?? undefined);
-    if (decision === 'deny') throw new Error('Permission denied');
-
-    if (decision === 'ask') {
-      const pubkey = await getActivePublicKey();
-      const approved = await queueRequest({
-        type: 'nip04Decrypt',
-        origin,
-        theirPubkey,
-        pubkey: pubkey ?? undefined,
-        permKey: permissions.permissionKey('nip04Decrypt'),
-        needsPermission: true,
-        accountId,
-      });
-      if (!approved.allow) throw new Error('User denied decryption');
-    }
-  }
-
-  if (accountType === 'nip46') {
-    if (vault.isLocked()) {
-      await waitForVaultUnlock(origin, 'nip04Decrypt', accountId);
-    }
-    if (vault.isLocked()) throw new Error('Vault is locked');
-    const acct = vault.getAccountById(accountId!);
-    if (!acct || acct.type !== 'nip46') throw new Error('No NIP-46 account active');
-    const nip46ReqId = await queueNip46InFlight({ type: 'nip04Decrypt', origin, accountId });
-    const ac = new AbortController();
-    _nip46Aborts.set(nip46ReqId, ac);
-    try {
-      return await raceAbort(ac.signal, handleNip46Request(acct, 'nip04Decrypt', { pubkey: theirPubkey, ciphertext }, origin));
-    } finally {
-      _nip46Aborts.delete(nip46ReqId);
-      await removeNip46InFlight(nip46ReqId);
-    }
-  }
-
-  if (vault.isLocked()) {
-    await waitForVaultUnlock(origin, 'nip04Decrypt', accountId);
-  }
-
-  if (vault.isLocked()) throw new Error('Vault is locked');
-
-  const privkey = vault.getPrivkey(accountId ?? undefined);
-  if (!privkey) throw new Error('No private key for active account');
-  try {
-    return await nip04Decrypt(ciphertext, privkey, hexToBytes(theirPubkey));
-  } finally {
-    privkey.fill(0);
-  }
+  return handleCryptoRequest('nip04Decrypt', theirPubkey, ciphertext, origin,
+    { pubkey: theirPubkey, ciphertext }, nip04Decrypt, 'User denied decryption');
 }
 
-/**
- * Handle NIP-44 encrypt request
- */
 export async function handleNip44Encrypt(theirPubkey: string, plaintext: string, origin: string): Promise<string> {
-  const { accountId, accountType } = await getActiveAccountInfo();
-
-  if (!(await vault.exists()) && accountType !== 'nip46') throw new Error('No signing key available');
-
-  if (accountType !== 'nip46') {
-    const decision = await permissions.check(origin, 'nip44Encrypt', undefined, accountId ?? undefined);
-    if (decision === 'deny') throw new Error('Permission denied');
-
-    if (decision === 'ask') {
-      const pubkey = await getActivePublicKey();
-      const approved = await queueRequest({
-        type: 'nip44Encrypt',
-        origin,
-        theirPubkey,
-        pubkey: pubkey ?? undefined,
-        permKey: permissions.permissionKey('nip44Encrypt'),
-        needsPermission: true,
-        accountId,
-      });
-      if (!approved.allow) throw new Error('User denied encryption');
-    }
-  }
-
-  if (accountType === 'nip46') {
-    if (vault.isLocked()) {
-      await waitForVaultUnlock(origin, 'nip44Encrypt', accountId);
-    }
-    if (vault.isLocked()) throw new Error('Vault is locked');
-    const acct = vault.getAccountById(accountId!);
-    if (!acct || acct.type !== 'nip46') throw new Error('No NIP-46 account active');
-    const nip46ReqId = await queueNip46InFlight({ type: 'nip44Encrypt', origin, accountId });
-    const ac = new AbortController();
-    _nip46Aborts.set(nip46ReqId, ac);
-    try {
-      return await raceAbort(ac.signal, handleNip46Request(acct, 'nip44Encrypt', { pubkey: theirPubkey, plaintext }, origin));
-    } finally {
-      _nip46Aborts.delete(nip46ReqId);
-      await removeNip46InFlight(nip46ReqId);
-    }
-  }
-
-  if (vault.isLocked()) {
-    await waitForVaultUnlock(origin, 'nip44Encrypt', accountId);
-  }
-
-  if (vault.isLocked()) throw new Error('Vault is locked');
-
-  const privkey = vault.getPrivkey(accountId ?? undefined);
-  if (!privkey) throw new Error('No private key for active account');
-  try {
-    return await nip44Encrypt(plaintext, privkey, hexToBytes(theirPubkey));
-  } finally {
-    privkey.fill(0);
-  }
+  return handleCryptoRequest('nip44Encrypt', theirPubkey, plaintext, origin,
+    { pubkey: theirPubkey, plaintext }, nip44Encrypt, 'User denied encryption');
 }
 
-/**
- * Handle NIP-44 decrypt request
- */
 export async function handleNip44Decrypt(theirPubkey: string, ciphertext: string, origin: string): Promise<string> {
-  const { accountId, accountType } = await getActiveAccountInfo();
-
-  if (!(await vault.exists()) && accountType !== 'nip46') throw new Error('No signing key available');
-
-  if (accountType !== 'nip46') {
-    const decision = await permissions.check(origin, 'nip44Decrypt', undefined, accountId ?? undefined);
-    if (decision === 'deny') throw new Error('Permission denied');
-
-    if (decision === 'ask') {
-      const pubkey = await getActivePublicKey();
-      const approved = await queueRequest({
-        type: 'nip44Decrypt',
-        origin,
-        theirPubkey,
-        pubkey: pubkey ?? undefined,
-        permKey: permissions.permissionKey('nip44Decrypt'),
-        needsPermission: true,
-        accountId,
-      });
-      if (!approved.allow) throw new Error('User denied decryption');
-    }
-  }
-
-  if (accountType === 'nip46') {
-    if (vault.isLocked()) {
-      await waitForVaultUnlock(origin, 'nip44Decrypt', accountId);
-    }
-    if (vault.isLocked()) throw new Error('Vault is locked');
-    const acct = vault.getAccountById(accountId!);
-    if (!acct || acct.type !== 'nip46') throw new Error('No NIP-46 account active');
-    const nip46ReqId = await queueNip46InFlight({ type: 'nip44Decrypt', origin, accountId });
-    const ac = new AbortController();
-    _nip46Aborts.set(nip46ReqId, ac);
-    try {
-      return await raceAbort(ac.signal, handleNip46Request(acct, 'nip44Decrypt', { pubkey: theirPubkey, ciphertext }, origin));
-    } finally {
-      _nip46Aborts.delete(nip46ReqId);
-      await removeNip46InFlight(nip46ReqId);
-    }
-  }
-
-  if (vault.isLocked()) {
-    await waitForVaultUnlock(origin, 'nip44Decrypt', accountId);
-  }
-
-  if (vault.isLocked()) throw new Error('Vault is locked');
-
-  const privkey = vault.getPrivkey(accountId ?? undefined);
-  if (!privkey) throw new Error('No private key for active account');
-  try {
-    return await nip44Decrypt(ciphertext, privkey, hexToBytes(theirPubkey));
-  } finally {
-    privkey.fill(0);
-  }
+  return handleCryptoRequest('nip44Decrypt', theirPubkey, ciphertext, origin,
+    { pubkey: theirPubkey, ciphertext }, nip44Decrypt, 'User denied decryption');
 }
 
 // -- NIP-46 Remote Signer (nostr-tools BunkerSigner) --
@@ -853,6 +701,11 @@ async function getNip46Client(acct: SafeAccount): Promise<BunkerSigner> {
   // Create BunkerSigner with auth_url handler (critical for nsec.app)
   const signer = BunkerSigner.fromBunker(secretKey, bp, {
     onauth(url: string) {
+      // E2: Only allow https:// auth URLs to prevent javascript:/data: injection
+      if (!url.startsWith('https://')) {
+        console.warn('[NIP-46] rejected non-HTTPS auth_url:', url);
+        return;
+      }
       console.log('[NIP-46] auth_url received, opening:', url);
       browser.tabs.create({ url });
     }

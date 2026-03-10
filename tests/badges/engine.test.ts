@@ -672,15 +672,15 @@ describe('badge engine: build output validation', () => {
         assert.ok(!/\bexport\s/.test(result.code), 'IIFE output must not contain export statements');
     });
 
-    it('background.ts references badges/engine.js (not .ts)', async () => {
+    it('domain-handlers.ts references badges/engine.js (not .ts)', async () => {
         const { readFileSync } = await import('fs');
         const { resolve } = await import('path');
         const { fileURLToPath } = await import('url');
 
         const root = fileURLToPath(new URL('../..', import.meta.url));
-        const bg = readFileSync(resolve(root, 'background.ts'), 'utf-8');
+        const bg = readFileSync(resolve(root, 'lib/bg/domain-handlers.ts'), 'utf-8');
 
-        assert.ok(bg.includes("'badges/engine.js'"), 'background.ts should reference badges/engine.js');
-        assert.ok(!bg.includes("'badges/engine.ts'"), 'background.ts should NOT reference badges/engine.ts');
+        assert.ok(bg.includes("'badges/engine.js'"), 'domain-handlers.ts should reference badges/engine.js');
+        assert.ok(!bg.includes("'badges/engine.ts'"), 'domain-handlers.ts should NOT reference badges/engine.ts');
     });
 });

@@ -17,6 +17,10 @@ export function randomBytes(len: number): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(len));
 }
 
+export function randomHex(byteLength: number): string {
+  return bytesToHex(randomBytes(byteLength));
+}
+
 export async function sha256(data: Uint8Array): Promise<Uint8Array> {
   return _sha256(data);
 }

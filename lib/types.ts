@@ -72,13 +72,6 @@ export interface VaultPayload {
   activeAccountId: string | null;
 }
 
-export interface VaultStorageEntry {
-  version: number;
-  salt: string;
-  iv: string;
-  ciphertext: string;
-}
-
 // ── Permissions ──
 
 export type PermissionDecision = 'allow' | 'deny' | 'ask';
@@ -118,33 +111,7 @@ export interface RequestDecision {
   reason?: string;
 }
 
-// ── NIP-46 ──
-
-export interface Nip46ParsedUrl {
-  pubkey: string;
-  relay: string;
-  secret: string | null;
-}
-
-export interface Nip46PendingEntry {
-  resolve: (value: string) => void;
-  reject: (error: Error) => void;
-  timer: ReturnType<typeof setTimeout>;
-}
-
-// ── WoT Config ──
-
-export interface WotConfig {
-  myPubkey: string;
-  oracleUrl: string;
-  mode: 'local' | 'oracle' | 'hybrid';
-  depth: number;
-  maxHops: number;
-  relays: string[];
-  autoSync: boolean;
-  syncInterval: number;
-  scoring: ScoringConfig;
-}
+// ── Scoring ──
 
 export interface ScoringConfig {
   distanceWeights: Record<number, number>;
@@ -196,25 +163,6 @@ export interface SupportedLanguage {
   native: string;
   flag: string;
   prompt: string;
-}
-
-// ── Messages (content/background/inject) ──
-
-export type MessageType =
-  | 'WOT_REQUEST'
-  | 'WOT_RESPONSE'
-  | 'NIP07_REQUEST'
-  | 'NIP07_RESPONSE'
-  | 'WEBLN_REQUEST'
-  | 'WEBLN_RESPONSE';
-
-export interface ExtensionMessage {
-  type: string;
-  id?: string;
-  method?: string;
-  params?: unknown;
-  result?: unknown;
-  error?: string;
 }
 
 // ── Relay / liveQuery ──

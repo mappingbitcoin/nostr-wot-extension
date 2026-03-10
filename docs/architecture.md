@@ -27,13 +27,36 @@ Firefox natively supports the `browser.*` API; Chrome uses the `chrome.*` API. A
 
 ## 2. Extension Architecture
 
-### 2.1 Background Script -- `background.ts`
+### 2.1 Background Script -- `background.ts` + `lib/bg/`
 
 The central coordinator. Runs as a **service worker** on Chrome and a **persistent background script** on Firefox (both declared in `manifest.json` via `"service_worker"` and `"scripts"` fields respectively, with `"type": "module"`).
 
-Responsibilities:
-- All business logic: graph queries, sync orchestration, trust scoring, vault lifecycle, account management, NIP-07 signing coordination, profile metadata fetching, activity logging.
-- Message handler: `browser.runtime.onMessage.addListener` receives messages from content scripts and extension pages, dispatches to `handleRequest()`.
+`background.ts` is a thin orchestrator (~300 lines) that assembles handler modules, sets up listeners, and dispatches requests. Business logic lives in `lib/bg/` handler modules, each exporting a `Map<string, HandlerFn>` plus individual functions for direct testing.
+
+#### Handler Modules -- `lib/bg/`
+
+| Module | Responsibility |
+|--------|---------------|
+| `state.ts` | Shared mutable state (`config`, `oracle`, `localGraph`), constants, rate limiting, method sets, utility functions |
+| `wot-handlers.ts` | WoT graph queries: distance, trust score, batch operations, sync, follows, paths |
+| `domain-handlers.ts` | Domain allowlist, badge injection, tab listeners, host permissions, identity disable |
+| `vault-handlers.ts` | Vault lifecycle (unlock/lock/create), account switching, database management |
+| `nip07-handlers.ts` | NIP-07 signer methods (sign, encrypt/decrypt), permission management |
+| `wallet-handlers.ts` | WebLN page methods + privileged wallet management (connect, provision, Lightning Address) |
+| `onboarding-handlers.ts` | Account import/generation, NostrConnect sessions, vault creation during onboarding |
+| `misc-handlers.ts` | Activity log, mute lists, local blocks, profile metadata, relay publishing, health checks |
+
+**Dispatch pattern:** Each handler module exports `handlers: Map<string, HandlerFn>`. `background.ts` merges all maps into a single `allHandlers` map. `handleRequest()` does pre-checks (rate limit, NIP-07 validation, domain gating, npub normalization) then delegates to `allHandlers.get(method)`.
+
+**Dependency rules:** Handler modules import from `state.ts` and `lib/*`, and may import exported functions from sibling handler modules (e.g., `nip07-handlers` imports `logActivity` from `misc-handlers`). No circular dependency chains exist.
+
+Responsibilities of `background.ts`:
+- Handler map assembly from all `lib/bg/*-handlers.ts` modules
+- `loadConfig()` -- initializes `state.config`, oracle, localGraph, runs migrations
+- Startup IIFEs: permission migration, vault auto-unlock, `signer.cleanupStale()`
+- `browser.runtime.onMessage` listener (privilege gate, origin derivation, dispatch to `handleRequest()`)
+- `browser.runtime.onConnect` listener (port-based NIP-07/WebLN)
+- Calls `setupTabListeners()` from `domain-handlers.ts`
 - Auto-injection: `content.ts` and `inject.ts` are declared as `content_scripts` in `manifest.json` (matching `<all_urls>`), so the browser handles injection automatically. The background additionally uses `browser.scripting.executeScript` to inject the badge engine and CSS into tabs that have WoT badges enabled.
 - On `runtime.onInstalled` (reason `install`), opens the onboarding wizard if no vault exists.
 

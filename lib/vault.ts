@@ -22,6 +22,7 @@
  */
 
 import type { VaultPayload, Account, SafeAccount, SafeAccountWithWallet, MemoryAccount, MemoryVaultPayload } from './types.ts';
+import { hexToBytes, bytesToHex, arrayToBase64, base64ToArray } from './crypto/utils.ts';
 import browser from './browser.ts';
 
 const STORAGE_KEY = 'keyVault';
@@ -33,24 +34,6 @@ let _cryptoKey: CryptoKey | null = null;
 let _decrypted: MemoryVaultPayload | null = null;
 let _autoLockTimer: ReturnType<typeof setTimeout> | null = null;
 let _autoLockMs: number = AUTO_LOCK_DEFAULT_MS;
-
-/** Convert hex string to Uint8Array */
-function hexToBytes(hex: string): Uint8Array {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) {
-    bytes[i >> 1] = parseInt(hex.substring(i, i + 2), 16);
-  }
-  return bytes;
-}
-
-/** Convert Uint8Array to hex string */
-function bytesToHex(bytes: Uint8Array): string {
-  let hex = '';
-  for (let i = 0; i < bytes.length; i++) {
-    hex += bytes[i].toString(16).padStart(2, '0');
-  }
-  return hex;
-}
 
 /** Convert Account (JSON storage format) to MemoryAccount (in-memory format) */
 function toMemoryAccount(acct: Account): MemoryAccount {
@@ -121,19 +104,6 @@ async function decrypt(key: CryptoKey, iv: Uint8Array, ciphertext: Uint8Array): 
     ciphertext as BufferSource
   );
   return new TextDecoder().decode(plaintext);
-}
-
-function arrayToBase64(arr: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < arr.length; i++) binary += String.fromCharCode(arr[i]);
-  return btoa(binary);
-}
-
-function base64ToArray(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const arr = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
-  return arr;
 }
 
 function resetAutoLock(): void {

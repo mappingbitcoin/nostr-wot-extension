@@ -28,6 +28,8 @@ if (window.__nostrWotContentInjected) {
     // Cross-browser compatibility
     const browser = (globalThis as unknown as Record<string, typeof chrome>).browser ?? chrome;
 
+    const LOCALHOST_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
+
     // ── WoT methods ──
 
     const WOT_ALLOWED_METHODS = [
@@ -62,6 +64,39 @@ if (window.__nostrWotContentInjected) {
             wotRateLimitReset = now;
         }
         return ++wotRequestCount <= WOT_RATE_LIMIT;
+    }
+
+    function forwardViaPort(portName: string, responseType: string, id: string, method: string, params: unknown): void {
+        const origin = window.location.hostname;
+        try {
+            const port = browser.runtime.connect({ name: portName });
+            let responded = false;
+
+            const sendResult = (result: unknown, error: unknown) => {
+                if (responded) return;
+                responded = true;
+                window.postMessage({ type: responseType, id, result, error }, window.location.origin);
+            };
+
+            port.onMessage.addListener((response: Record<string, unknown>) => {
+                sendResult(response.result, response.error);
+                try { port.disconnect(); } catch {}
+            });
+
+            port.onDisconnect.addListener(() => {
+                sendResult(null, 'Extension context invalidated — reload the page');
+            });
+
+            port.postMessage({
+                method: portName + '_' + method,
+                params: { ...(params as Record<string, unknown>), origin }
+            });
+        } catch {
+            window.postMessage({
+                type: responseType, id, result: null,
+                error: 'Extension context invalidated — reload the page'
+            }, window.location.origin);
+        }
     }
 
     // Bridge between page and extension
@@ -110,7 +145,7 @@ if (window.__nostrWotContentInjected) {
 
             // Reject NIP-07 from insecure HTTP origins (except localhost)
             if (window.location.protocol === 'http:' &&
-                !['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname)) {
+                !LOCALHOST_HOSTS.includes(window.location.hostname)) {
                 window.postMessage({
                     type: 'NIP07_RESPONSE', id, result: null,
                     error: 'NIP-07 requires a secure (HTTPS) connection'
@@ -126,40 +161,7 @@ if (window.__nostrWotContentInjected) {
                 return;
             }
 
-            // Forward to background via port connection (keeps service worker alive
-            // during long operations like vault unlock prompts, NIP-46 remote signing)
-            const origin = window.location.hostname;
-            try {
-                const port = browser.runtime.connect({ name: 'nip07' });
-                let responded = false;
-
-                const sendResult = (result: unknown, error: unknown) => {
-                    if (responded) return;
-                    responded = true;
-                    window.postMessage({
-                        type: 'NIP07_RESPONSE', id, result, error
-                    }, window.location.origin);
-                };
-
-                port.onMessage.addListener((response: Record<string, unknown>) => {
-                    sendResult(response.result, response.error);
-                    try { port.disconnect(); } catch {}
-                });
-
-                port.onDisconnect.addListener(() => {
-                    sendResult(null, 'Extension context invalidated — reload the page');
-                });
-
-                port.postMessage({
-                    method: 'nip07_' + method,
-                    params: { ...params, origin }
-                });
-            } catch {
-                window.postMessage({
-                    type: 'NIP07_RESPONSE', id, result: null,
-                    error: 'Extension context invalidated — reload the page'
-                }, window.location.origin);
-            }
+            forwardViaPort('nip07', 'NIP07_RESPONSE', id, method, params);
             return;
         }
 
@@ -169,7 +171,7 @@ if (window.__nostrWotContentInjected) {
 
             // Reject WebLN from insecure HTTP origins (except localhost)
             if (window.location.protocol === 'http:' &&
-                !['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname)) {
+                !LOCALHOST_HOSTS.includes(window.location.hostname)) {
                 window.postMessage({
                     type: 'WEBLN_RESPONSE', id, result: null,
                     error: 'WebLN requires a secure (HTTPS) connection'
@@ -185,39 +187,7 @@ if (window.__nostrWotContentInjected) {
                 return;
             }
 
-            // Forward to background via port connection (keeps service worker alive)
-            const origin = window.location.hostname;
-            try {
-                const port = browser.runtime.connect({ name: 'webln' });
-                let responded = false;
-
-                const sendResult = (result: unknown, error: unknown) => {
-                    if (responded) return;
-                    responded = true;
-                    window.postMessage({
-                        type: 'WEBLN_RESPONSE', id, result, error
-                    }, window.location.origin);
-                };
-
-                port.onMessage.addListener((response: Record<string, unknown>) => {
-                    sendResult(response.result, response.error);
-                    try { port.disconnect(); } catch {}
-                });
-
-                port.onDisconnect.addListener(() => {
-                    sendResult(null, 'Extension context invalidated — reload the page');
-                });
-
-                port.postMessage({
-                    method: 'webln_' + method,
-                    params: { ...params, origin }
-                });
-            } catch {
-                window.postMessage({
-                    type: 'WEBLN_RESPONSE', id, result: null,
-                    error: 'Extension context invalidated — reload the page'
-                }, window.location.origin);
-            }
+            forwardViaPort('webln', 'WEBLN_RESPONSE', id, method, params);
             return;
         }
     });

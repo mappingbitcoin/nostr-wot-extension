@@ -11,6 +11,7 @@
 
 import type { UnsignedEvent, SignedEvent } from '../types.ts';
 import type { WalletProvider, WalletProviderInfo, Transaction } from './types.ts';
+import { hexToBytes, bytesToHex } from '../crypto/utils.ts';
 
 // ── Parsed URI ──
 
@@ -62,7 +63,7 @@ export class NwcProvider implements WalletProvider {
 
   private readonly walletPubkey: string;
   private readonly relay: string;
-  private readonly secret: Uint8Array;
+  private secret: Uint8Array;
   private readonly deps: NwcCryptoDeps;
 
   private ws: WebSocket | null = null;
@@ -190,13 +191,7 @@ export class NwcProvider implements WalletProvider {
         this._connected = true;
 
         // Subscribe to NWC response events (kind 23195) from the wallet
-        const pubkey = this.deps.getPubkey(this.secret);
-        const pubkeyHex =
-          typeof pubkey === 'string'
-            ? pubkey
-            : Array.from(pubkey)
-                .map((b) => b.toString(16).padStart(2, '0'))
-                .join('');
+        const pubkeyHex = this.getPubkeyHex();
         const sub = JSON.stringify([
           'REQ',
           'nwc-sub',
@@ -226,6 +221,8 @@ export class NwcProvider implements WalletProvider {
       this.ws = null;
     }
     this._connected = false;
+    // E3: Zero secret key material on disconnect
+    this.secret.fill(0);
 
     // Reject all in-flight requests
     for (const [id, entry] of this.pending) {
@@ -241,6 +238,11 @@ export class NwcProvider implements WalletProvider {
 
   // ── Private ──
 
+  private getPubkeyHex(): string {
+    const pubkey = this.deps.getPubkey(this.secret);
+    return typeof pubkey === 'string' ? pubkey : bytesToHex(pubkey);
+  }
+
   private async sendRequest(method: string, params: Record<string, unknown>): Promise<unknown> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error('NWC not connected');
@@ -250,13 +252,7 @@ export class NwcProvider implements WalletProvider {
     const walletPubkeyBytes = hexToBytes(this.walletPubkey);
     const encrypted = await this.deps.encrypt(content, this.secret, walletPubkeyBytes);
 
-    const pubkeyBytes = this.deps.getPubkey(this.secret);
-    const pubkeyHex =
-      typeof pubkeyBytes === 'string'
-        ? pubkeyBytes
-        : Array.from(pubkeyBytes)
-            .map((b) => b.toString(16).padStart(2, '0'))
-            .join('');
+    const pubkeyHex = this.getPubkeyHex();
 
     const unsignedEvent: UnsignedEvent = {
       pubkey: pubkeyHex,
@@ -322,12 +318,3 @@ export class NwcProvider implements WalletProvider {
   }
 }
 
-// ── Utility ──
-
-function hexToBytes(hex: string): Uint8Array {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-  }
-  return bytes;
-}
