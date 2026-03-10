@@ -33,6 +33,7 @@ function compileBadgeEngine(): Plugin {
         loader: 'ts',
         format: 'iife',
         target: 'es2022',
+        minify: false,
       });
       writeFileSync(jsFile, result.code);
       unlinkSync(tsFile);
@@ -53,7 +54,11 @@ export default defineConfig({
     crx({ manifest }),
     compileBadgeEngine(),
   ],
+  define: {
+    'process.env.NODE_ENV': JSON.stringify('development'),
+  },
   build: {
+    minify: false,
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
@@ -64,6 +69,7 @@ export default defineConfig({
     },
   },
   resolve: {
+    conditions: ['development'],
     alias: {
       '@assets': resolve(__dirname, 'src/assets'),
       '@shared': resolve(__dirname, 'src/shared'),

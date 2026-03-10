@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2026-03-10
+
+### Changed
+- **Unminified builds** — all production builds (Chrome and Firefox) now output fully readable, unminified JavaScript including vendor dependencies (React, ReactDOM); required for store review compliance
+- Vite config enforces `minify: false` and resolves development builds of all dependencies
+- Removed redundant `--minify false` CLI flags from package scripts (now enforced at config level)
+
+### Fixed
+- Firefox and Chrome store submissions were rejected due to minified/obfuscated code in bundled output
+
 ## [0.3.0] - 2026-03-09
 
 ### Added
