@@ -112,7 +112,7 @@ export default function PromptApp() {
           </div>
           {prompt.walletAmount !== undefined && prompt.walletAmount > 0 && (
             <div className={styles.paymentAmount}>
-              {prompt.walletAmount.toLocaleString()} sats
+              {Math.round(prompt.walletAmount).toLocaleString()} sats
             </div>
           )}
         </>

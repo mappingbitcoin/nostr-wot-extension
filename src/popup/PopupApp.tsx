@@ -108,6 +108,7 @@ function PopupInner() {
             onEditProfile={() => setEditProfileOpen(true)}
             onManageScoring={() => setScoringOpen(true)}
             onOpenWallet={() => { setMenuSection('wallet'); setMenuOpen(true); }}
+            menuOpen={menuOpen}
           />
         </div>
 

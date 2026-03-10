@@ -1,7 +1,6 @@
 
 import browser from './lib/browser.ts';
 import { RemoteOracle } from './lib/api.ts';
-import { LocalGraph } from './lib/graph.ts';
 import * as storage from './lib/storage.ts';
 import * as vault from './lib/vault.ts';
 import * as signer from './lib/signer.ts';
@@ -13,7 +12,7 @@ import type { ScoringConfig } from './lib/types.ts';
 // ── State & handler modules ──
 
 import {
-    config, setOracle, setLocalGraph,
+    config, setOracle, resetLocalGraph,
     PRIVILEGED_METHODS, NIP07_SIGNING_METHODS,
     checkRateLimit, npubToHex,
     type HandlerFn,
@@ -98,7 +97,7 @@ async function loadConfig(): Promise<void> {
     }
 
     setOracle(new RemoteOracle(config.oracleUrl));
-    setLocalGraph(new LocalGraph());
+    resetLocalGraph();
 
     // Clean up stale sync state from interrupted syncs
     try {
@@ -163,13 +162,9 @@ async function handleRequest({ method, params }: { method: string; params: Recor
         throw new Error(`Rate limit exceeded for ${method}. Max 50 requests per second.`);
     }
 
-    // Runtime validation of page-supplied NIP-07 params
+    // NIP-07: validate params and gate behind domain allowlist
     if (method.startsWith('nip07_')) {
         validateNip07Params(method, params);
-    }
-
-    // Gate all NIP-07 methods behind the "Connect this site" allowlist
-    if (method.startsWith('nip07_')) {
         const origin = params?.origin as string;
         if (!origin || !(await isDomainAllowed(origin))) {
             logActivity({ domain: origin || 'unknown', method: method.replace('nip07_', ''), decision: 'blocked' });
@@ -229,7 +224,7 @@ async function handleRequest({ method, params }: { method: string; params: Recor
         (method === 'getDistanceBatch' || method === 'getTrustScoreBatch')) {
         const remapped: Record<string, unknown> = {};
         for (const [key, val] of Object.entries(result as Record<string, unknown>)) {
-            remapped[_batchKeyMap.get(key) || key] = val;
+            remapped[_batchKeyMap!.get(key) || key] = val;
         }
         return remapped;
     }

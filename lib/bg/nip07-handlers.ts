@@ -35,6 +35,30 @@ export function validateNip07Params(method: string, params: Record<string, unkno
     }
 }
 
+// ── Helpers ──
+
+/** Wraps an encrypt/decrypt handler with identity-disabled check and activity logging. */
+function withIdentityGuard(
+    method: string,
+    fn: (origin: string, params: Record<string, unknown>) => Promise<unknown>,
+): HandlerFn {
+    return async (params) => {
+        const origin = params.origin as string;
+        if (origin && await isIdentityDisabled(origin)) {
+            logActivity({ domain: origin, method, decision: 'blocked' });
+            throw new Error('Identity access disabled for this site');
+        }
+        try {
+            const result = await fn(origin, params);
+            logActivity({ domain: origin, method, decision: 'approved', theirPubkey: params.pubkey as string });
+            return result;
+        } catch (e) {
+            logActivity({ domain: origin, method, decision: 'rejected', theirPubkey: params.pubkey as string });
+            throw e;
+        }
+    };
+}
+
 // ── Handler Map ──
 
 export const handlers = new Map<string, HandlerFn>([
@@ -82,69 +106,17 @@ export const handlers = new Map<string, HandlerFn>([
         return relayObj;
     }],
 
-    ['nip07_nip04Encrypt', async (params) => {
-        const nip07Origin = params.origin as string;
-        if (nip07Origin && await isIdentityDisabled(nip07Origin)) {
-            logActivity({ domain: nip07Origin, method: 'nip04Encrypt', decision: 'blocked' });
-            throw new Error('Identity access disabled for this site');
-        }
-        try {
-            const result = await signer.handleNip04Encrypt(params.pubkey as string, params.plaintext as string, nip07Origin);
-            logActivity({ domain: nip07Origin, method: 'nip04Encrypt', decision: 'approved', theirPubkey: params.pubkey as string });
-            return result;
-        } catch (e) {
-            logActivity({ domain: nip07Origin, method: 'nip04Encrypt', decision: 'rejected', theirPubkey: params.pubkey as string });
-            throw e;
-        }
-    }],
+    ['nip07_nip04Encrypt', withIdentityGuard('nip04Encrypt', (origin, params) =>
+        signer.handleNip04Encrypt(params.pubkey as string, params.plaintext as string, origin))],
 
-    ['nip07_nip04Decrypt', async (params) => {
-        const nip07Origin = params.origin as string;
-        if (nip07Origin && await isIdentityDisabled(nip07Origin)) {
-            logActivity({ domain: nip07Origin, method: 'nip04Decrypt', decision: 'blocked' });
-            throw new Error('Identity access disabled for this site');
-        }
-        try {
-            const result = await signer.handleNip04Decrypt(params.pubkey as string, params.ciphertext as string, nip07Origin);
-            logActivity({ domain: nip07Origin, method: 'nip04Decrypt', decision: 'approved', theirPubkey: params.pubkey as string });
-            return result;
-        } catch (e) {
-            logActivity({ domain: nip07Origin, method: 'nip04Decrypt', decision: 'rejected', theirPubkey: params.pubkey as string });
-            throw e;
-        }
-    }],
+    ['nip07_nip04Decrypt', withIdentityGuard('nip04Decrypt', (origin, params) =>
+        signer.handleNip04Decrypt(params.pubkey as string, params.ciphertext as string, origin))],
 
-    ['nip07_nip44Encrypt', async (params) => {
-        const nip07Origin = params.origin as string;
-        if (nip07Origin && await isIdentityDisabled(nip07Origin)) {
-            logActivity({ domain: nip07Origin, method: 'nip44Encrypt', decision: 'blocked' });
-            throw new Error('Identity access disabled for this site');
-        }
-        try {
-            const result = await signer.handleNip44Encrypt(params.pubkey as string, params.plaintext as string, nip07Origin);
-            logActivity({ domain: nip07Origin, method: 'nip44Encrypt', decision: 'approved', theirPubkey: params.pubkey as string });
-            return result;
-        } catch (e) {
-            logActivity({ domain: nip07Origin, method: 'nip44Encrypt', decision: 'rejected', theirPubkey: params.pubkey as string });
-            throw e;
-        }
-    }],
+    ['nip07_nip44Encrypt', withIdentityGuard('nip44Encrypt', (origin, params) =>
+        signer.handleNip44Encrypt(params.pubkey as string, params.plaintext as string, origin))],
 
-    ['nip07_nip44Decrypt', async (params) => {
-        const nip07Origin = params.origin as string;
-        if (nip07Origin && await isIdentityDisabled(nip07Origin)) {
-            logActivity({ domain: nip07Origin, method: 'nip44Decrypt', decision: 'blocked' });
-            throw new Error('Identity access disabled for this site');
-        }
-        try {
-            const result = await signer.handleNip44Decrypt(params.pubkey as string, params.ciphertext as string, nip07Origin);
-            logActivity({ domain: nip07Origin, method: 'nip44Decrypt', decision: 'approved', theirPubkey: params.pubkey as string });
-            return result;
-        } catch (e) {
-            logActivity({ domain: nip07Origin, method: 'nip44Decrypt', decision: 'rejected', theirPubkey: params.pubkey as string });
-            throw e;
-        }
-    }],
+    ['nip07_nip44Decrypt', withIdentityGuard('nip44Decrypt', (origin, params) =>
+        signer.handleNip44Decrypt(params.pubkey as string, params.ciphertext as string, origin))],
 
     // ── Signer permission management ──
 

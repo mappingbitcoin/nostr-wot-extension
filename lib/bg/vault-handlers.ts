@@ -9,13 +9,12 @@ import * as signer from '../signer.ts';
 import * as signerPermissions from '../permissions.ts';
 import * as storage from '../storage.ts';
 import * as accounts from '../accounts.ts';
-import { LocalGraph } from '../graph.ts';
 import { isSyncInProgress, stopSync } from '../sync.ts';
-import { nsecEncode, npubEncode } from '../crypto/bech32.ts';
+import { nsecEncode } from '../crypto/bech32.ts';
 import { bytesToHex } from '../crypto/utils.ts';
 import { ncryptsecEncode, ncryptsecDecode } from '../crypto/nip49.ts';
-import { clearWalletProviders } from '../wallet/index.ts';
-import { config, setLocalGraph, type HandlerFn } from './state.ts';
+import { clearWalletProviders } from '../wallet/';
+import { config, resetLocalGraph, type HandlerFn, type LocalAccountEntry } from './state.ts';
 import { broadcastAccountChanged, refreshBadgesOnAllTabs } from './domain-handlers.ts';
 import type { Account, VaultPayload } from '../types.ts';
 
@@ -103,7 +102,7 @@ export const handlers = new Map<string, HandlerFn>([
 
     ['vault_addAccount', async (params) => {
         await vault.addAccount(params.account as Account);
-        const addLocalData = await browser.storage.local.get(['accounts']) as Record<string, Array<{ id: string; name: string; pubkey: string; type: string; readOnly: boolean }>>;
+        const addLocalData = await browser.storage.local.get(['accounts']) as Record<string, LocalAccountEntry[]>;
         const addAccts = addLocalData.accounts || [];
         if (!addAccts.some(a => a.id === (params.account as Account).id)) {
             addAccts.push({
@@ -111,7 +110,7 @@ export const handlers = new Map<string, HandlerFn>([
                 name: (params.account as Account).name || 'Account',
                 pubkey: (params.account as Account).pubkey,
                 type: (params.account as Account).type || 'generated',
-                readOnly: !!(params.account as Account).readOnly
+                readOnly: (params.account as Account).readOnly
             });
             await browser.storage.local.set({ accounts: addAccts });
         }
@@ -127,15 +126,14 @@ export const handlers = new Map<string, HandlerFn>([
         const rmAccts = ((rmLocalData.accounts as Array<{ id: string }>) || []).filter(a => a.id !== removedId);
         const updates: Record<string, unknown> = { accounts: rmAccts };
         if (rmLocalData.activeAccountId === removedId) {
-            const newActive = vault.getActiveAccountId() || (rmAccts[0] as { id: string })?.id || null;
-            updates.activeAccountId = newActive;
+            updates.activeAccountId = vault.getActiveAccountId() || (rmAccts[0] as { id: string })?.id || null;
         }
         await browser.storage.local.set(updates);
         const newActiveId = (updates.activeAccountId ?? rmLocalData.activeAccountId) as string;
         if (newActiveId) {
             await storage.switchDatabase(newActiveId);
         }
-        setLocalGraph(new LocalGraph());
+        resetLocalGraph();
         return { ok: true };
     }],
 
@@ -160,7 +158,7 @@ export const handlers = new Map<string, HandlerFn>([
         }
         await browser.storage.local.set({ activeAccountId: switchId });
         await storage.switchDatabase(switchId);
-        setLocalGraph(new LocalGraph());
+        resetLocalGraph();
         refreshBadgesOnAllTabs();
         if (oldAccountId && oldAccountId !== switchId) {
             await signer.rejectPendingForAccount(oldAccountId);
@@ -178,7 +176,7 @@ export const handlers = new Map<string, HandlerFn>([
         await vault.setActiveAccount(params.accountId as string);
         await syncActivePubkey();
         await storage.switchDatabase(params.accountId as string);
-        setLocalGraph(new LocalGraph());
+        resetLocalGraph();
         return { ok: true };
     }],
 
@@ -198,8 +196,7 @@ export const handlers = new Map<string, HandlerFn>([
         const privkeyBytes = vault.getPrivkey(exportData.activeAccountId);
         if (!privkeyBytes) throw new Error('No private key available');
         try {
-            const ncryptsec = await ncryptsecEncode(bytesToHex(privkeyBytes), params.password as string);
-            return ncryptsec;
+            return await ncryptsecEncode(bytesToHex(privkeyBytes), params.password as string);
         } finally {
             privkeyBytes.fill(0);
         }
@@ -232,7 +229,7 @@ export const handlers = new Map<string, HandlerFn>([
 
     ['vault_getActiveAccountType', async () => {
         const typeData = await browser.storage.local.get(['accounts', 'activeAccountId']) as Record<string, unknown>;
-        const typeAccts = (typeData.accounts as Array<{ id: string; type?: string; readOnly?: boolean }>) || [];
+        const typeAccts = (typeData.accounts as LocalAccountEntry[]) || [];
         const typeActive = typeAccts.find(a => a.id === typeData.activeAccountId);
         if (typeActive) {
             return { type: typeActive.type || 'npub', readOnly: typeActive.readOnly !== false };
@@ -246,7 +243,7 @@ export const handlers = new Map<string, HandlerFn>([
 
     ['deleteAccountDatabase', async (params) => {
         await storage.deleteDatabase(params.accountId as string);
-        setLocalGraph(new LocalGraph());
+        resetLocalGraph();
         return { ok: true };
     }],
 
@@ -255,7 +252,7 @@ export const handlers = new Map<string, HandlerFn>([
         for (const d of dbs) {
             await storage.deleteDatabase((d as Record<string, string>).accountId);
         }
-        setLocalGraph(new LocalGraph());
+        resetLocalGraph();
         return { ok: true };
     }],
 ]);

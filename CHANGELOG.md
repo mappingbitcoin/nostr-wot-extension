@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.2] - 2026-03-10
+
+### Changed
+- **Modularized background service worker** — split the monolithic `background.ts` (~2800 lines) into 8 focused handler modules under `lib/bg/`: state, wot-handlers, misc-handlers, domain-handlers, vault-handlers, wallet-handlers, nip07-handlers, onboarding-handlers; background.ts is now a ~300-line orchestrator with Map-based dispatch
+- **Code quality improvements** — eliminated duplicate types (`DistanceInfo`, `LocalAccountEntry`), extracted shared helpers (`resetLocalGraph`, `buildStrategyCSS`, `withIdentityGuard`), converted key zeroing to try/finally pattern, removed dead code and unnecessary exports
+
+### Fixed
+- **Sats display shows whole numbers** — wallet balance, transaction amounts, invoice previews, and payment prompts no longer show decimal fractions
+- **Wallet setup banner persists after setup** — the "Set up wallet" banner on the home screen now disappears immediately after configuring a wallet, instead of requiring a restart
+
 ## [0.3.1] - 2026-03-10
 
 ### Changed

@@ -7,14 +7,13 @@ import browser from '../browser.ts';
 import * as vault from '../vault.ts';
 import * as accounts from '../accounts.ts';
 import * as storage from '../storage.ts';
-import { LocalGraph } from '../graph.ts';
 import { isSyncInProgress, stopSync } from '../sync.ts';
 import { npubEncode } from '../crypto/bech32.ts';
 import { bytesToHex, randomHex } from '../crypto/utils.ts';
 import { ncryptsecEncode, ncryptsecDecode } from '../crypto/nip49.ts';
 import { BunkerSigner, createNostrConnectURI } from 'nostr-tools/nip46';
 import { generateSecretKey, getPublicKey as ntGetPublicKey } from 'nostr-tools/pure';
-import { config, DEFAULT_RELAYS, setLocalGraph, type HandlerFn } from './state.ts';
+import { config, DEFAULT_RELAYS, resetLocalGraph, type HandlerFn, type LocalAccountEntry } from './state.ts';
 import { syncActivePubkey } from './vault-handlers.ts';
 import { broadcastAccountChanged, refreshBadgesOnAllTabs } from './domain-handlers.ts';
 import type { Account } from '../types.ts';
@@ -264,8 +263,7 @@ export const handlers = new Map<string, HandlerFn>([
     ['onboarding_exportNcryptsec', async (params) => {
         const pendingAcctEnc = await getPendingOnboardingAccount();
         if (!pendingAcctEnc?.privkey) throw new Error('No pending account');
-        const ncryptsec = await ncryptsecEncode(pendingAcctEnc.privkey, params.password as string);
-        return ncryptsec;
+        return await ncryptsecEncode(pendingAcctEnc.privkey, params.password as string);
     }],
 
     ['onboarding_saveReadOnly', async (params) => {
@@ -276,7 +274,7 @@ export const handlers = new Map<string, HandlerFn>([
             config.myPubkey = pubkey;
             await browser.storage.sync.set({ myPubkey: pubkey });
         }
-        const localAccts = await browser.storage.local.get(['accounts']) as Record<string, Array<{ id: string; name: string; pubkey: string; type: string; readOnly: boolean }>>;
+        const localAccts = await browser.storage.local.get(['accounts']) as Record<string, LocalAccountEntry[]>;
         const accts = localAccts.accounts || [];
         if (!accts.some(a => a.id === acctId)) {
             accts.push({
@@ -289,7 +287,7 @@ export const handlers = new Map<string, HandlerFn>([
         }
         await browser.storage.local.set({ accounts: accts, activeAccountId: acctId });
         await storage.switchDatabase(acctId);
-        setLocalGraph(new LocalGraph());
+        resetLocalGraph();
         return { ok: true };
     }],
 
@@ -314,7 +312,7 @@ export const handlers = new Map<string, HandlerFn>([
         }
         await syncActivePubkey();
         const vaultAcctId = fullAccount.id;
-        const localAccts = await browser.storage.local.get(['accounts']) as Record<string, Array<{ id: string; name: string; pubkey: string; type: string; readOnly: boolean }>>;
+        const localAccts = await browser.storage.local.get(['accounts']) as Record<string, LocalAccountEntry[]>;
         let accts = localAccts.accounts || [];
         if (params.upgradeFromReadOnly) {
             accts = accts.filter(a => a.id !== params.upgradeFromReadOnly);
@@ -333,7 +331,7 @@ export const handlers = new Map<string, HandlerFn>([
         }
         await browser.storage.local.set({ accounts: accts, activeAccountId: vaultAcctId });
         await storage.switchDatabase((params.upgradeFromReadOnly as string) || vaultAcctId);
-        setLocalGraph(new LocalGraph());
+        resetLocalGraph();
         return { ok: true };
     }],
 
@@ -353,7 +351,7 @@ export const handlers = new Map<string, HandlerFn>([
         await vault.setActiveAccount(fullAccountAdd.id);
         await syncActivePubkey();
 
-        const addVaultLocalData = await browser.storage.local.get(['accounts']) as Record<string, Array<{ id: string; name: string; pubkey: string; type: string; readOnly: boolean }>>;
+        const addVaultLocalData = await browser.storage.local.get(['accounts']) as Record<string, LocalAccountEntry[]>;
         let addVaultAccts = addVaultLocalData.accounts || [];
         if (params.upgradeFromReadOnly) {
             addVaultAccts = addVaultAccts.filter(a => a.id !== params.upgradeFromReadOnly);
@@ -375,7 +373,7 @@ export const handlers = new Map<string, HandlerFn>([
             await stopSync();
         }
         await storage.switchDatabase((params.upgradeFromReadOnly as string) || fullAccountAdd.id);
-        setLocalGraph(new LocalGraph());
+        resetLocalGraph();
         refreshBadgesOnAllTabs();
         if (fullAccountAdd.pubkey) {
             broadcastAccountChanged(fullAccountAdd.pubkey);

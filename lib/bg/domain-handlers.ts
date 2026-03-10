@@ -4,9 +4,9 @@
  */
 
 import browser from '../browser.ts';
-import { getDomainFromUrl } from '../../src/shared/url.ts';
-import { getDefaultsForDomain } from '../../src/shared/adapterDefaults.ts';
-import { isRestrictedUrl, sanitizeCSS, type HandlerFn } from './state.ts';
+import { getDomainFromUrl } from '@shared/url.ts';
+import { getDefaultsForDomain } from '@shared/adapterDefaults.ts';
+import { isRestrictedUrl, sanitizeCSS, type HandlerFn, type LocalAccountEntry } from './state.ts';
 
 // ── Domain permission functions ──
 
@@ -137,7 +137,7 @@ export async function refreshBadgesOnAllTabs(): Promise<void> {
 
 export async function isActiveAccountReadOnly(): Promise<boolean> {
     const data = await browser.storage.local.get(['accounts', 'activeAccountId']) as Record<string, unknown>;
-    const acct = ((data.accounts as Array<{ id: string; readOnly?: boolean; type?: string }>) || []).find(a => a.id === data.activeAccountId);
+    const acct = ((data.accounts as LocalAccountEntry[]) || []).find(a => a.id === data.activeAccountId);
     return !!(acct?.readOnly || acct?.type === 'npub');
 }
 
@@ -155,6 +155,26 @@ async function setIdentityDisabled(domain: string, disabled: boolean): Promise<b
     else sites.delete(domain);
     await browser.storage.local.set({ identityDisabledSites: [...sites] });
     return true;
+}
+
+// ── CSS strategy helpers ──
+
+/** Build per-strategy custom CSS from an adapter config. */
+function buildStrategyCSS(cfg: Record<string, unknown>): string[] {
+    const parts: string[] = [];
+    if (cfg.customCSS) parts.push(sanitizeCSS(cfg.customCSS as string));
+    if (Array.isArray(cfg.strategies)) {
+        for (let i = 0; i < cfg.strategies.length; i++) {
+            const s = cfg.strategies[i] as Record<string, unknown>;
+            if (s.customCSS && s.enabled !== false) {
+                parts.push(sanitizeCSS(s.customCSS as string).replace(
+                    /\.wot-badge(?![-\w])/g,
+                    `.wot-badge[data-wot-strategy="${i}"]`
+                ));
+            }
+        }
+    }
+    return parts;
 }
 
 // ── Enable for current domain ──
@@ -222,20 +242,7 @@ export async function injectIntoTab(tabId: number, url: string): Promise<boolean
                     });
                 }
                 if (domain && effectiveConfig[domain]) {
-                    const cfg = effectiveConfig[domain] as Record<string, unknown>;
-                    const parts: string[] = [];
-                    if (cfg.customCSS) parts.push(sanitizeCSS(cfg.customCSS as string));
-                    if (Array.isArray(cfg.strategies)) {
-                        for (let i = 0; i < cfg.strategies.length; i++) {
-                            const s = cfg.strategies[i] as Record<string, unknown>;
-                            if (s.customCSS && s.enabled !== false) {
-                                parts.push(sanitizeCSS(s.customCSS as string).replace(
-                                    /\.wot-badge(?![-\w])/g,
-                                    `.wot-badge[data-wot-strategy="${i}"]`
-                                ));
-                            }
-                        }
-                    }
+                    const parts = buildStrategyCSS(effectiveConfig[domain] as Record<string, unknown>);
                     if (parts.length > 0) {
                         await browser.scripting.insertCSS({
                             target: { tabId },
@@ -424,18 +431,7 @@ export const handlers = new Map<string, HandlerFn>([
             try {
                 const effectiveCfg: Record<string, unknown> = {};
                 effectiveCfg[td] = previewConfig;
-                const parts: string[] = [];
-                if (Array.isArray(previewConfig.strategies)) {
-                    for (let i = 0; i < previewConfig.strategies.length; i++) {
-                        const s = previewConfig.strategies[i] as Record<string, unknown>;
-                        if (s.customCSS && s.enabled !== false) {
-                            parts.push(sanitizeCSS(s.customCSS as string).replace(
-                                /\.wot-badge(?![-\w])/g,
-                                `.wot-badge[data-wot-strategy="${i}"]`
-                            ));
-                        }
-                    }
-                }
+                const parts = buildStrategyCSS(previewConfig);
                 if (parts.length > 0) {
                     await browser.scripting.insertCSS({
                         target: { tabId: tab.id! },

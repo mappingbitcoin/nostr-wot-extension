@@ -338,7 +338,7 @@ export default function Wallet({ providerType, onDisconnected }: WalletProps) {
         ) : (
           <div>
             <span className={styles.balanceValue}>
-              {(balance ?? 0).toLocaleString()}
+              {Math.round(balance ?? 0).toLocaleString()}
             </span>
             <span className={styles.balanceUnit}>sats</span>
           </div>
@@ -424,7 +424,7 @@ export default function Wallet({ providerType, onDisconnected }: WalletProps) {
                       <span className={styles.invoiceLabel}>{t('wallet.invoiceAmount')}</span>
                       <span className={`${styles.invoiceValue} ${styles.invoiceAmountValue}`}>
                         {decodedInvoice.amountSats !== null
-                          ? `${decodedInvoice.amountSats.toLocaleString()} sats`
+                          ? `${Math.round(decodedInvoice.amountSats).toLocaleString()} sats`
                           : '—'}
                       </span>
                     </div>
@@ -509,7 +509,7 @@ export default function Wallet({ providerType, onDisconnected }: WalletProps) {
                   <div className={styles.txDate}>{formatTxDate(tx.createdAt)}</div>
                 </div>
                 <span className={`${styles.txAmount} ${tx.amount >= 0 ? styles.txIncoming : styles.txOutgoing}`}>
-                  {tx.amount >= 0 ? '+' : ''}{tx.amount.toLocaleString()}
+                  {tx.amount >= 0 ? '+' : ''}{Math.round(tx.amount).toLocaleString()}
                 </span>
               </div>
             ))}

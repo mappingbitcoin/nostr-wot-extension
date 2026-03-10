@@ -25,6 +25,17 @@ interface ActivityEntry {
     theirPubkey?: string;
 }
 
+interface StoredActivityEntry {
+    timestamp: number;
+    domain?: string;
+    method: string;
+    kind?: number | null;
+    decision: string;
+    pubkey?: string | null;
+    event?: { tags?: string[][] } & Record<string, unknown>;
+    theirPubkey?: string;
+}
+
 // ── Activity Log ──
 
 export async function logActivity(entry: ActivityEntry): Promise<void> {
@@ -251,14 +262,14 @@ export const handlers = new Map<string, HandlerFn>([
         if (!hasFilter) {
             await browser.storage.local.remove('activityLog');
         } else {
-            const allLog = ((await browser.storage.local.get(['activityLog'])) as Record<string, any[]>).activityLog || [];
+            const allLog = ((await browser.storage.local.get(['activityLog'])) as Record<string, StoredActivityEntry[]>).activityLog || [];
             const typeMethods: Record<string, string[]> = {
                 signEvent: ['signEvent'], getPublicKey: ['getPublicKey'],
                 encrypt: ['nip04Encrypt', 'nip44Encrypt'], decrypt: ['nip04Decrypt', 'nip44Decrypt'],
                 nip04Encrypt: ['nip04Encrypt'], nip04Decrypt: ['nip04Decrypt'],
                 nip44Encrypt: ['nip44Encrypt'], nip44Decrypt: ['nip44Decrypt'],
             };
-            const kept = allLog.filter((e: any) => {
+            const kept = allLog.filter((e: StoredActivityEntry) => {
                 if (params.accountPubkey && e.pubkey !== params.accountPubkey) return true;
                 if (params.domain && e.domain !== params.domain) return true;
                 if (params.typeFilter) {
@@ -406,8 +417,6 @@ export const handlers = new Map<string, HandlerFn>([
             };
 
             const signed = await signEvent(event, privkeyBytes);
-            privkeyBytes.fill(0);
-
             const broadcastUrls = relayUrls.length > 0 ? relayUrls : config.relays;
             const result = await broadcastEvent(signed, broadcastUrls);
 
@@ -417,9 +426,8 @@ export const handlers = new Map<string, HandlerFn>([
             });
 
             return { ok: true, sent: result.sent, failed: result.failed };
-        } catch (e) {
+        } finally {
             privkeyBytes.fill(0);
-            throw e;
         }
     }],
 

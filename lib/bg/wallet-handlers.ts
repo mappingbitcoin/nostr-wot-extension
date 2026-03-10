@@ -9,10 +9,7 @@ import * as signer from '../signer.ts';
 import * as signerPermissions from '../permissions.ts';
 import { npubEncode } from '../crypto/bech32.ts';
 import { signEvent } from '../crypto/nip01.ts';
-import {
-    getWalletProvider, removeWalletProvider,
-} from '../wallet/index.ts';
-import type { WalletConfig } from '../wallet/types.ts';
+import { getWalletProvider, removeWalletProvider, type WalletConfig } from '../wallet/';
 import { provisionLnbitsWallet, claimLightningAddress, getLightningAddress, releaseLightningAddress, DEFAULT_LNBITS_URL } from '../wallet/lnbits-provision.ts';
 import type { SignedEvent } from '../types.ts';
 import type { HandlerFn } from './state.ts';

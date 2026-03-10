@@ -23,6 +23,7 @@ interface HomeTabProps {
   onEditProfile: () => void;
   onManageScoring: () => void;
   onOpenWallet: () => void;
+  menuOpen?: boolean;
 }
 
 interface SyncStaleInfo {
@@ -30,7 +31,7 @@ interface SyncStaleInfo {
   dismissed?: boolean;
 }
 
-export default function HomeTab({ onViewAllActivity, onManagePermissions, onManageFilters, onManageBadges, onEditProfile, onManageScoring, onOpenWallet }: HomeTabProps) {
+export default function HomeTab({ onViewAllActivity, onManagePermissions, onManageFilters, onManageBadges, onEditProfile, onManageScoring, onOpenWallet, menuOpen }: HomeTabProps) {
   const { active, cachedProfile, isReadOnly, isNip46 } = useAccount();
   const { locked } = useVault();
   const [domain, setDomain] = useState<string | null>(null);
@@ -82,6 +83,13 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
       setWalletDismissed(list.includes(active.id));
     });
   }, [active?.id, canUseWallet, checkWallet]);
+
+  // Re-check wallet state when menu overlay closes (e.g. after wallet setup)
+  useEffect(() => {
+    if (menuOpen === false && canUseWallet) {
+      checkWallet();
+    }
+  }, [menuOpen, canUseWallet, checkWallet]);
 
   useEffect(() => {
     async function checkPending() {
@@ -333,7 +341,7 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
           <div className={styles.walletCardInfo}>
             <IconZap size={14} className={styles.walletCardIcon} />
             <div className={styles.walletCardText}>
-              <strong>{walletState.balance.toLocaleString()} sats</strong>
+              <strong>{Math.round(walletState.balance).toLocaleString()} sats</strong>
               <span>{t('wallet.balance')}</span>
             </div>
           </div>

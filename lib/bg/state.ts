@@ -38,13 +38,25 @@ export const config: ExtConfig = {
     scoring: DEFAULT_SCORING,
 };
 
+// ── Shared types ──
+
+/** Account entry shape stored in browser.storage.local.accounts */
+export interface LocalAccountEntry {
+    id: string;
+    name: string;
+    pubkey: string;
+    type: string;
+    readOnly: boolean;
+}
+
 // ── Oracle & Graph ──
 
 export let oracle: RemoteOracle | null = null;
 export let localGraph: LocalGraph | null = null;
 
 export function setOracle(o: RemoteOracle | null): void { oracle = o; }
-export function setLocalGraph(g: LocalGraph | null): void { localGraph = g; }
+/** Reset local graph to a fresh instance (used after account/DB changes). */
+export function resetLocalGraph(): void { localGraph = new LocalGraph(); }
 
 // ── Profile Cache ──
 

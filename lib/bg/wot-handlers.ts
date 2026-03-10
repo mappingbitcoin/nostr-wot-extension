@@ -7,15 +7,10 @@ import { GraphSync, isSyncInProgress, stopSync } from '../sync.ts';
 import { calculateScore } from '../scoring.ts';
 import * as storage from '../storage.ts';
 import { config, oracle, localGraph, type HandlerFn } from './state.ts';
+import type { DistanceInfo } from '../types.ts';
 import browser from '../browser.ts';
 
 // ── Types ──
-
-interface DistanceInfo {
-    hops: number;
-    paths?: number | null;
-    score?: number;
-}
 
 interface BatchOptions {
     includePaths?: boolean;
@@ -121,7 +116,7 @@ export async function clearGraph(): Promise<{ ok: boolean }> {
     return { ok: true };
 }
 
-export function formatSingleResult(info: DistanceInfo, opts: BatchOptions): unknown {
+function formatSingleResult(info: DistanceInfo, opts: BatchOptions): unknown {
     const { includePaths, includeScores } = opts;
 
     if (!includePaths && !includeScores) {
@@ -141,7 +136,7 @@ export function formatSingleResult(info: DistanceInfo, opts: BatchOptions): unkn
     return result;
 }
 
-export function formatBatchResults(results: Map<string, DistanceInfo | null>, opts: BatchOptions): Record<string, unknown> {
+function formatBatchResults(results: Map<string, DistanceInfo | null>, opts: BatchOptions): Record<string, unknown> {
     const obj: Record<string, unknown> = {};
     for (const [pubkey, info] of results) {
         obj[pubkey] = info ? formatSingleResult(info, opts) : null;
@@ -182,9 +177,7 @@ export async function getDistanceBatch(targets: string[], options: BatchOptions 
     if (!config.myPubkey) throw new Error('My pubkey not configured');
     if (!Array.isArray(targets)) throw new Error('targets must be an array');
 
-    const opts: BatchOptions = typeof options === 'boolean'
-        ? { includePaths: options, includeScores: false }
-        : { includePaths: false, includeScores: false, ...options };
+    const opts: BatchOptions = { includePaths: false, includeScores: false, ...options };
 
     const { includePaths, includeScores } = opts;
     const needDetails = includePaths || includeScores;
