@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, ReactNode } from 'react';
 import { t, getSupportedLanguages, getLanguage, setLanguage } from '@lib/i18n.js';
 import { IconLock, IconShield, IconUsers, IconGlobe, IconKey, IconDownload, IconZap } from '@assets';
-import iconBaseSvg from '/icons/icon-base.svg';
 import { version as appVersion } from '../../../../package.json';
 import OverlayPanel from '@components/OverlayPanel/OverlayPanel';
 import ScrollWheelPicker from '@components/ScrollWheelPicker/ScrollWheelPicker';
@@ -257,7 +256,7 @@ export default function MenuOverlay({ visible, onClose, initialSection }: MenuOv
             </button>
           )}
           <div className={styles.aboutFooter}>
-            <img src={iconBaseSvg} className={styles.aboutLogo} alt="" />
+            <img src="/icons/icon-base.svg" className={styles.aboutLogo} alt="" />
             <span className={styles.aboutName}>Nostr WoT Extension</span>
             <span className={styles.aboutVersion}>v{appVersion}</span>
           </div>
