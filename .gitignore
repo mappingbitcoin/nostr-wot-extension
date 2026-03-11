@@ -16,8 +16,9 @@ npm-debug.log*
 *.zip
 dist/
 
-# SVG source files (keep PNGs)
-icons/*.svg
+# SVG source files for PNG icons (icon-base and icon-white are used at runtime)
+icons/icon48.svg
+icons/icon128.svg
 
 # Local settings
 .claude/
