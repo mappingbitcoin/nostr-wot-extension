@@ -55,7 +55,7 @@ export class LnbitsProvider implements WalletProvider {
 
   async getBalance(): Promise<{ balance: number }> {
     const data = await this.request<{ balance: number }>('GET', '/api/v1/wallet');
-    return { balance: data.balance };
+    return { balance: Math.round(data.balance / 1000) };
   }
 
   async payInvoice(bolt11: string): Promise<{ preimage: string }> {

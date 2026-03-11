@@ -126,7 +126,7 @@ export class NwcProvider implements WalletProvider {
 
   async getBalance(): Promise<{ balance: number }> {
     const result = (await this.sendRequest('get_balance', {})) as { balance: number };
-    return { balance: result.balance };
+    return { balance: Math.round(result.balance / 1000) };
   }
 
   async payInvoice(bolt11: string): Promise<{ preimage: string }> {
