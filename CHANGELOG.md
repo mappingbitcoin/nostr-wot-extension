@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.3] - 2026-03-13
+
+### Changed
+- **Comprehensive code review (Round 2)** — 10 parallel Opus agents audited the full codebase covering security, performance, code quality, dead code, documentation accuracy, and future enhancements; 70 new findings documented in `docs/code-review.md`
+- **Misc-handlers split** — `misc-handlers.ts` (507 lines) split into `activity-handlers.ts`, `profile-handlers.ts`, `publish-handlers.ts`; original file is now a re-export facade
+- **Graph module hardened** — underscore-prefixed methods replaced with `private` modifier; all 11 internal call sites updated
+- **NIP-07 input validation** — added `event.tags` validation (array of string arrays) and `event.created_at` validation (integer, not >1 hour in future)
+- **signEvent zeroing contract** — comprehensive JSDoc documenting caller responsibility for key zeroing
+- **LNbits HTTP warning** — console.warn added when admin key is sent over non-localhost HTTP
+
+### Fixed
+- **Permission cache test failures** — added `storage.onChanged` support to browser mock so in-memory caches invalidate correctly between tests
+- **Wallet balance assertions** — fixed msats-to-sats conversion in NWC test mocks (values now in millisats, expected results in sats)
+- **Import extensions** — standardized all 17 test files from `.js` to `.ts` import extensions
+- **nostr-tools/pure removal** — replaced `generateSecretKey`/`getPublicKey` imports with own crypto; only `nostr-tools/nip46` remains
+- **IDB upgrade deduplication** — extracted shared `upgradeDatabase()` helper from duplicate `onupgradeneeded` callbacks
+- **NODE_ENV** — changed from `'development'` to `'production'` in vite.config.ts
+
+### Added
+- `lib/constants.ts` — centralized magic numbers (timeouts, rate limits, crypto parameters)
+- `lib/utils/async-lock.ts` — shared async mutex (extracted from duplicated `withStorageLock` pattern)
+- `lib/bg/activity-handlers.ts` — activity log handlers with write buffering
+- `lib/bg/profile-handlers.ts` — profile metadata and mute list handlers
+- `lib/bg/publish-handlers.ts` — event signing, broadcasting, and NIP-46 session handlers
+- `docs/code-review.md` — comprehensive Round 2 audit with 70 findings and prioritized roadmap
+
 ## [0.3.2] - 2026-03-10
 
 ### Changed

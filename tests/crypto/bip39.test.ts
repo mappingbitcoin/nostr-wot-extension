@@ -1,9 +1,9 @@
 import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { bytesToHex, hexToBytes } from '../../lib/crypto/utils.js';
+import { bytesToHex, hexToBytes } from '../../lib/crypto/utils.ts';
 import {
   generateMnemonic, validateMnemonic, mnemonicToSeed, entropyToMnemonic
-} from '../../lib/crypto/bip39.js';
+} from '../../lib/crypto/bip39.ts';
 
 describe('generateMnemonic', () => {
   it('returns 12 words by default (128-bit)', async () => {

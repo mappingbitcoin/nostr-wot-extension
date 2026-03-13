@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import browser from '@shared/browser.ts';
 
 type StorageArea = 'sync' | 'local' | 'session';
@@ -16,6 +16,7 @@ export default function useBrowserStorage<T>(
   area: StorageArea = 'sync'
 ): [T | null, (val: T) => void] {
   const [value, setValue] = useState<T | null>(defaultValue);
+  const defaultRef = useRef(defaultValue);
 
   useEffect(() => {
     // Initial read
@@ -29,12 +30,12 @@ export default function useBrowserStorage<T>(
       changedArea: string
     ): void {
       if (changedArea === area && changes[key]) {
-        setValue((changes[key].newValue as T) ?? defaultValue);
+        setValue((changes[key].newValue as T) ?? defaultRef.current);
       }
     }
     browser.storage.onChanged.addListener(onChange);
     return () => browser.storage.onChanged.removeListener(onChange);
-  }, [key, area, defaultValue]);
+  }, [key, area]);
 
   const set = useCallback(
     (newValue: T): void => {

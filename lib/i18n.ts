@@ -119,14 +119,3 @@ export function isLanguageChosen(): boolean {
 export function getSupportedLanguages(): SupportedLanguage[] {
   return SUPPORTED_LANGUAGES;
 }
-
-/**
- * Get extension version from the manifest (single source of truth).
- */
-export function getVersion(): string {
-  try {
-    return browser.runtime.getManifest().version;
-  } catch {
-    return '';
-  }
-}

@@ -22,6 +22,23 @@ export function validateNip07Params(method: string, params: Record<string, unkno
         if (typeof e.kind !== 'number' || !Number.isInteger(e.kind) || e.kind < 0)
             throw new Error('Invalid event kind');
         if (typeof e.content !== 'string') throw new Error('Invalid event content');
+        // Validate tags is an array of string arrays
+        if (e.tags !== undefined) {
+            if (!Array.isArray(e.tags)) throw new Error('Invalid event tags: must be an array');
+            for (const tag of e.tags as unknown[]) {
+                if (!Array.isArray(tag) || !tag.every(v => typeof v === 'string'))
+                    throw new Error('Invalid event tags: each tag must be an array of strings');
+            }
+        }
+        // Validate created_at is a reasonable timestamp
+        if (e.created_at !== undefined) {
+            if (typeof e.created_at !== 'number' || !Number.isInteger(e.created_at) || e.created_at < 0)
+                throw new Error('Invalid event created_at');
+            // Reject timestamps more than 1 hour in the future
+            const maxFuture = Math.floor(Date.now() / 1000) + 3600;
+            if (e.created_at > maxFuture)
+                throw new Error('Invalid event created_at: too far in the future');
+        }
     }
     if (method === 'nip07_nip04Encrypt' || method === 'nip07_nip44Encrypt') {
         if (typeof params.pubkey !== 'string' || !/^[0-9a-f]{64}$/i.test(params.pubkey))

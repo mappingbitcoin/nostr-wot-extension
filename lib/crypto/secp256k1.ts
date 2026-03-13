@@ -2,7 +2,7 @@
  * secp256k1 — Thin wrapper over @noble/curves
  *
  * Provides the same API surface used by other modules (getPublicKey, ecdh,
- * isValidPrivateKey, liftX, N, P) via noble's audited implementation.
+ * isValidPrivateKey, liftX, N) via noble's audited implementation.
  *
  * @module lib/crypto/secp256k1
  */
@@ -11,7 +11,7 @@ import { secp256k1, schnorr } from '@noble/curves/secp256k1.js';
 import { bytesToHex } from './utils.ts';
 
 export const N: bigint = secp256k1.Point.Fn.ORDER;
-export const P: bigint = secp256k1.Point.Fp.ORDER;
+const P: bigint = secp256k1.Point.Fp.ORDER;
 
 export function getPublicKey(privkey: Uint8Array): Uint8Array {
   return schnorr.getPublicKey(privkey);

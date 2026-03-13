@@ -27,6 +27,9 @@ export class LnbitsProvider implements WalletProvider {
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+    if (this.instanceUrl.startsWith('http://') && !this.instanceUrl.startsWith('http://localhost')) {
+      console.warn('[LNbits] WARNING: Using insecure HTTP connection. Admin key may be exposed.');
+    }
     const url = `${this.instanceUrl}${path}`;
     const init: RequestInit = {
       method,

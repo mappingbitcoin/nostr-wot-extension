@@ -49,7 +49,7 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
 
   // ── Listen for storage changes ──
   useEffect(() => {
-    function onChange(changes: Record<string, any>, area: string) {
+    function onChange(changes: Record<string, { newValue?: unknown; oldValue?: unknown }>, area: string) {
       if (area === 'local' && (changes.signerPermissions || changes.signerUseGlobalDefaults)) {
         reload();
       }

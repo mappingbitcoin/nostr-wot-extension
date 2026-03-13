@@ -7,12 +7,12 @@
 import { describe, it, beforeEach } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { resetMockStorage } from './helpers/browser-mock.ts';
-import * as vault from '../lib/vault.js';
-import * as permissions from '../lib/permissions.js';
-import { nip04Encrypt, nip04Decrypt } from '../lib/crypto/nip04.js';
-import { ncryptsecEncode, ncryptsecDecode } from '../lib/crypto/nip49.js';
-import { randomBytes, hexToBytes, bytesToHex } from '../lib/crypto/utils.js';
-import { getPublicKey } from '../lib/crypto/secp256k1.js';
+import * as vault from '../lib/vault.ts';
+import * as permissions from '../lib/permissions.ts';
+import { nip04Encrypt, nip04Decrypt } from '../lib/crypto/nip04.ts';
+import { ncryptsecEncode, ncryptsecDecode } from '../lib/crypto/nip49.ts';
+import { randomBytes, hexToBytes, bytesToHex } from '../lib/crypto/utils.ts';
+import { getPublicKey } from '../lib/crypto/secp256k1.ts';
 import type { VaultPayload } from '../lib/types.ts';
 
 const TEST_PASSWORD = 'testpassword123';

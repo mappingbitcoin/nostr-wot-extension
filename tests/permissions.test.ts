@@ -1,7 +1,7 @@
 import { describe, it, beforeEach } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { resetMockStorage } from './helpers/browser-mock.ts';
-import * as permissions from '../lib/permissions.js';
+import * as permissions from '../lib/permissions.ts';
 
 describe('permissions -- check cascade', () => {
   beforeEach(() => resetMockStorage());

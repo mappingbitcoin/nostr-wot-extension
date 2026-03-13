@@ -58,13 +58,13 @@ export function AccountProvider({ children }: AccountProviderProps) {
   const active = accounts?.find((a) => a.id === activeId) || accounts?.[0] || null;
 
   const load = useCallback(async () => {
-    const data: any = await browser.storage.local.get(['accounts', 'activeAccountId', 'profileCache']);
-    const accts: Account[] = data.accounts || [];
-    const id: string = data.activeAccountId || '';
+    const data = await browser.storage.local.get(['accounts', 'activeAccountId', 'profileCache']) as Record<string, unknown>;
+    const accts: Account[] = (data.accounts as Account[] | undefined) || [];
+    const id: string = (data.activeAccountId as string | undefined) || '';
 
     setAccounts(accts);
     setActiveId(id || accts[0]?.id || null);
-    setProfileCache(data.profileCache || {});
+    setProfileCache((data.profileCache as ProfileCache | undefined) || {});
   }, []);
 
   // Fetch kind:0 metadata for all accounts in the background.
@@ -83,8 +83,8 @@ export function AccountProvider({ children }: AccountProviderProps) {
       rpc<ProfileMetadata | null>('getProfileMetadata', { pubkey: pk })
         .then(async (metadata) => {
           if (!metadata) return;
-          const data: any = await browser.storage.local.get('profileCache');
-          const pc: ProfileCache = data.profileCache || {};
+          const data = await browser.storage.local.get('profileCache') as Record<string, unknown>;
+          const pc: ProfileCache = (data.profileCache as ProfileCache | undefined) || {};
           pc[pk] = metadata;
           await browser.storage.local.set({ profileCache: pc });
           // State update will happen via storage.onChanged listener
@@ -113,7 +113,7 @@ export function AccountProvider({ children }: AccountProviderProps) {
 
   // Listen for storage changes to accounts
   useEffect(() => {
-    function onChange(changes: Record<string, any>, area: string) {
+    function onChange(changes: Record<string, { newValue?: unknown; oldValue?: unknown }>, area: string) {
       if (area === 'local' && (changes.accounts || changes.activeAccountId || changes.profileCache)) {
         load();
       }

@@ -1,6 +1,6 @@
 import browser from '@shared/browser.ts';
 
-export class RpcError extends Error {
+class RpcError extends Error {
   method: string;
 
   constructor(message: string, method: string) {

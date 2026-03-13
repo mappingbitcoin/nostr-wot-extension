@@ -31,6 +31,28 @@ function getDbName(accountId: string): string {
     return `${DB_PREFIX}-${accountId}`;
 }
 
+/**
+ * Shared schema upgrade handler for all IDBOpenDBRequest.onupgradeneeded callbacks.
+ * Creates (or migrates to) the v2 object store layout.
+ */
+function upgradeDatabase(database: IDBDatabase, oldVersion: number): void {
+    if (oldVersion < 2) {
+        if (!database.objectStoreNames.contains('pubkeys')) {
+            const pubkeyStore = database.createObjectStore('pubkeys', { keyPath: 'id' });
+            pubkeyStore.createIndex('pubkey', 'pubkey', { unique: true });
+        }
+        if (!database.objectStoreNames.contains('follows_v2')) {
+            database.createObjectStore('follows_v2', { keyPath: 'id' });
+        }
+        if (!database.objectStoreNames.contains('meta')) {
+            database.createObjectStore('meta', { keyPath: 'key' });
+        }
+        if (database.objectStoreNames.contains('follows')) {
+            database.deleteObjectStore('follows');
+        }
+    }
+}
+
 export async function initDB(accountId?: string): Promise<IDBDatabase> {
     // If called with no accountId, return existing db or reject
     if (accountId === undefined) {
@@ -60,29 +82,7 @@ export async function initDB(accountId?: string): Promise<IDBDatabase> {
         };
 
         request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
-            const database = (event.target as IDBOpenDBRequest).result;
-            const oldVersion = event.oldVersion;
-
-            if (oldVersion < 2) {
-                // Pubkey mapping: { id: number, pubkey: string }
-                if (!database.objectStoreNames.contains('pubkeys')) {
-                    const pubkeyStore = database.createObjectStore('pubkeys', { keyPath: 'id' });
-                    pubkeyStore.createIndex('pubkey', 'pubkey', { unique: true });
-                }
-
-                // Follows with numeric IDs: { id: number, follows: ArrayBuffer }
-                if (!database.objectStoreNames.contains('follows_v2')) {
-                    database.createObjectStore('follows_v2', { keyPath: 'id' });
-                }
-
-                if (!database.objectStoreNames.contains('meta')) {
-                    database.createObjectStore('meta', { keyPath: 'key' });
-                }
-
-                if (database.objectStoreNames.contains('follows')) {
-                    database.deleteObjectStore('follows');
-                }
-            }
+            upgradeDatabase((event.target as IDBOpenDBRequest).result, event.oldVersion);
         };
     });
 }
@@ -632,24 +632,7 @@ export async function getDatabaseStats(accountId: string): Promise<DatabaseStats
         request.onerror = () => reject(request.error);
 
         request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
-            const database = (event.target as IDBOpenDBRequest).result;
-            const oldVersion = event.oldVersion;
-
-            if (oldVersion < 2) {
-                if (!database.objectStoreNames.contains('pubkeys')) {
-                    const pubkeyStore = database.createObjectStore('pubkeys', { keyPath: 'id' });
-                    pubkeyStore.createIndex('pubkey', 'pubkey', { unique: true });
-                }
-                if (!database.objectStoreNames.contains('follows_v2')) {
-                    database.createObjectStore('follows_v2', { keyPath: 'id' });
-                }
-                if (!database.objectStoreNames.contains('meta')) {
-                    database.createObjectStore('meta', { keyPath: 'key' });
-                }
-                if (database.objectStoreNames.contains('follows')) {
-                    database.deleteObjectStore('follows');
-                }
-            }
+            upgradeDatabase((event.target as IDBOpenDBRequest).result, event.oldVersion);
         };
 
         request.onsuccess = async () => {

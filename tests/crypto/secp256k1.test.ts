@@ -1,9 +1,9 @@
 import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { hexToBytes, bytesToHex } from '../../lib/crypto/utils.js';
+import { hexToBytes, bytesToHex } from '../../lib/crypto/utils.ts';
 import {
   getPublicKey, isValidPrivateKey, liftX, ecdh, N
-} from '../../lib/crypto/secp256k1.js';
+} from '../../lib/crypto/secp256k1.ts';
 
 // BIP-340 test vector 0: known privkey -> pubkey
 const VEC0_SECKEY = '0000000000000000000000000000000000000000000000000000000000000003';

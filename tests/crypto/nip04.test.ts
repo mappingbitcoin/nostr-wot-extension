@@ -1,8 +1,8 @@
 import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { hexToBytes } from '../../lib/crypto/utils.js';
-import { getPublicKey } from '../../lib/crypto/secp256k1.js';
-import { nip04Encrypt, nip04Decrypt } from '../../lib/crypto/nip04.js';
+import { hexToBytes } from '../../lib/crypto/utils.ts';
+import { getPublicKey } from '../../lib/crypto/secp256k1.ts';
+import { nip04Encrypt, nip04Decrypt } from '../../lib/crypto/nip04.ts';
 
 const ALICE_PRIVKEY: Uint8Array = hexToBytes('0000000000000000000000000000000000000000000000000000000000000001');
 const BOB_PRIVKEY: Uint8Array = hexToBytes('0000000000000000000000000000000000000000000000000000000000000002');

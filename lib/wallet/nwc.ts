@@ -291,6 +291,9 @@ export class NwcProvider implements WalletProvider {
     const event = parsed[2] as SignedEvent;
     if (event.kind !== 23195) return;
 
+    // S-19: Verify the response actually came from the wallet service
+    if (event.pubkey !== this.walletPubkey) return;
+
     // Find the 'e' tag that references the original request
     const eTag = event.tags?.find((t) => t[0] === 'e');
     if (!eTag || !eTag[1]) return;

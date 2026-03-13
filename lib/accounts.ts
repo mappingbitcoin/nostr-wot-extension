@@ -18,7 +18,7 @@
  * @module lib/accounts
  */
 
-import type { Account, AccountType, Nip46Config } from './types.ts';
+import type { Account } from './types.ts';
 import { getPublicKey } from './crypto/secp256k1.js';
 import { bytesToHex, hexToBytes } from './crypto/utils.js';
 import { nsecDecode, npubDecode } from './crypto/bech32.js';

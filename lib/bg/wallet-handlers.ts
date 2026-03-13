@@ -10,13 +10,14 @@ import * as signerPermissions from '../permissions.ts';
 import { npubEncode } from '../crypto/bech32.ts';
 import { signEvent } from '../crypto/nip01.ts';
 import { getWalletProvider, removeWalletProvider, type WalletConfig } from '../wallet/';
+import { decodeBolt11 } from '../wallet/bolt11.ts';
 import { provisionLnbitsWallet, claimLightningAddress, getLightningAddress, releaseLightningAddress, DEFAULT_LNBITS_URL } from '../wallet/lnbits-provision.ts';
 import type { SignedEvent } from '../types.ts';
 import type { HandlerFn } from './state.ts';
 
 // ── Shared utilities ──
 
-export async function getConnectedProvider(): Promise<{ provider: ReturnType<typeof getWalletProvider> & {}; acct: NonNullable<ReturnType<typeof vault.getActiveAccountWithWallet>> }> {
+export async function getConnectedProvider(): Promise<{ provider: ReturnType<typeof getWalletProvider>; acct: NonNullable<ReturnType<typeof vault.getActiveAccountWithWallet>> }> {
     if (vault.isLocked()) throw new Error('Vault is locked');
     const acct = vault.getActiveAccountWithWallet();
     if (!acct?.walletConfig) throw new Error('No wallet configured');
@@ -65,14 +66,39 @@ export const handlers = new Map<string, HandlerFn>([
 
         const { provider } = await getConnectedProvider();
 
+        // S-17: Decode BOLT11 to extract invoice amount for user display
+        let invoiceAmountSats = 0;
+        try {
+            const decoded = decodeBolt11(paymentRequest);
+            if (decoded?.amountSats != null) {
+                invoiceAmountSats = decoded.amountSats;
+            }
+        } catch {
+            // Decode failed — fall through with 0 (unknown amount)
+        }
+
         const perm = await signerPermissions.check(origin, 'webln_sendPayment');
         if (perm === 'deny') throw new Error('Permission denied');
-        if (perm === 'ask') {
+
+        // S-18: Auto-approve if amount is within the stored threshold
+        let autoApproved = false;
+        if (perm === 'allow' && invoiceAmountSats > 0) {
+            const acctId = vault.getActiveAccountId();
+            if (acctId) {
+                const data = await browser.storage.local.get(`walletThreshold_${acctId}`) as Record<string, number>;
+                const threshold = data[`walletThreshold_${acctId}`] || 0;
+                if (threshold > 0 && invoiceAmountSats <= threshold) {
+                    autoApproved = true;
+                }
+            }
+        }
+
+        if (!autoApproved && perm === 'ask') {
             const decision = await signer.queueRequest({
                 type: 'webln_sendPayment',
                 origin,
                 needsPermission: true,
-                walletAmount: 0,
+                walletAmount: invoiceAmountSats,
             });
             if (!decision.allow) throw new Error('Payment denied by user');
             if (decision.remember) {

@@ -1,14 +1,14 @@
 import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { hexToBytes, bytesToHex, sha256, randomBytes, constantTimeEqual } from '../../lib/crypto/utils.js';
-import { getPublicKey, isValidPrivateKey, ecdh, N } from '../../lib/crypto/secp256k1.js';
-import { schnorrSign, schnorrVerify } from '../../lib/crypto/schnorr.js';
-import { signEvent, verifyEvent, computeEventId } from '../../lib/crypto/nip01.js';
-import { nip04Encrypt, nip04Decrypt } from '../../lib/crypto/nip04.js';
-import { nip44Encrypt, nip44Decrypt } from '../../lib/crypto/nip44.js';
-import { npubEncode, npubDecode, nsecEncode, nsecDecode, normalizeToHex } from '../../lib/crypto/bech32.js';
-import { validateMnemonic, mnemonicToSeed, entropyToMnemonic } from '../../lib/crypto/bip39.js';
-import { derivePath } from '../../lib/crypto/bip32.js';
+import { hexToBytes, bytesToHex, sha256, randomBytes, constantTimeEqual } from '../../lib/crypto/utils.ts';
+import { getPublicKey, isValidPrivateKey, ecdh, N } from '../../lib/crypto/secp256k1.ts';
+import { schnorrSign, schnorrVerify } from '../../lib/crypto/schnorr.ts';
+import { signEvent, verifyEvent, computeEventId } from '../../lib/crypto/nip01.ts';
+import { nip04Encrypt, nip04Decrypt } from '../../lib/crypto/nip04.ts';
+import { nip44Encrypt, nip44Decrypt } from '../../lib/crypto/nip44.ts';
+import { npubEncode, npubDecode, nsecEncode, nsecDecode, normalizeToHex } from '../../lib/crypto/bech32.ts';
+import { validateMnemonic, mnemonicToSeed, entropyToMnemonic } from '../../lib/crypto/bip39.ts';
+import { derivePath } from '../../lib/crypto/bip32.ts';
 
 // -- Input validation and boundary tests --
 

@@ -10,13 +10,13 @@ interface BfsCache {
 
 export class LocalGraph {
     ready: Promise<void>;
-    _cache: BfsCache | null;
-    _cachedRoot: string | null;
+    private cache: BfsCache | null;
+    private cachedRoot: string | null;
 
     constructor() {
         this.ready = Promise.resolve();
-        this._cache = null;     // { rootId, hops: Uint8Array, paths: Uint32Array, maxId }
-        this._cachedRoot = null; // pubkey string of cached root
+        this.cache = null;     // { rootId, hops: Uint8Array, paths: Uint32Array, maxId }
+        this.cachedRoot = null; // pubkey string of cached root
     }
 
     async ensureReady(): Promise<void> {
@@ -25,17 +25,17 @@ export class LocalGraph {
 
     // Invalidate the precomputed cache (called on sync, account switch, clear)
     invalidateCache(): void {
-        this._cache = null;
-        this._cachedRoot = null;
+        this.cache = null;
+        this.cachedRoot = null;
     }
 
     // Precompute hops and paths from a root pubkey using a single BFS pass.
     // Results stored in typed arrays indexed by node ID for O(1) lookup.
-    _buildCache(rootPubkey: string, maxHops: number = 6): void {
+    private buildCache(rootPubkey: string, maxHops: number = 6): void {
         const rootId = storage.getId(rootPubkey);
         if (rootId === null) {
-            this._cache = null;
-            this._cachedRoot = null;
+            this.cache = null;
+            this.cachedRoot = null;
             return;
         }
 
@@ -81,58 +81,58 @@ export class LocalGraph {
             frontier = nextFrontier;
         }
 
-        this._cache = { rootId, hops, paths, maxId };
-        this._cachedRoot = rootPubkey;
+        this.cache = { rootId, hops, paths, maxId };
+        this.cachedRoot = rootPubkey;
     }
 
     // Get precomputed result for a (from, to) query. Returns { hops, paths } or null.
     // Only works when from === cachedRoot.
-    _getCached(from: string, to: string): DistanceInfo | null | undefined {
-        if (!this._cache || this._cachedRoot !== from) return undefined; // cache miss
+    private getCached(from: string, to: string): DistanceInfo | null | undefined {
+        if (!this.cache || this.cachedRoot !== from) return undefined; // cache miss
 
         if (from === to) return { hops: 0, paths: 1 };
 
         const toId = storage.getId(to);
-        if (toId === null || toId > this._cache.maxId) return null;
+        if (toId === null || toId > this.cache.maxId) return null;
 
-        const h = this._cache.hops[toId];
+        const h = this.cache.hops[toId];
         if (h === 0) return null; // unreachable
 
-        return { hops: h - 1, paths: this._cache.paths[toId] };
+        return { hops: h - 1, paths: this.cache.paths[toId] };
     }
 
     // Ensure cache is built for the given root
-    _ensureCache(from: string, maxHops: number): void {
-        if (this._cachedRoot !== from || !this._cache) {
-            this._buildCache(from, maxHops);
+    private ensureCache(from: string, maxHops: number): void {
+        if (this.cachedRoot !== from || !this.cache) {
+            this.buildCache(from, maxHops);
         }
     }
 
     async getDistance(from: string, to: string, maxHops: number = 6): Promise<number | null> {
         await this.ensureReady();
-        this._ensureCache(from, maxHops);
+        this.ensureCache(from, maxHops);
 
-        const cached = this._getCached(from, to);
+        const cached = this.getCached(from, to);
         if (cached !== undefined) return cached ? cached.hops : null;
 
         // Fallback BFS for non-cached roots (arbitrary from pubkey)
-        const result = this._bfsDistanceInfo(from, to, maxHops);
+        const result = this.bfsDistanceInfo(from, to, maxHops);
         return result ? result.hops : null;
     }
 
     async getDistanceInfo(from: string, to: string, maxHops: number = 6): Promise<DistanceInfo | null> {
         await this.ensureReady();
-        this._ensureCache(from, maxHops);
+        this.ensureCache(from, maxHops);
 
-        const cached = this._getCached(from, to);
+        const cached = this.getCached(from, to);
         if (cached !== undefined) return cached;
 
         // Fallback BFS for non-cached roots
-        return this._bfsDistanceInfo(from, to, maxHops);
+        return this.bfsDistanceInfo(from, to, maxHops);
     }
 
     // Raw BFS with path counting -- used for arbitrary (non-root) queries
-    _bfsDistanceInfo(from: string, to: string, maxHops: number = 6): DistanceInfo | null {
+    private bfsDistanceInfo(from: string, to: string, maxHops: number = 6): DistanceInfo | null {
         if (from === to) return { hops: 0, paths: 1 };
 
         const fromId = storage.getId(from);
@@ -190,29 +190,29 @@ export class LocalGraph {
     // Batch distance check for multiple targets -- uses cache when available
     async getDistancesBatch(from: string, targets: string[], maxHops: number = 6, includePaths: boolean = false): Promise<Map<string, DistanceInfo | null>> {
         await this.ensureReady();
-        this._ensureCache(from, maxHops);
+        this.ensureCache(from, maxHops);
 
         const results = new Map<string, DistanceInfo | null>();
 
         // If cache is available for this root, all lookups are O(1)
-        if (this._cachedRoot === from && this._cache) {
+        if (this.cachedRoot === from && this.cache) {
             for (const target of targets) {
                 if (from === target) {
                     results.set(target, { hops: 0, paths: includePaths ? 1 : null });
                     continue;
                 }
                 const toId = storage.getId(target);
-                if (toId === null || toId > this._cache.maxId) {
+                if (toId === null || toId > this.cache.maxId) {
                     results.set(target, null);
                     continue;
                 }
-                const h = this._cache.hops[toId];
+                const h = this.cache.hops[toId];
                 if (h === 0) {
                     results.set(target, null);
                 } else {
                     results.set(target, {
                         hops: h - 1,
-                        paths: includePaths ? this._cache.paths[toId] : null
+                        paths: includePaths ? this.cache.paths[toId] : null
                     });
                 }
             }
@@ -220,11 +220,11 @@ export class LocalGraph {
         }
 
         // Fallback: full BFS for arbitrary root (same as before)
-        return this._bfsBatch(from, targets, maxHops, includePaths);
+        return this.bfsBatch(from, targets, maxHops, includePaths);
     }
 
     // Full BFS batch for non-cached roots
-    _bfsBatch(from: string, targets: string[], maxHops: number, includePaths: boolean): Map<string, DistanceInfo | null> {
+    private bfsBatch(from: string, targets: string[], maxHops: number, includePaths: boolean): Map<string, DistanceInfo | null> {
         const fromId = storage.getId(from);
         const results = new Map<string, DistanceInfo | null>();
 
@@ -317,9 +317,9 @@ export class LocalGraph {
     // Check if target is within maxHops -- uses cache for O(1) lookup
     async isWithinHops(from: string, to: string, maxHops: number = 3): Promise<boolean> {
         await this.ensureReady();
-        this._ensureCache(from, maxHops);
+        this.ensureCache(from, maxHops);
 
-        const cached = this._getCached(from, to);
+        const cached = this.getCached(from, to);
         if (cached !== undefined) return cached !== null && cached.hops <= maxHops;
 
         // Fallback BFS

@@ -28,16 +28,15 @@ export function VaultProvider({ children }: VaultProviderProps) {
 
   const checkState = useCallback(async () => {
     try {
-      const existsResult = await rpc('vault_exists');
+      const [existsResult, lockedResult, autoLockMs, acctType] = await Promise.all([
+        rpc('vault_exists'),
+        rpc('vault_isLocked'),
+        rpc<number>('vault_getAutoLock'),
+        rpc<{ type?: string }>('vault_getActiveAccountType'),
+      ]);
       setExists(!!existsResult);
-
-      const lockedResult = await rpc('vault_isLocked');
       setLocked(!!lockedResult);
-
-      const autoLockMs = await rpc<number>('vault_getAutoLock');
       setAutoLockEnabled(autoLockMs > 0);
-
-      const acctType = await rpc<{ type?: string }>('vault_getActiveAccountType');
       setIsNip46(acctType?.type === 'nip46');
       setIsGenerated(acctType?.type === 'generated');
     } catch {
@@ -69,7 +68,7 @@ export function VaultProvider({ children }: VaultProviderProps) {
 
   // Re-check vault state when active account changes
   useEffect(() => {
-    function onChange(changes: Record<string, any>, area: string) {
+    function onChange(changes: Record<string, { newValue?: unknown; oldValue?: unknown }>, area: string) {
       if (area === 'local' && changes.activeAccountId) {
         checkState();
       }

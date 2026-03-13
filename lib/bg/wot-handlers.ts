@@ -19,23 +19,35 @@ interface BatchOptions {
 
 // ── Core graph functions ──
 
+function requireLocalGraph(): NonNullable<typeof localGraph> {
+    if (!localGraph) throw new Error('Local graph not initialized — is account configured?');
+    return localGraph;
+}
+
+function requireOracle(): NonNullable<typeof oracle> {
+    if (!oracle) throw new Error('Oracle not initialized — check oracle URL configuration');
+    return oracle;
+}
+
 export async function getDistance(from: string, to: string): Promise<number | null> {
     if (!from) throw new Error('My pubkey not configured');
 
     if (config.mode === 'local') {
-        await localGraph!.ensureReady();
-        return localGraph!.getDistance(from, to, config.maxHops);
+        const lg = requireLocalGraph();
+        await lg.ensureReady();
+        return lg.getDistance(from, to, config.maxHops);
     }
 
     if (config.mode === 'remote') {
-        return oracle!.getDistance(from, to);
+        return requireOracle().getDistance(from, to);
     }
 
     // Hybrid: try local first, fall back to remote
-    await localGraph!.ensureReady();
-    const local = await localGraph!.getDistance(from, to, config.maxHops);
+    const lg = requireLocalGraph();
+    await lg.ensureReady();
+    const local = await lg.getDistance(from, to, config.maxHops);
     if (local !== null) return local;
-    return oracle!.getDistance(from, to);
+    return requireOracle().getDistance(from, to);
 }
 
 export async function getDetails(from: string, to: string): Promise<{ hops: number; paths: number | null; score: number } | null> {
@@ -44,15 +56,15 @@ export async function getDetails(from: string, to: string): Promise<{ hops: numb
     let info: DistanceInfo | null;
 
     if (config.mode === 'local') {
-        await localGraph!.ensureReady();
-        info = await localGraph!.getDistanceInfo(from, to, config.maxHops);
+        await requireLocalGraph().ensureReady();
+        info = await requireLocalGraph().getDistanceInfo(from, to, config.maxHops);
     } else if (config.mode === 'remote') {
-        info = await oracle!.getDistanceInfo(from, to);
+        info = await requireOracle().getDistanceInfo(from, to);
     } else {
-        await localGraph!.ensureReady();
-        info = await localGraph!.getDistanceInfo(from, to, config.maxHops);
+        await requireLocalGraph().ensureReady();
+        info = await requireLocalGraph().getDistanceInfo(from, to, config.maxHops);
         if (info === null) {
-            info = await oracle!.getDistanceInfo(from, to);
+            info = await requireOracle().getDistanceInfo(from, to);
         }
     }
 
@@ -159,7 +171,7 @@ async function getDetailsBatchRemote(targets: string[]): Promise<Record<string, 
         const batch = targets.slice(i, i + CONCURRENCY);
         const promises = batch.map(async (target): Promise<[string, DistanceInfo | null]> => {
             try {
-                const info = await oracle!.getDistanceInfo(config.myPubkey!, target);
+                const info = await requireOracle().getDistanceInfo(config.myPubkey!, target);
                 return [target, info ? { hops: info.hops, paths: info.paths ?? null } : null];
             } catch {
                 return [target, null];
@@ -183,8 +195,8 @@ export async function getDistanceBatch(targets: string[], options: BatchOptions 
     const needDetails = includePaths || includeScores;
 
     if (config.mode === 'local') {
-        await localGraph!.ensureReady();
-        const results = await localGraph!.getDistancesBatch(config.myPubkey, targets, config.maxHops, needDetails);
+        await requireLocalGraph().ensureReady();
+        const results = await requireLocalGraph().getDistancesBatch(config.myPubkey, targets, config.maxHops, needDetails);
         return formatBatchResults(results, opts);
     }
 
@@ -193,12 +205,12 @@ export async function getDistanceBatch(targets: string[], options: BatchOptions 
             const results = await getDetailsBatchRemote(targets);
             return formatBatchResultsFromDetails(results, opts);
         }
-        return oracle!.getDistanceBatch(config.myPubkey, targets);
+        return requireOracle().getDistanceBatch(config.myPubkey, targets);
     }
 
     // Hybrid: try local first, then remote for missing
-    await localGraph!.ensureReady();
-    const localResults = await localGraph!.getDistancesBatch(config.myPubkey, targets, config.maxHops, needDetails);
+    await requireLocalGraph().ensureReady();
+    const localResults = await requireLocalGraph().getDistancesBatch(config.myPubkey, targets, config.maxHops, needDetails);
 
     const obj: Record<string, unknown> = {};
     const missing: string[] = [];
@@ -219,7 +231,7 @@ export async function getDistanceBatch(targets: string[], options: BatchOptions 
                     obj[pubkey] = details ? formatSingleResult(details as DistanceInfo, opts) : null;
                 }
             } else {
-                const remoteResults = await oracle!.getDistanceBatch(config.myPubkey, missing);
+                const remoteResults = await requireOracle().getDistanceBatch(config.myPubkey, missing);
                 for (const [pubkey, hops] of Object.entries(remoteResults)) {
                     obj[pubkey] = hops;
                 }
@@ -266,18 +278,18 @@ async function getFollowsForPubkey(pubkey: string): Promise<string[]> {
     if (!targetPubkey) throw new Error('No pubkey specified');
 
     if (config.mode === 'remote') {
-        return oracle!.getFollows(targetPubkey);
+        return requireOracle().getFollows(targetPubkey);
     }
 
     if (config.mode === 'hybrid') {
-        await localGraph!.ensureReady();
-        const local = await localGraph!.getFollows(targetPubkey);
+        await requireLocalGraph().ensureReady();
+        const local = await requireLocalGraph().getFollows(targetPubkey);
         if (local && local.length > 0) return local;
-        return oracle!.getFollows(targetPubkey);
+        return requireOracle().getFollows(targetPubkey);
     }
 
-    await localGraph!.ensureReady();
-    return localGraph!.getFollows(targetPubkey);
+    await requireLocalGraph().ensureReady();
+    return requireLocalGraph().getFollows(targetPubkey);
 }
 
 async function getCommonFollows(targetPubkey: string): Promise<string[]> {
@@ -285,18 +297,18 @@ async function getCommonFollows(targetPubkey: string): Promise<string[]> {
     if (!targetPubkey) throw new Error('No target pubkey specified');
 
     if (config.mode === 'remote') {
-        return oracle!.getCommonFollows(config.myPubkey, targetPubkey);
+        return requireOracle().getCommonFollows(config.myPubkey, targetPubkey);
     }
 
     if (config.mode === 'hybrid') {
-        await localGraph!.ensureReady();
-        const local = await localGraph!.getCommonFollows(config.myPubkey, targetPubkey);
+        await requireLocalGraph().ensureReady();
+        const local = await requireLocalGraph().getCommonFollows(config.myPubkey, targetPubkey);
         if (local && local.length > 0) return local;
-        return oracle!.getCommonFollows(config.myPubkey, targetPubkey);
+        return requireOracle().getCommonFollows(config.myPubkey, targetPubkey);
     }
 
-    await localGraph!.ensureReady();
-    return localGraph!.getCommonFollows(config.myPubkey, targetPubkey);
+    await requireLocalGraph().ensureReady();
+    return requireLocalGraph().getCommonFollows(config.myPubkey, targetPubkey);
 }
 
 async function getPathTo(target: string): Promise<string[] | null> {
@@ -304,18 +316,18 @@ async function getPathTo(target: string): Promise<string[] | null> {
     if (!target) throw new Error('No target specified');
 
     if (config.mode === 'remote') {
-        return oracle!.getPath(config.myPubkey, target);
+        return requireOracle().getPath(config.myPubkey, target);
     }
 
     if (config.mode === 'hybrid') {
-        await localGraph!.ensureReady();
-        const local = await localGraph!.getPath(config.myPubkey, target, config.maxHops);
+        await requireLocalGraph().ensureReady();
+        const local = await requireLocalGraph().getPath(config.myPubkey, target, config.maxHops);
         if (local) return local;
-        return oracle!.getPath(config.myPubkey, target);
+        return requireOracle().getPath(config.myPubkey, target);
     }
 
-    await localGraph!.ensureReady();
-    return localGraph!.getPath(config.myPubkey, target, config.maxHops);
+    await requireLocalGraph().ensureReady();
+    return requireLocalGraph().getPath(config.myPubkey, target, config.maxHops);
 }
 
 // ── Handler Map ──

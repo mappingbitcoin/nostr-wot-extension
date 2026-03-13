@@ -419,7 +419,7 @@ describe('NwcProvider', () => {
       );
       ws.simulateMessage(response);
       const result = await balancePromise;
-      assert.equal(result.balance, 100000);
+      assert.equal(result.balance, 100); // 100000 msats = 100 sats
     });
 
     it('getBalance() resolves when matching response arrives (matched by e tag)', async () => {
@@ -436,7 +436,7 @@ describe('NwcProvider', () => {
       ws.simulateMessage(response);
 
       const result = await balancePromise;
-      assert.equal(result.balance, 42000);
+      assert.equal(result.balance, 42); // 42000 msats = 42 sats
     });
 
     it('payInvoice() sends pay_invoice request with invoice param', async () => {
@@ -633,12 +633,12 @@ describe('NwcProvider', () => {
       // Now send the actual response
       const response = buildResponseMessage(
         sentEvent.id,
-        JSON.stringify({ result_type: 'get_balance', result: { balance: 500 } }),
+        JSON.stringify({ result_type: 'get_balance', result: { balance: 500000 } }),
       );
       ws.simulateMessage(response);
 
       const result = await balancePromise;
-      assert.equal(result.balance, 500);
+      assert.equal(result.balance, 500); // 500000 msats = 500 sats
     });
 
     it('ignores non-EVENT messages (OK)', async () => {
@@ -652,12 +652,12 @@ describe('NwcProvider', () => {
       // Send real response
       const response = buildResponseMessage(
         sentEvent.id,
-        JSON.stringify({ result_type: 'get_balance', result: { balance: 800 } }),
+        JSON.stringify({ result_type: 'get_balance', result: { balance: 800000 } }),
       );
       ws.simulateMessage(response);
 
       const result = await balancePromise;
-      assert.equal(result.balance, 800);
+      assert.equal(result.balance, 800); // 800000 msats = 800 sats
     });
 
     it('ignores events without matching e tag', async () => {
@@ -675,12 +675,12 @@ describe('NwcProvider', () => {
       // The promise should still be pending -- now send correct response
       const correctResponse = buildResponseMessage(
         sentEvent.id,
-        JSON.stringify({ result_type: 'get_balance', result: { balance: 123 } }),
+        JSON.stringify({ result_type: 'get_balance', result: { balance: 123000 } }),
       );
       ws.simulateMessage(correctResponse);
 
       const result = await balancePromise;
-      assert.equal(result.balance, 123);
+      assert.equal(result.balance, 123); // 123000 msats = 123 sats
     });
 
     it('ignores events with no e tag', async () => {
@@ -703,12 +703,12 @@ describe('NwcProvider', () => {
       // Send correct response
       const correctResponse = buildResponseMessage(
         sentEvent.id,
-        JSON.stringify({ result_type: 'get_balance', result: { balance: 77 } }),
+        JSON.stringify({ result_type: 'get_balance', result: { balance: 77000 } }),
       );
       ws.simulateMessage(correctResponse);
 
       const result = await balancePromise;
-      assert.equal(result.balance, 77);
+      assert.equal(result.balance, 77); // 77000 msats = 77 sats
     });
 
     it('rejects pending request on NWC error response', async () => {
@@ -782,12 +782,12 @@ describe('NwcProvider', () => {
       // Send correct response
       const response = buildResponseMessage(
         sentEvent.id,
-        JSON.stringify({ result_type: 'get_balance', result: { balance: 10 } }),
+        JSON.stringify({ result_type: 'get_balance', result: { balance: 10000 } }),
       );
       ws.simulateMessage(response);
 
       const result = await balancePromise;
-      assert.equal(result.balance, 10);
+      assert.equal(result.balance, 10); // 10000 msats = 10 sats
     });
 
     it('ignores events with non-23195 kind', async () => {
@@ -813,12 +813,12 @@ describe('NwcProvider', () => {
       // Send correct response
       const correctResponse = buildResponseMessage(
         sentEvent.id,
-        JSON.stringify({ result_type: 'get_balance', result: { balance: 55 } }),
+        JSON.stringify({ result_type: 'get_balance', result: { balance: 55000 } }),
       );
       ws.simulateMessage(correctResponse);
 
       const result = await balancePromise;
-      assert.equal(result.balance, 55);
+      assert.equal(result.balance, 55); // 55000 msats = 55 sats
     });
   });
 
@@ -880,8 +880,8 @@ describe('NwcProvider', () => {
         decrypt: async (ciphertext: string, _privkey: Uint8Array, theirPubkey: Uint8Array) => {
           capturedCiphertext = ciphertext;
           capturedTheirPubkey = new Uint8Array(theirPubkey);
-          // Return valid decrypted content
-          return JSON.stringify({ result_type: 'get_balance', result: { balance: 300 } });
+          // Return valid decrypted content (balance in msats)
+          return JSON.stringify({ result_type: 'get_balance', result: { balance: 300000 } });
         },
       });
 

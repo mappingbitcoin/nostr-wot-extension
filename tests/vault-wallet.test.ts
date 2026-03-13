@@ -1,7 +1,7 @@
 import { describe, it, beforeEach } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { resetMockStorage } from './helpers/browser-mock.ts';
-import * as vault from '../lib/vault.js';
+import * as vault from '../lib/vault.ts';
 import type { VaultPayload, Account } from '../lib/types.ts';
 import type { WalletConfig } from '../lib/wallet/types.ts';
 

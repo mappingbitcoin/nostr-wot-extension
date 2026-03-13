@@ -13,8 +13,10 @@ import type { ScoringConfig } from './lib/types.ts';
 
 import {
     config, setOracle, resetLocalGraph,
-    PRIVILEGED_METHODS, NIP07_SIGNING_METHODS,
+    NIP07_SIGNING_METHODS,
     checkRateLimit, npubToHex,
+    buildPrivilegedMethods, setPrivilegedMethods,
+    PRIVILEGED_METHODS,
     type HandlerFn,
 } from './lib/bg/state.ts';
 import { handlers as wotHandlers } from './lib/bg/wot-handlers.ts';
@@ -32,18 +34,34 @@ import { handlers as onboardingHandlers } from './lib/bg/onboarding-handlers.ts'
 // ── Assemble handler map ──
 
 const allHandlers = new Map<string, HandlerFn>();
-for (const group of [wotHandlers, miscHandlers, domainHandlers, vaultHandlers, walletHandlers, nip07Handlers, onboardingHandlers]) {
+const handlerGroups = [wotHandlers, miscHandlers, domainHandlers, vaultHandlers, walletHandlers, nip07Handlers, onboardingHandlers];
+for (const group of handlerGroups) {
     for (const [method, fn] of group) {
+        if (allHandlers.has(method)) {
+            console.error(`[BG] Duplicate handler registration: "${method}" — later registration overwrites earlier one`);
+        }
         allHandlers.set(method, fn);
     }
 }
 
 // configUpdated stays here because it calls loadConfig which is local
+let _refreshDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 allHandlers.set('configUpdated', async () => {
     await loadConfig();
-    refreshBadgesOnAllTabs();
+    // Debounce badge refresh — multiple rapid config updates only trigger one refresh
+    if (_refreshDebounceTimer) clearTimeout(_refreshDebounceTimer);
+    _refreshDebounceTimer = setTimeout(() => { refreshBadgesOnAllTabs(); _refreshDebounceTimer = null; }, 500);
     return { ok: true };
 });
+
+// Auto-derive PRIVILEGED_METHODS from all handler maps (no manual allowlist needed)
+const privilegedHandlerGroups = [miscHandlers, domainHandlers, vaultHandlers, walletHandlers, nip07Handlers, onboardingHandlers];
+setPrivilegedMethods(buildPrivilegedMethods(...privilegedHandlerGroups));
+// Also add configUpdated and other locally-defined handlers
+PRIVILEGED_METHODS.add('configUpdated');
+PRIVILEGED_METHODS.add('syncGraph');
+PRIVILEGED_METHODS.add('stopSync');
+PRIVILEGED_METHODS.add('clearGraph');
 
 // ── Config loading ──
 
@@ -52,7 +70,7 @@ async function loadConfig(): Promise<void> {
         'mode', 'oracleUrl', 'myPubkey', 'relays', 'scoring'
     ]) as Record<string, unknown>;
 
-    config.mode = (data.mode as string) || 'hybrid';
+    config.mode = (data.mode as 'local' | 'remote' | 'hybrid') || 'hybrid';
     config.myPubkey = (data.myPubkey as string) || null;
     config.maxHops = 3;
     config.timeout = 5000;
@@ -290,9 +308,7 @@ browser.runtime.onConnect.addListener((port: chrome.runtime.Port) => {
         }
 
         try {
-            console.log('[PORT]', port.name, 'request:', method);
             const result = await handleRequest(request as { method: string; params: Record<string, unknown> });
-            console.log('[PORT]', port.name, 'success:', method);
             try { port.postMessage({ result }); } catch {}
         } catch (error) {
             console.error('[PORT]', port.name, 'error:', method, (error as Error).message);

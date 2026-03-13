@@ -9,10 +9,10 @@ import * as accounts from '../accounts.ts';
 import * as storage from '../storage.ts';
 import { isSyncInProgress, stopSync } from '../sync.ts';
 import { npubEncode } from '../crypto/bech32.ts';
-import { bytesToHex, randomHex } from '../crypto/utils.ts';
+import { bytesToHex, hexToBytes, randomBytes, randomHex } from '../crypto/utils.ts';
+import { getPublicKey } from '../crypto/secp256k1.ts';
 import { ncryptsecEncode, ncryptsecDecode } from '../crypto/nip49.ts';
 import { BunkerSigner, createNostrConnectURI } from 'nostr-tools/nip46';
-import { generateSecretKey, getPublicKey as ntGetPublicKey } from 'nostr-tools/pure';
 import { config, DEFAULT_RELAYS, resetLocalGraph, type HandlerFn, type LocalAccountEntry } from './state.ts';
 import { syncActivePubkey } from './vault-handlers.ts';
 import { broadcastAccountChanged, refreshBadgesOnAllTabs } from './domain-handlers.ts';
@@ -37,21 +37,73 @@ let _pendingOnboardingAccount: Account | null = null;
 let _pendingOnboardingTimer: ReturnType<typeof setTimeout> | null = null;
 const ONBOARDING_TTL_MS = 5 * 60 * 1000;
 
+/**
+ * XOR two equal-length Uint8Arrays and return the result.
+ */
+function xorBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
+    const out = new Uint8Array(a.length);
+    for (let i = 0; i < a.length; i++) out[i] = a[i] ^ b[i];
+    return out;
+}
+
 async function setPendingOnboardingAccount(acct: Account | null): Promise<void> {
     _pendingOnboardingAccount = acct;
     if (_pendingOnboardingTimer) { clearTimeout(_pendingOnboardingTimer); _pendingOnboardingTimer = null; }
     if (acct) {
-        await browser.storage.session.set({ _pendingOnboardingAccount: acct });
+        // S-6: Split the privkey across two session storage keys via XOR so
+        // neither key alone reveals the secret.
+        if (acct.privkey) {
+            const privkeyBytes = hexToBytes(acct.privkey);
+            const pad = crypto.getRandomValues(new Uint8Array(privkeyBytes.length));
+            const masked = xorBytes(privkeyBytes, pad);
+            // Zero the intermediate plaintext copy
+            privkeyBytes.fill(0);
+
+            const redacted = { ...acct, privkey: null };
+            await browser.storage.session.set({
+                _pendingOnboardingAccount: redacted,
+                _pendingOnboardingPad: bytesToHex(pad),
+                _pendingOnboardingMasked: bytesToHex(masked),
+            });
+            pad.fill(0);
+            masked.fill(0);
+        } else {
+            await browser.storage.session.set({ _pendingOnboardingAccount: acct });
+            await browser.storage.session.remove(['_pendingOnboardingPad', '_pendingOnboardingMasked']);
+        }
         _pendingOnboardingTimer = setTimeout(() => setPendingOnboardingAccount(null), ONBOARDING_TTL_MS);
     } else {
-        await browser.storage.session.remove('_pendingOnboardingAccount');
+        await browser.storage.session.remove([
+            '_pendingOnboardingAccount',
+            '_pendingOnboardingPad',
+            '_pendingOnboardingMasked',
+        ]);
     }
 }
 
 async function getPendingOnboardingAccount(): Promise<Account | null> {
     if (_pendingOnboardingAccount) return _pendingOnboardingAccount;
-    const data = await browser.storage.session.get('_pendingOnboardingAccount');
-    return (data as Record<string, Account | null>)._pendingOnboardingAccount || null;
+    const data = await browser.storage.session.get([
+        '_pendingOnboardingAccount',
+        '_pendingOnboardingPad',
+        '_pendingOnboardingMasked',
+    ]) as Record<string, unknown>;
+    const stored = data._pendingOnboardingAccount as Account | null;
+    if (!stored) return null;
+
+    // S-6: Reconstruct privkey from the XOR-split halves
+    const padHex = data._pendingOnboardingPad as string | undefined;
+    const maskedHex = data._pendingOnboardingMasked as string | undefined;
+    if (padHex && maskedHex) {
+        const pad = hexToBytes(padHex);
+        const masked = hexToBytes(maskedHex);
+        const privkeyBytes = xorBytes(pad, masked);
+        stored.privkey = bytesToHex(privkeyBytes);
+        privkeyBytes.fill(0);
+        pad.fill(0);
+        masked.fill(0);
+    }
+    return stored;
 }
 
 export async function checkDuplicateAccount(pubkey: string): Promise<{ upgradeFromReadOnly: string | null }> {
@@ -138,13 +190,14 @@ export const handlers = new Map<string, HandlerFn>([
         for (const [oldId, oldSession] of _nostrConnectSessions) {
             oldSession.abortController.abort();
             if (oldSession.signer) oldSession.signer.close().catch(() => {});
+            oldSession.secretKey.fill(0);
             _nostrConnectSessions.delete(oldId);
         }
 
         const NIP46_RELAYS = ['wss://relay.nsec.app', ...DEFAULT_RELAYS];
         const connectSecret = randomHex(16);
-        const ncSecretKey = generateSecretKey();
-        const ncLocalPubkey = ntGetPublicKey(ncSecretKey);
+        const ncSecretKey = randomBytes(32);
+        const ncLocalPubkey = bytesToHex(getPublicKey(ncSecretKey));
 
         const nostrconnectUri = createNostrConnectURI({
             clientPubkey: ncLocalPubkey,
@@ -216,6 +269,7 @@ export const handlers = new Map<string, HandlerFn>([
         if (session2) {
             session2.abortController.abort();
             if (session2.signer) session2.signer.close().catch(() => {});
+            session2.secretKey.fill(0);
             _nostrConnectSessions.delete(params.sessionId as string);
         }
         return { ok: true };

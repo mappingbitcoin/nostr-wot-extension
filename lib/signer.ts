@@ -28,34 +28,27 @@ import type { RequestDecision, PendingRequest, UnsignedEvent, SignedEvent, SafeA
 import browser from './browser.ts';
 import * as vault from './vault.ts';
 import * as permissions from './permissions.ts';
-import { signEvent as cryptoSignEvent } from './crypto/nip01.js';
-import { bytesToHex, hexToBytes } from './crypto/utils.js';
-import { getPublicKey } from './crypto/secp256k1.js';
-import { nip04Encrypt, nip04Decrypt } from './crypto/nip04.js';
-import { nip44Encrypt, nip44Decrypt } from './crypto/nip44.js';
+import { AsyncLock } from './utils/async-lock.ts';
+import { SIGNER_REQUEST_TIMEOUT_MS, VAULT_POLL_INTERVAL_MS } from './constants.ts';
+import { signEvent as cryptoSignEvent } from './crypto/nip01.ts';
+import { bytesToHex, hexToBytes, randomBytes } from './crypto/utils.ts';
+import { getPublicKey } from './crypto/secp256k1.ts';
+import { nip04Encrypt, nip04Decrypt } from './crypto/nip04.ts';
+import { nip44Encrypt, nip44Decrypt } from './crypto/nip44.ts';
 import { BunkerSigner, parseBunkerInput } from 'nostr-tools/nip46';
-import { generateSecretKey } from 'nostr-tools/pure';
 
 // In-memory resolvers for pending requests (keyed by request ID)
 const _pendingResolvers: Map<string, (decision: RequestDecision) => void> = new Map();
 let _requestCounter: number = 0;
 
-// Timeout for pending requests (2 minutes)
-const REQUEST_TIMEOUT_MS = 120_000;
+const REQUEST_TIMEOUT_MS = SIGNER_REQUEST_TIMEOUT_MS;
 const _timeoutTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
 // Vault unlock waiters -- independent of _pendingResolvers for resilience
 const _unlockWaiters: Map<string, { resolve: () => void; reject: (err: Error) => void }> = new Map();
 
-// Mutex for session storage writes (prevents concurrent read-modify-write races)
-let _storageLock: Promise<void> = Promise.resolve();
-async function withStorageLock<T>(fn: () => Promise<T>): Promise<T> {
-  const prev = _storageLock;
-  let release!: () => void;
-  _storageLock = new Promise(r => release = r);
-  await prev;
-  try { return await fn(); } finally { release(); }
-}
+// Shared async lock for session storage writes
+const _lock = new AsyncLock();
 
 // NIP-46 client instances (keyed by account ID)
 const _nip46Clients: Map<string, BunkerSigner> = new Map();
@@ -156,7 +149,7 @@ export async function queueRequest(request: QueueRequestInput): Promise<RequestD
   const entry: PendingRequest = { id, ...request, timestamp: Date.now() };
 
   // Serialized storage write to prevent concurrent read-modify-write races
-  await withStorageLock(async () => {
+  await _lock.run(async () => {
     const data = await browser.storage.session.get('signerPending');
     const pending: PendingRequest[] = (data.signerPending as PendingRequest[] | undefined) || [];
     pending.push(entry);
@@ -207,7 +200,7 @@ async function queueNip46InFlight(request: QueueRequestInput): Promise<string> {
   const id = `nip46_${Date.now()}_${++_requestCounter}`;
   const entry: PendingRequest = { id, ...request, nip46InFlight: true, timestamp: Date.now() };
 
-  await withStorageLock(async () => {
+  await _lock.run(async () => {
     const data = await browser.storage.session.get('signerPending');
     const pending: PendingRequest[] = (data.signerPending as PendingRequest[] | undefined) || [];
     pending.push(entry);
@@ -223,7 +216,7 @@ async function queueNip46InFlight(request: QueueRequestInput): Promise<string> {
  * Remove a NIP-46 in-flight tracking entry.
  */
 async function removeNip46InFlight(id: string): Promise<void> {
-  await withStorageLock(async () => {
+  await _lock.run(async () => {
     const data = await browser.storage.session.get('signerPending');
     const pending: PendingRequest[] = ((data.signerPending as PendingRequest[] | undefined) || []).filter((r: PendingRequest) => r.id !== id);
     await browser.storage.session.set({ signerPending: pending });
@@ -253,7 +246,7 @@ async function updateBadge(count: number): Promise<void> {
 }
 
 async function removePendingFromStorage(id: string): Promise<void> {
-  await withStorageLock(async () => {
+  await _lock.run(async () => {
     const data = await browser.storage.session.get('signerPending');
     const pending: PendingRequest[] = ((data.signerPending as PendingRequest[] | undefined) || []).filter((r: PendingRequest) => r.id !== id);
     await browser.storage.session.set({ signerPending: pending });
@@ -285,7 +278,7 @@ export function resolveRequest(id: string, decision: RequestDecision): void {
  * @param decision - { allow: boolean, remember: boolean }
  */
 export async function resolveBatch(origin: string, method: string, decision: RequestDecision, eventKind?: number): Promise<void> {
-  await withStorageLock(async () => {
+  await _lock.run(async () => {
     const data = await browser.storage.session.get('signerPending');
     const pending: PendingRequest[] = (data.signerPending as PendingRequest[] | undefined) || [];
     const kindMatch = (r: PendingRequest) => eventKind === undefined || r.eventKind === eventKind;
@@ -328,7 +321,7 @@ export async function onVaultUnlocked(): Promise<void> {
 
   // Also resolve any legacy queueRequest-based unlock waiters
   let hadWaiters = false;
-  await withStorageLock(async () => {
+  await _lock.run(async () => {
     const data = await browser.storage.session.get('signerPending');
     const pending: PendingRequest[] = (data.signerPending as PendingRequest[] | undefined) || [];
     const unlockWaiters = pending.filter(r => r.waitingForUnlock);
@@ -362,7 +355,7 @@ export async function cleanupStale(): Promise<void> {
   _timeoutTimers.clear();
   _pendingResolvers.clear();
   _unlockWaiters.clear();
-  await withStorageLock(async () => {
+  await _lock.run(async () => {
     await browser.storage.session.set({ signerPending: [] });
     await updateBadge(0);
   });
@@ -375,7 +368,7 @@ export async function cleanupStale(): Promise<void> {
  */
 export async function rejectPendingForAccount(accountId: string): Promise<void> {
   if (!accountId) return;
-  await withStorageLock(async () => {
+  await _lock.run(async () => {
     const data = await browser.storage.session.get('signerPending');
     const pending: PendingRequest[] = (data.signerPending as PendingRequest[] | undefined) || [];
     const forAccount = pending.filter(r => r.accountId === accountId);
@@ -405,7 +398,7 @@ export async function cancelAllUnlockWaiters(): Promise<void> {
     waiter.reject(error);
   }
   _unlockWaiters.clear();
-  await withStorageLock(async () => {
+  await _lock.run(async () => {
     const data = await browser.storage.session.get('signerPending');
     const pending: PendingRequest[] = ((data.signerPending as PendingRequest[] | undefined) || [])
       .filter((r: PendingRequest) => !r.waitingForUnlock);
@@ -448,7 +441,7 @@ async function waitForVaultUnlock(origin: string, type: string, accountId: strin
   };
 
   // Add unlock marker to session storage so popup shows unlock modal
-  await withStorageLock(async () => {
+  await _lock.run(async () => {
     const data = await browser.storage.session.get('signerPending');
     const pending: PendingRequest[] = (data.signerPending as PendingRequest[] | undefined) || [];
     pending.push(marker);
@@ -477,10 +470,10 @@ async function waitForVaultUnlock(origin: string, type: string, accountId: strin
       };
       _unlockWaiters.set(markerId, { resolve: done, reject: fail });
 
-      // Fallback: poll vault.isLocked() every 500ms
+      // Fallback: poll vault.isLocked() periodically
       const poller = setInterval(() => {
         if (!vault.isLocked()) done();
-      }, 500);
+      }, VAULT_POLL_INTERVAL_MS);
 
       // Timeout after 2 minutes
       const timer = setTimeout(() => {
@@ -491,7 +484,7 @@ async function waitForVaultUnlock(origin: string, type: string, accountId: strin
     });
   } finally {
     // Remove marker from session storage
-    await withStorageLock(async () => {
+    await _lock.run(async () => {
       const data = await browser.storage.session.get('signerPending');
       const pending: PendingRequest[] = ((data.signerPending as PendingRequest[] | undefined) || []).filter((r: PendingRequest) => r.id !== markerId);
       await browser.storage.session.set({ signerPending: pending });
@@ -687,7 +680,7 @@ async function getNip46Client(acct: SafeAccount): Promise<BunkerSigner> {
   if (acct.nip46Config.localPrivkey) {
     secretKey = hexToBytes(acct.nip46Config.localPrivkey);
   } else {
-    secretKey = generateSecretKey();
+    secretKey = randomBytes(32);
     // Persist the new keypair for reconnection after service worker restart
     const pubkey = bytesToHex(getPublicKey(secretKey));
     const privkeyHex = bytesToHex(secretKey);
@@ -706,7 +699,7 @@ async function getNip46Client(acct: SafeAccount): Promise<BunkerSigner> {
         console.warn('[NIP-46] rejected non-HTTPS auth_url:', url);
         return;
       }
-      console.log('[NIP-46] auth_url received, opening:', url);
+      console.debug('[NIP-46] auth_url received, opening:', url);
       browser.tabs.create({ url });
     }
   });
@@ -718,20 +711,32 @@ async function getNip46Client(acct: SafeAccount): Promise<BunkerSigner> {
   return signer;
 }
 
-async function handleNip46Request(acct: SafeAccount, method: string, data: unknown, _origin: string): Promise<any> {
+/**
+ * Forward a signing/crypto request to the remote NIP-46 signer.
+ * NIP-46 ephemeral keys live in memory for the session lifetime (held by BunkerSigner).
+ */
+async function handleNip46Request(acct: SafeAccount, method: string, data: unknown, _origin: string): Promise<SignedEvent | string> {
   const signer = await getNip46Client(acct);
 
   switch (method) {
     case 'signEvent':
       return signer.signEvent(data as UnsignedEvent);
-    case 'nip04Encrypt':
-      return signer.nip04Encrypt((data as { pubkey: string; plaintext: string }).pubkey, (data as { pubkey: string; plaintext: string }).plaintext);
-    case 'nip04Decrypt':
-      return signer.nip04Decrypt((data as { pubkey: string; ciphertext: string }).pubkey, (data as { pubkey: string; ciphertext: string }).ciphertext);
-    case 'nip44Encrypt':
-      return signer.nip44Encrypt((data as { pubkey: string; plaintext: string }).pubkey, (data as { pubkey: string; plaintext: string }).plaintext);
-    case 'nip44Decrypt':
-      return signer.nip44Decrypt((data as { pubkey: string; ciphertext: string }).pubkey, (data as { pubkey: string; ciphertext: string }).ciphertext);
+    case 'nip04Encrypt': {
+      const { pubkey, plaintext } = data as { pubkey: string; plaintext: string };
+      return signer.nip04Encrypt(pubkey, plaintext);
+    }
+    case 'nip04Decrypt': {
+      const { pubkey, ciphertext } = data as { pubkey: string; ciphertext: string };
+      return signer.nip04Decrypt(pubkey, ciphertext);
+    }
+    case 'nip44Encrypt': {
+      const { pubkey, plaintext } = data as { pubkey: string; plaintext: string };
+      return signer.nip44Encrypt(pubkey, plaintext);
+    }
+    case 'nip44Decrypt': {
+      const { pubkey, ciphertext } = data as { pubkey: string; ciphertext: string };
+      return signer.nip44Decrypt(pubkey, ciphertext);
+    }
     default:
       throw new Error(`Unsupported NIP-46 method: ${method}`);
   }

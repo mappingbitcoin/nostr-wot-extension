@@ -21,7 +21,7 @@ export function randomHex(byteLength: number): string {
   return bytesToHex(randomBytes(byteLength));
 }
 
-export async function sha256(data: Uint8Array): Promise<Uint8Array> {
+export function sha256(data: Uint8Array): Uint8Array {
   return _sha256(data);
 }
 
@@ -54,9 +54,12 @@ export function readU32BE(buf: Uint8Array, offset: number = 0): number {
 // ── Base64 helpers ──
 
 export function arrayToBase64(arr: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < arr.length; i++) binary += String.fromCharCode(arr[i]);
-  return btoa(binary);
+  const chunks: string[] = [];
+  const chunkSize = 8192;
+  for (let i = 0; i < arr.length; i += chunkSize) {
+    chunks.push(String.fromCharCode(...arr.subarray(i, i + chunkSize)));
+  }
+  return btoa(chunks.join(''));
 }
 
 export function base64ToArray(b64: string): Uint8Array {

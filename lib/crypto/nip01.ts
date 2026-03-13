@@ -27,6 +27,18 @@ export async function computeEventId(event: UnsignedEvent): Promise<string> {
   return bytesToHex(hash);
 }
 
+/**
+ * Signs a Nostr event with the given private key.
+ *
+ * SECURITY CONTRACT: Callers MUST zero the private key bytes after use by calling
+ * `privkey.fill(0)` in a try/finally block. This function does not zero the key internally
+ * because it may still be needed by the caller for additional operations (e.g., signing
+ * multiple events). Failure to zero the key leaves sensitive material in memory.
+ *
+ * @param event - The unsigned event to sign (must have kind, tags, content, created_at)
+ * @param privkey - Private key bytes (Uint8Array). Caller must zero after use.
+ * @returns The signed event with id and sig populated
+ */
 export async function signEvent(event: UnsignedEvent, privkey: Uint8Array): Promise<SignedEvent> {
   const pubkey = bytesToHex(schnorr.getPublicKey(privkey));
 

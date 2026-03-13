@@ -110,7 +110,7 @@ function validatePathResponse(data: unknown): PathResponse {
 }
 
 export class RemoteOracle {
-    baseUrl: string;
+    private readonly baseUrl: string;
 
     constructor(baseUrl: string) {
         this.baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash

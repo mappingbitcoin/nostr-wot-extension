@@ -80,8 +80,8 @@ export function ScoringProvider({ children }: ScoringProviderProps) {
 
   // Load on mount
   useEffect(() => {
-    browser.storage.sync.get(['scoring']).then((data: any) => {
-      const s = data.scoring || DEFAULT_SCORING;
+    browser.storage.sync.get(['scoring']).then((data: Record<string, unknown>) => {
+      const s = (data.scoring as ScoringConfig | undefined) || DEFAULT_SCORING;
       setScoring(s);
       applyMatch(s);
     });
@@ -89,9 +89,9 @@ export function ScoringProvider({ children }: ScoringProviderProps) {
 
   // Listen for external changes (e.g. from another popup instance or background)
   useEffect(() => {
-    function onChange(changes: Record<string, any>, area: string) {
+    function onChange(changes: Record<string, { newValue?: unknown; oldValue?: unknown }>, area: string) {
       if (area === 'sync' && changes.scoring) {
-        const s = changes.scoring.newValue || DEFAULT_SCORING;
+        const s = (changes.scoring.newValue as ScoringConfig | undefined) || DEFAULT_SCORING;
         setScoring(s);
         applyMatch(s);
       }

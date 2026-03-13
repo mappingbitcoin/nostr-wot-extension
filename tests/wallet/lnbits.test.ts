@@ -30,10 +30,10 @@ describe('LnbitsProvider', () => {
   const config = { instanceUrl: 'https://lnbits.example.com', adminKey: 'testapikey123' };
 
   describe('getBalance', () => {
-    it('returns balance in msats', async () => {
+    it('returns balance in sats (converted from msats)', async () => {
       const provider = new LnbitsProvider(config, mockFetch({ balance: 100_000 }));
       const result = await provider.getBalance();
-      assert.deepEqual(result, { balance: 100_000 });
+      assert.deepEqual(result, { balance: 100 });
     });
 
     it('sends admin key in X-Api-Key header', async () => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { rpc } from '@shared/rpc.ts';
 
 interface UseRpcOptions<T> {
@@ -24,11 +24,18 @@ export default function useRpc<T = unknown>(
   const [loading, setLoading] = useState<boolean>(!lazy);
   const [error, setError] = useState<string | null>(null);
 
+  const paramsRef = useRef(params);
+  const paramsKey = JSON.stringify(params);
+  // Only update ref when serialized value changes
+  if (JSON.stringify(paramsRef.current) !== paramsKey) {
+    paramsRef.current = params;
+  }
+
   const call = useCallback(async (overrideParams?: unknown): Promise<T | null> => {
     setLoading(true);
     setError(null);
     try {
-      let result: unknown = await rpc(method, overrideParams ?? params);
+      let result: unknown = await rpc(method, overrideParams ?? paramsRef.current);
       if (transform) result = transform(result);
       setData(result as T);
       return result as T;
@@ -39,7 +46,7 @@ export default function useRpc<T = unknown>(
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [method, JSON.stringify(params)]);
+  }, [method, paramsKey]);
 
   useEffect(() => { if (!lazy) call(); }, [call, lazy]);
 

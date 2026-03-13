@@ -30,20 +30,33 @@
 
 import type { PermissionDecision, PermissionMap, PermissionBucket, DomainPermissions } from './types.ts';
 import browser from './browser.ts';
+import { AsyncLock } from './utils/async-lock.ts';
 
 const STORAGE_KEY = 'signerPermissions';
 const GLOBAL_DEFAULTS_KEY = 'signerUseGlobalDefaults';
 const DEFAULT_BUCKET = '_default';
 
-// Mutex for storage writes (prevents concurrent read-modify-write races)
-let _storageLock: Promise<void> = Promise.resolve();
-async function withStorageLock<T>(fn: () => Promise<T>): Promise<T> {
-  const prev = _storageLock;
-  let release!: () => void;
-  _storageLock = new Promise(r => release = r);
-  await prev;
-  try { return await fn(); } finally { release(); }
+// Shared async lock for storage writes
+const _lock = new AsyncLock();
+
+// ── In-memory cache ──
+let _cachedPerms: PermissionMap | null = null;
+let _cachedUseGlobalDefaults: boolean | null = null;
+
+/** Invalidate cached permissions (call after writes or in test setup) */
+export function invalidateCache(): void {
+  _cachedPerms = null;
+  _cachedUseGlobalDefaults = null;
 }
+
+// Listen for external storage changes (e.g. from other contexts)
+try {
+  browser.storage.onChanged.addListener((changes: Record<string, { newValue?: unknown }>, area: string) => {
+    if (area === 'local' && (changes[STORAGE_KEY] || changes[GLOBAL_DEFAULTS_KEY])) {
+      invalidateCache();
+    }
+  });
+} catch { /* storage.onChanged may not be available in tests */ }
 
 // Decisions: "allow" | "deny" | "ask"
 
@@ -123,7 +136,7 @@ export async function check(domain: string, method: string, kind?: number, accou
  * @param accountId - account ID (uses _default if omitted)
  */
 export async function save(domain: string, method: string, kind: number | null, decision: PermissionDecision, accountId?: string): Promise<void> {
-  await withStorageLock(async () => {
+  await _lock.run(async () => {
     const perms = await load();
     const useDefaults = await getUseGlobalDefaults();
     const bucket = useDefaults ? DEFAULT_BUCKET : (accountId || DEFAULT_BUCKET);
@@ -134,6 +147,7 @@ export async function save(domain: string, method: string, kind: number | null, 
     perms[domain][bucket][key] = decision;
 
     await browser.storage.local.set({ [STORAGE_KEY]: perms });
+    invalidateCache();
   });
 }
 
@@ -145,7 +159,7 @@ export async function save(domain: string, method: string, kind: number | null, 
  * @param accountId - account ID (uses _default if omitted)
  */
 export async function saveDirect(domain: string, key: string, decision: PermissionDecision, accountId?: string): Promise<void> {
-  await withStorageLock(async () => {
+  await _lock.run(async () => {
     const perms = await load();
     const useDefaults = await getUseGlobalDefaults();
     const bucket = useDefaults ? DEFAULT_BUCKET : (accountId || DEFAULT_BUCKET);
@@ -153,6 +167,7 @@ export async function saveDirect(domain: string, key: string, decision: Permissi
     if (!perms[domain][bucket]) perms[domain][bucket] = {};
     perms[domain][bucket][key] = decision;
     await browser.storage.local.set({ [STORAGE_KEY]: perms });
+    invalidateCache();
   });
 }
 
@@ -162,7 +177,7 @@ export async function saveDirect(domain: string, key: string, decision: Permissi
  * they are no longer meaningful in the per-kind model.
  */
 export async function migrateToPerKind(): Promise<void> {
-  await withStorageLock(async () => {
+  await _lock.run(async () => {
     const perms = await load();
     let changed = false;
     const OLD_KEYS = ['signEvent', 'nip04Encrypt', 'nip04Decrypt', 'nip44Encrypt', 'nip44Decrypt', '*'];
@@ -195,6 +210,7 @@ export async function migrateToPerKind(): Promise<void> {
     }
     if (changed) {
       await browser.storage.local.set({ [STORAGE_KEY]: perms });
+      invalidateCache();
     }
   });
 }
@@ -205,7 +221,7 @@ export async function migrateToPerKind(): Promise<void> {
  * Safe to call multiple times -- skips already-migrated domains.
  */
 export async function migrateToPerAccount(): Promise<void> {
-  await withStorageLock(async () => {
+  await _lock.run(async () => {
     const perms = await load();
     let changed = false;
     for (const domain of Object.keys(perms)) {
@@ -225,6 +241,7 @@ export async function migrateToPerAccount(): Promise<void> {
     }
     if (changed) {
       await browser.storage.local.set({ [STORAGE_KEY]: perms });
+      invalidateCache();
     }
   });
 }
@@ -235,7 +252,7 @@ export async function migrateToPerAccount(): Promise<void> {
  * Now permissions are account-type-agnostic; "ask" is the conservative default.
  */
 export async function migrateForwardToAsk(): Promise<void> {
-  await withStorageLock(async () => {
+  await _lock.run(async () => {
     const perms = await load();
     let changed = false;
     for (const domain of Object.keys(perms)) {
@@ -263,9 +280,10 @@ export async function migrateForwardToAsk(): Promise<void> {
 export async function clear(domain?: string, accountId?: string): Promise<void> {
   if (!domain) {
     await browser.storage.local.remove(STORAGE_KEY);
+    invalidateCache();
     return;
   }
-  await withStorageLock(async () => {
+  await _lock.run(async () => {
     const perms = await load();
     if (!perms[domain]) return;
 
@@ -277,6 +295,7 @@ export async function clear(domain?: string, accountId?: string): Promise<void> 
       delete perms[domain];
     }
     await browser.storage.local.set({ [STORAGE_KEY]: perms });
+    invalidateCache();
   });
 }
 
@@ -287,7 +306,7 @@ export async function clear(domain?: string, accountId?: string): Promise<void> 
  */
 export async function clearForAccount(accountId: string): Promise<void> {
   if (!accountId || accountId === DEFAULT_BUCKET) return;
-  await withStorageLock(async () => {
+  await _lock.run(async () => {
     const perms = await load();
     let changed = false;
     for (const domain of Object.keys(perms)) {
@@ -301,6 +320,7 @@ export async function clearForAccount(accountId: string): Promise<void> {
     }
     if (changed) {
       await browser.storage.local.set({ [STORAGE_KEY]: perms });
+      invalidateCache();
     }
   });
 }
@@ -312,7 +332,7 @@ export async function clearForAccount(accountId: string): Promise<void> {
  */
 export async function copyPermissions(fromAccountId: string | null, toAccountId: string): Promise<void> {
   if (!toAccountId) return;
-  await withStorageLock(async () => {
+  await _lock.run(async () => {
     const from = fromAccountId || DEFAULT_BUCKET;
     const perms = await load();
     let changed = false;
@@ -325,6 +345,7 @@ export async function copyPermissions(fromAccountId: string | null, toAccountId:
     }
     if (changed) {
       await browser.storage.local.set({ [STORAGE_KEY]: perms });
+      invalidateCache();
     }
   });
 }
@@ -383,9 +404,11 @@ export async function getForDomainRaw(domain: string): Promise<DomainPermissions
  * When false, ONLY per-account buckets are used.
  */
 export async function getUseGlobalDefaults(): Promise<boolean> {
+  if (_cachedUseGlobalDefaults !== null) return _cachedUseGlobalDefaults;
   const data = await browser.storage.local.get(GLOBAL_DEFAULTS_KEY);
   // Default to true for backward compatibility
-  return data[GLOBAL_DEFAULTS_KEY] !== false;
+  _cachedUseGlobalDefaults = data[GLOBAL_DEFAULTS_KEY] !== false;
+  return _cachedUseGlobalDefaults;
 }
 
 /**
@@ -395,9 +418,12 @@ export async function getUseGlobalDefaults(): Promise<boolean> {
  */
 export async function setUseGlobalDefaults(enabled: boolean): Promise<void> {
   await browser.storage.local.set({ [GLOBAL_DEFAULTS_KEY]: !!enabled });
+  invalidateCache();
 }
 
 async function load(): Promise<PermissionMap> {
+  if (_cachedPerms !== null) return _cachedPerms;
   const data = await browser.storage.local.get(STORAGE_KEY);
-  return (data[STORAGE_KEY] as PermissionMap) || {};
+  _cachedPerms = (data[STORAGE_KEY] as PermissionMap) || {};
+  return _cachedPerms;
 }

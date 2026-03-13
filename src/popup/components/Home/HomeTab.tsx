@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import browser from '@shared/browser.ts';
 import { rpc, rpcNotify } from '@shared/rpc.ts';
 import { getDomainFromUrl } from '@shared/url.ts';
@@ -14,6 +14,7 @@ import Button from '@components/Button/Button';
 import EmptyState from '@components/EmptyState/EmptyState';
 import { IconGlobe, IconZap, IconChevronRight } from '@assets';
 import styles from './HomeTab.module.css';
+import type { PendingRequest } from '@lib/types.ts';
 
 interface HomeTabProps {
   onViewAllActivity: (domain: string | null) => void;
@@ -31,137 +32,24 @@ interface SyncStaleInfo {
   dismissed?: boolean;
 }
 
-export default function HomeTab({ onViewAllActivity, onManagePermissions, onManageFilters, onManageBadges, onEditProfile, onManageScoring, onOpenWallet, menuOpen }: HomeTabProps) {
-  const { active, cachedProfile, isReadOnly, isNip46 } = useAccount();
-  const { locked } = useVault();
+interface Account {
+  id: string;
+  pubkey: string;
+  name?: string;
+  readOnly?: boolean;
+  type?: string;
+}
+
+// ── Custom hooks (extracted from HomeTab state) ──
+
+function useSiteState(active: Account | null) {
   const [domain, setDomain] = useState<string | null>(null);
   const [siteState, setSiteState] = useState<string | null>(null); // null = loading, 'empty' | 'notConnected' | 'connected'
   const [identityEnabled, setIdentityEnabled] = useState<boolean>(true);
   const [wotEnabled, setWotEnabled] = useState<boolean>(true);
   const [canInject, setCanInject] = useState<boolean>(false);
-  const [syncStale, setSyncStale] = useState<SyncStaleInfo | null>(null);
-  const [isSyncing, setIsSyncing] = useState<boolean>(false);
-  const [profileDismissed, setProfileDismissed] = useState<boolean>(false);
 
-  // Pending requests count
-  const [pendingCount, setPendingCount] = useState(0);
-
-  // Wallet state: null = loading, false = no wallet, { balance } = has wallet
-  const [walletState, setWalletState] = useState<null | false | { balance: number }>(null);
-  const [walletDismissed, setWalletDismissed] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (!active?.id) return;
-    browser.storage.local.get('profileSuggestionDismissed').then((data) => {
-      const dismissed = (data as Record<string, unknown>).profileSuggestionDismissed;
-      const list: string[] = Array.isArray(dismissed) ? dismissed : [];
-      setProfileDismissed(list.includes(active.id));
-    });
-  }, [active?.id]);
-
-  // Check wallet config + balance
-  const checkWallet = useCallback(async () => {
-    try {
-      const configType = await rpc<string | false>('wallet_hasConfig');
-      if (!configType) { setWalletState(false); return; }
-      const result = await rpc<{ balance: number }>('wallet_getBalance');
-      setWalletState({ balance: result?.balance ?? 0 });
-    } catch {
-      setWalletState(false);
-    }
-  }, []);
-
-  // Wallet is only available for unlocked signing accounts (generated/nsec)
-  const canUseWallet = active && !isReadOnly && !isNip46 && !locked;
-
-  useEffect(() => {
-    if (!active?.id || !canUseWallet) { setWalletState(null); setWalletDismissed(false); return; }
-    checkWallet();
-    browser.storage.local.get('walletBannerDismissed').then((data) => {
-      const dismissed = (data as Record<string, unknown>).walletBannerDismissed;
-      const list: string[] = Array.isArray(dismissed) ? dismissed : [];
-      setWalletDismissed(list.includes(active.id));
-    });
-  }, [active?.id, canUseWallet, checkWallet]);
-
-  // Re-check wallet state when menu overlay closes (e.g. after wallet setup)
-  useEffect(() => {
-    if (menuOpen === false && canUseWallet) {
-      checkWallet();
-    }
-  }, [menuOpen, canUseWallet, checkWallet]);
-
-  useEffect(() => {
-    async function checkPending() {
-      try {
-        const pending: any[] = await rpc('signer_getPending') || [];
-        const actionable = pending.filter((r: any) => (r.needsPermission || r.waitingForUnlock) && !r.nip46InFlight);
-        setPendingCount(actionable.length);
-      } catch {
-        setPendingCount(0);
-      }
-    }
-    checkPending();
-    const listener = (message: any) => {
-      if (message.type === 'signerPendingUpdated') checkPending();
-    };
-    browser.runtime.onMessage.addListener(listener);
-    return () => browser.runtime.onMessage.removeListener(listener);
-  }, []);
-
-  useEffect(() => {
-    loadHomeState();
-  }, [active]);
-
-  // Check if sync is stale (>24h) and poll sync-in-progress state
-  useEffect(() => {
-    if (!active?.id) { setSyncStale(null); setIsSyncing(false); return; }
-
-    async function checkSync() {
-      try {
-        const [stats, syncState] = await Promise.all([
-          rpc<{ lastSync?: number; nodes?: number }>('getDatabaseStats', { accountId: active!.id }),
-          rpc<{ inProgress?: boolean }>('getSyncState'),
-        ]);
-        const syncing = !!(syncState?.inProgress);
-        setIsSyncing(syncing);
-
-        if (syncing) {
-          // Don't show stale banner while syncing
-          setSyncStale(null);
-        } else {
-          // Check if user dismissed the stale banner within the last 24h
-          const dismissData = await browser.storage.local.get('syncStaleDismissed');
-          const dismissed = (dismissData as Record<string, unknown>).syncStaleDismissed as Record<string, number> | undefined;
-          const dismissedAt = dismissed?.[active!.id];
-          const recentlyDismissed = dismissedAt && (Date.now() - dismissedAt < 24 * 60 * 60 * 1000);
-
-          if (recentlyDismissed) {
-            setSyncStale(null);
-          } else {
-            const lastSync = stats?.lastSync;
-            if (!lastSync && (stats?.nodes ?? 0) === 0) {
-              setSyncStale({ lastSync: null });
-            } else if (lastSync && Date.now() - lastSync > 24 * 60 * 60 * 1000) {
-              setSyncStale({ lastSync });
-            } else {
-              setSyncStale(null);
-            }
-          }
-        }
-      } catch {
-        setSyncStale(null);
-        setIsSyncing(false);
-      }
-    }
-
-    checkSync();
-    // Poll while popup is open so syncing indicator updates
-    const interval = setInterval(checkSync, 3000);
-    return () => clearInterval(interval);
-  }, [active]);
-
-  async function loadHomeState() {
+  const loadHomeState = useCallback(async () => {
     try {
       const tabs = await browser.tabs.query({ active: true, currentWindow: true });
       const tab = tabs[0];
@@ -181,12 +69,12 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
 
       const [allowedDomains, badgeDisabledData, identityDisabled, perms] = await Promise.all([
         rpc<string[]>('getAllowedDomains'),
-        browser.storage.local.get('badgeDisabledSites') as Promise<any>,
+        browser.storage.local.get('badgeDisabledSites') as Promise<Record<string, unknown>>,
         rpc<string[]>('getIdentityDisabledSites'),
         rpc<Record<string, string>>('signer_getPermissionsForDomain', { domain: d }),
       ]);
 
-      const badgeDisabled = new Set<string>(badgeDisabledData.badgeDisabledSites || []);
+      const badgeDisabled = new Set<string>((badgeDisabledData.badgeDisabledSites as string[] | undefined) || []);
       const identityDisabledSet = new Set<string>(identityDisabled || []);
       const inject = (allowedDomains || []).includes(d);
       const permObj = perms || {};
@@ -205,7 +93,175 @@ export default function HomeTab({ onViewAllActivity, onManagePermissions, onMana
     } catch {
       setSiteState('empty');
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    loadHomeState();
+  }, [active, loadHomeState]);
+
+  return { domain, siteState, identityEnabled, setIdentityEnabled, wotEnabled, setWotEnabled, canInject, loadHomeState };
+}
+
+function useSyncState(active: Account | null) {
+  const [syncStale, setSyncStale] = useState<SyncStaleInfo | null>(null);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const checkSync = useCallback(async () => {
+    if (!active?.id) return;
+    try {
+      const [stats, syncState] = await Promise.all([
+        rpc<{ lastSync?: number; nodes?: number }>('getDatabaseStats', { accountId: active.id }),
+        rpc<{ inProgress?: boolean }>('getSyncState'),
+      ]);
+      const syncing = !!(syncState?.inProgress);
+      setIsSyncing(syncing);
+
+      if (syncing) {
+        // Don't show stale banner while syncing
+        setSyncStale(null);
+      } else {
+        // Check if user dismissed the stale banner within the last 24h
+        const dismissData = await browser.storage.local.get('syncStaleDismissed');
+        const dismissed = (dismissData as Record<string, unknown>).syncStaleDismissed as Record<string, number> | undefined;
+        const dismissedAt = dismissed?.[active.id];
+        const recentlyDismissed = dismissedAt && (Date.now() - dismissedAt < 24 * 60 * 60 * 1000);
+
+        if (recentlyDismissed) {
+          setSyncStale(null);
+        } else {
+          const lastSync = stats?.lastSync;
+          if (!lastSync && (stats?.nodes ?? 0) === 0) {
+            setSyncStale({ lastSync: null });
+          } else if (lastSync && Date.now() - lastSync > 24 * 60 * 60 * 1000) {
+            setSyncStale({ lastSync });
+          } else {
+            setSyncStale(null);
+          }
+        }
+      }
+    } catch {
+      setSyncStale(null);
+      setIsSyncing(false);
+    }
+  }, [active?.id]);
+
+  // Initial check + listen for syncProgress messages
+  useEffect(() => {
+    if (!active?.id) { setSyncStale(null); setIsSyncing(false); return; }
+
+    checkSync();
+
+    // Listen for sync progress updates from background
+    function onMessage(message: { type?: string }) {
+      if (message.type === 'syncProgress') {
+        checkSync();
+      }
+    }
+    browser.runtime.onMessage.addListener(onMessage);
+    return () => browser.runtime.onMessage.removeListener(onMessage);
+  }, [active?.id, checkSync]);
+
+  // Only poll every 3s while syncing is in progress
+  useEffect(() => {
+    if (isSyncing) {
+      intervalRef.current = setInterval(checkSync, 3000);
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [isSyncing, checkSync]);
+
+  return { syncStale, setSyncStale, isSyncing, setIsSyncing };
+}
+
+function useWalletBanner(active: Account | null, canUseWallet: boolean | null, menuOpen?: boolean) {
+  const [walletState, setWalletState] = useState<null | false | { balance: number }>(null);
+  const [walletDismissed, setWalletDismissed] = useState<boolean>(false);
+
+  const checkWallet = useCallback(async () => {
+    try {
+      const configType = await rpc<string | false>('wallet_hasConfig');
+      if (!configType) { setWalletState(false); return; }
+      const result = await rpc<{ balance: number }>('wallet_getBalance');
+      setWalletState({ balance: result?.balance ?? 0 });
+    } catch {
+      setWalletState(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!active?.id || !canUseWallet) { setWalletState(null); setWalletDismissed(false); return; }
+    checkWallet();
+    browser.storage.local.get('walletBannerDismissed').then((data) => {
+      const dismissed = (data as Record<string, unknown>).walletBannerDismissed;
+      const list: string[] = Array.isArray(dismissed) ? dismissed : [];
+      setWalletDismissed(list.includes(active.id));
+    });
+  }, [active?.id, canUseWallet, checkWallet]);
+
+  // Re-check wallet state when menu overlay closes (e.g. after wallet setup)
+  useEffect(() => {
+    if (menuOpen === false && canUseWallet) {
+      checkWallet();
+    }
+  }, [menuOpen, canUseWallet, checkWallet]);
+
+  return { walletState, walletDismissed, setWalletDismissed };
+}
+
+// ── HomeTab component ──
+
+export default function HomeTab({ onViewAllActivity, onManagePermissions, onManageFilters, onManageBadges, onEditProfile, onManageScoring, onOpenWallet, menuOpen }: HomeTabProps) {
+  const { active, cachedProfile, isReadOnly, isNip46 } = useAccount();
+  const { locked } = useVault();
+  const [profileDismissed, setProfileDismissed] = useState<boolean>(false);
+
+  // Pending requests count
+  const [pendingCount, setPendingCount] = useState(0);
+
+  // Extracted hooks
+  const { domain, siteState, identityEnabled, setIdentityEnabled, wotEnabled, setWotEnabled, canInject, loadHomeState } = useSiteState(active);
+  const { syncStale, setSyncStale, isSyncing, setIsSyncing } = useSyncState(active);
+
+  // Wallet is only available for unlocked signing accounts (generated/nsec)
+  const canUseWallet = active && !isReadOnly && !isNip46 && !locked;
+  const { walletState, walletDismissed, setWalletDismissed } = useWalletBanner(active, canUseWallet, menuOpen);
+
+  useEffect(() => {
+    if (!active?.id) return;
+    browser.storage.local.get('profileSuggestionDismissed').then((data) => {
+      const dismissed = (data as Record<string, unknown>).profileSuggestionDismissed;
+      const list: string[] = Array.isArray(dismissed) ? dismissed : [];
+      setProfileDismissed(list.includes(active.id));
+    });
+  }, [active?.id]);
+
+  useEffect(() => {
+    async function checkPending() {
+      try {
+        const pending: PendingRequest[] = await rpc('signer_getPending') || [];
+        const actionable = pending.filter((r) => (r.needsPermission || r.waitingForUnlock) && !r.nip46InFlight);
+        setPendingCount(actionable.length);
+      } catch {
+        setPendingCount(0);
+      }
+    }
+    checkPending();
+    const listener = (message: { type?: string }) => {
+      if (message.type === 'signerPendingUpdated') checkPending();
+    };
+    browser.runtime.onMessage.addListener(listener);
+    return () => browser.runtime.onMessage.removeListener(listener);
+  }, []);
 
   const handleIdentityToggle = async (checked: boolean) => {
     setIdentityEnabled(checked);

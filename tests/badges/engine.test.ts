@@ -326,7 +326,7 @@ describe('badge engine: hexToNpub conversion', () => {
     });
 
     it('consistent with lib/crypto/bech32 npubEncode for the same input', async () => {
-        const { npubEncode } = await import('../../lib/crypto/bech32.js');
+        const { npubEncode } = await import('../../lib/crypto/bech32.ts');
         const engineNpub = hexToNpub(TEST_PUBKEY_HEX);
         const libNpub = npubEncode(TEST_PUBKEY_HEX);
         assert.strictEqual(engineNpub, libNpub);
@@ -595,7 +595,7 @@ describe('badge engine: buildCustomAdapters', () => {
 
 describe('badge engine: cross-validation with lib/crypto/bech32', () => {
     it('hexToNpub matches npubEncode for multiple vectors', async () => {
-        const { npubEncode } = await import('../../lib/crypto/bech32.js');
+        const { npubEncode } = await import('../../lib/crypto/bech32.ts');
 
         for (const hex of [TEST_PUBKEY_HEX, ZERO_HEX, ALL_ZEROS_HEX]) {
             const engineResult = hexToNpub(hex);
@@ -605,7 +605,7 @@ describe('badge engine: cross-validation with lib/crypto/bech32', () => {
     });
 
     it('validateNpub(npubEncode(hex)) always returns the npub', async () => {
-        const { npubEncode } = await import('../../lib/crypto/bech32.js');
+        const { npubEncode } = await import('../../lib/crypto/bech32.ts');
 
         for (const hex of [TEST_PUBKEY_HEX, ZERO_HEX, ALL_ZEROS_HEX]) {
             const npub = npubEncode(hex);
@@ -614,7 +614,7 @@ describe('badge engine: cross-validation with lib/crypto/bech32', () => {
     });
 
     it('both implementations agree on all-zeros and all-ones inputs', async () => {
-        const { npubEncode } = await import('../../lib/crypto/bech32.js');
+        const { npubEncode } = await import('../../lib/crypto/bech32.ts');
 
         const engineZeros = hexToNpub(ALL_ZEROS_HEX);
         const libZeros = npubEncode(ALL_ZEROS_HEX);

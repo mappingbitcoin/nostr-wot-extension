@@ -3,7 +3,7 @@ import { strict as assert } from 'node:assert';
 import {
   hexToBytes, bytesToHex, concatBytes, constantTimeEqual,
   sha256, randomBytes, writeU32BE, readU32BE
-} from '../../lib/crypto/utils.js';
+} from '../../lib/crypto/utils.ts';
 
 describe('hexToBytes / bytesToHex', () => {
   it('round-trips correctly', () => {

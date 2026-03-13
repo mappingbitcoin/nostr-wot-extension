@@ -408,6 +408,9 @@ export async function updateAccountWalletConfig(
  */
 export function setAutoLockTimeout(ms: number): void {
   _autoLockMs = ms;
+  if (ms === 0) {
+    console.warn('[Vault] Auto-lock disabled. Vault encrypted with empty password — reduced security.');
+  }
   resetAutoLock();
 }
 

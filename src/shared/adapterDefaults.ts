@@ -228,4 +228,4 @@ export const COMMON_SELECTORS: readonly CommonSelector[] = [
   { label: 'data-user (no badges)', value: '[data-user]:not([class*="verificationIcon"])' },
 ] as const;
 
-export { BUILTIN_ADAPTER_DEFAULTS, GENERIC_DEFAULTS, CSS_SKELETON };
+export { CSS_SKELETON };

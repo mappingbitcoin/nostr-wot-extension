@@ -8,11 +8,29 @@ import { getDomainFromUrl } from '@shared/url.ts';
 import { getDefaultsForDomain } from '@shared/adapterDefaults.ts';
 import { isRestrictedUrl, sanitizeCSS, type HandlerFn, type LocalAccountEntry } from './state.ts';
 
-// ── Domain permission functions ──
+// ── Domain permission functions (with in-memory cache) ──
+
+let _cachedDomains: string[] | null = null;
+let _cachedAccountReadOnly: { accountId: string | undefined; readOnly: boolean } | null = null;
+
+function invalidateDomainCache(): void { _cachedDomains = null; }
+function invalidateAccountCache(): void { _cachedAccountReadOnly = null; }
+
+// Invalidate caches on external storage changes
+try {
+    browser.storage.onChanged.addListener((changes: Record<string, unknown>, area: string) => {
+        if (area === 'local') {
+            if ((changes as Record<string, unknown>).allowedDomains) invalidateDomainCache();
+            if ((changes as Record<string, unknown>).accounts || (changes as Record<string, unknown>).activeAccountId) invalidateAccountCache();
+        }
+    });
+} catch { /* storage.onChanged may not be available in tests */ }
 
 export async function getAllowedDomains(): Promise<string[]> {
+    if (_cachedDomains !== null) return _cachedDomains;
     const data = await browser.storage.local.get('allowedDomains');
-    return (data as Record<string, string[]>).allowedDomains || [];
+    _cachedDomains = (data as Record<string, string[]>).allowedDomains || [];
+    return _cachedDomains;
 }
 
 export async function isDomainAllowed(domain: string): Promise<boolean> {
@@ -25,6 +43,7 @@ export async function addAllowedDomain(domain: string): Promise<boolean> {
     if (!domains.includes(domain)) {
         domains.push(domain);
         await browser.storage.local.set({ allowedDomains: domains });
+        invalidateDomainCache();
     }
     return true;
 }
@@ -33,6 +52,7 @@ export async function removeAllowedDomain(domain: string): Promise<boolean> {
     const domains = await getAllowedDomains();
     const filtered = domains.filter(d => d !== domain);
     await browser.storage.local.set({ allowedDomains: filtered });
+    invalidateDomainCache();
     return true;
 }
 
@@ -137,8 +157,14 @@ export async function refreshBadgesOnAllTabs(): Promise<void> {
 
 export async function isActiveAccountReadOnly(): Promise<boolean> {
     const data = await browser.storage.local.get(['accounts', 'activeAccountId']) as Record<string, unknown>;
-    const acct = ((data.accounts as LocalAccountEntry[]) || []).find(a => a.id === data.activeAccountId);
-    return !!(acct?.readOnly || acct?.type === 'npub');
+    const activeId = data.activeAccountId as string | undefined;
+    if (_cachedAccountReadOnly && _cachedAccountReadOnly.accountId === activeId) {
+        return _cachedAccountReadOnly.readOnly;
+    }
+    const acct = ((data.accounts as LocalAccountEntry[]) || []).find(a => a.id === activeId);
+    const readOnly = !!(acct?.readOnly || acct?.type === 'npub');
+    _cachedAccountReadOnly = { accountId: activeId, readOnly };
+    return readOnly;
 }
 
 // ── Identity disable ──

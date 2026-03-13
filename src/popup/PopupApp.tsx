@@ -23,26 +23,30 @@ import OverlayPanel from '@components/OverlayPanel/OverlayPanel';
 import UnlockModal from './components/Vault/UnlockModal';
 import { t } from '@lib/i18n.js';
 
+interface WaiterInfo {
+  id: string;
+  type: string;
+  origin: string;
+  [key: string]: unknown;
+}
+
+type OverlayType = 'menu' | 'filters' | 'activity' | 'wizard' | 'editProfile' | 'scoring' | 'permissions' | null;
+
 function PopupInner() {
   const [splashVisible, setSplashVisible] = useState<boolean>(true);
   const [unlockVisible, setUnlockVisible] = useState<boolean>(false);
-  const [unlockWaiters, setUnlockWaiters] = useState<any[]>([]);
-  const [menuOpen, setMenuOpen] = useState<boolean>(false);
+  const [unlockWaiters, setUnlockWaiters] = useState<WaiterInfo[]>([]);
+  const [activeOverlay, setActiveOverlay] = useState<OverlayType>(null);
   const [menuSection, setMenuSection] = useState<string | null>(null);
-  const [filtersOpen, setFiltersOpen] = useState<boolean>(false);
-  const [activityOpen, setActivityOpen] = useState<boolean>(false);
   const [activityDomain, setActivityDomain] = useState<string | null>(null);
-  const [wizardOpen, setWizardOpen] = useState<boolean>(false);
-  const [editProfileOpen, setEditProfileOpen] = useState<boolean>(false);
   const [permsDomain, setPermsDomain] = useState<string | null>(null);
-  const [scoringOpen, setScoringOpen] = useState<boolean>(false);
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const account = useAccount();
   const vault = useVault();
 
   // Capture active tab screenshot for backdrop
   useEffect(() => {
-    browser.tabs.captureVisibleTab(undefined as any, { format: 'jpeg', quality: 50 })
+    browser.tabs.captureVisibleTab({ format: 'jpeg', quality: 20 })
       .then((dataUrl: string) => setScreenshot(dataUrl))
       .catch(() => {}); // Fails on chrome:// pages etc — just skip
   }, []);
@@ -56,7 +60,7 @@ function PopupInner() {
   // Show wizard if no accounts
   useEffect(() => {
     if (account.accounts !== null && account.accounts.length === 0) {
-      setWizardOpen(true);
+      setActiveOverlay('wizard');
     }
   }, [account.accounts]);
 
@@ -66,7 +70,7 @@ function PopupInner() {
       .then((data: Record<string, unknown>) => {
         const saved = data.wizardState as { step?: string; ts?: number } | undefined;
         if (saved?.step && saved?.ts && Date.now() - saved.ts < 5 * 60 * 1000) {
-          setWizardOpen(true);
+          setActiveOverlay('wizard');
         }
       })
       .catch(() => {});
@@ -77,7 +81,7 @@ function PopupInner() {
   // 2. The user clicks the lock icon in TopBar
 
   const handleWizardComplete = () => {
-    setWizardOpen(false);
+    setActiveOverlay(null);
     account.reload();
     rpcNotify('configUpdated');
   };
@@ -93,22 +97,22 @@ function PopupInner() {
       <TopoBg className={styles.card}>
         <Splash visible={splashVisible} />
         <TopBar
-          onMenuOpen={() => setMenuOpen(true)}
-          onAddAccount={() => setWizardOpen(true)}
-          onEditProfile={() => setEditProfileOpen(true)}
+          onMenuOpen={() => setActiveOverlay('menu')}
+          onAddAccount={() => setActiveOverlay('wizard')}
+          onEditProfile={() => setActiveOverlay('editProfile')}
           onRequestUnlock={() => setUnlockVisible(true)}
         />
 
         <div className={styles.scrollArea}>
           <HomeTab
-            onViewAllActivity={(d: string | null) => { setActivityDomain(d || null); setActivityOpen(true); }}
-            onManagePermissions={(domain: string) => setPermsDomain(domain)}
-            onManageFilters={() => setFiltersOpen(true)}
-            onManageBadges={() => { setMenuSection('wot-injection'); setMenuOpen(true); }}
-            onEditProfile={() => setEditProfileOpen(true)}
-            onManageScoring={() => setScoringOpen(true)}
-            onOpenWallet={() => { setMenuSection('wallet'); setMenuOpen(true); }}
-            menuOpen={menuOpen}
+            onViewAllActivity={(d: string | null) => { setActivityDomain(d || null); setActiveOverlay('activity'); }}
+            onManagePermissions={(domain: string) => { setPermsDomain(domain); setActiveOverlay('permissions'); }}
+            onManageFilters={() => setActiveOverlay('filters')}
+            onManageBadges={() => { setMenuSection('wot-injection'); setActiveOverlay('menu'); }}
+            onEditProfile={() => setActiveOverlay('editProfile')}
+            onManageScoring={() => setActiveOverlay('scoring')}
+            onOpenWallet={() => { setMenuSection('wallet'); setActiveOverlay('menu'); }}
+            menuOpen={activeOverlay === 'menu'}
           />
         </div>
 
@@ -118,44 +122,44 @@ function PopupInner() {
         />
 
         <MenuOverlay
-          visible={menuOpen}
-          onClose={() => { setMenuOpen(false); setMenuSection(null); }}
+          visible={activeOverlay === 'menu'}
+          onClose={() => { setActiveOverlay(null); setMenuSection(null); }}
           initialSection={menuSection}
         />
 
         <FiltersModal
-          visible={filtersOpen}
-          onClose={() => setFiltersOpen(false)}
+          visible={activeOverlay === 'filters'}
+          onClose={() => setActiveOverlay(null)}
         />
 
         <ActivityModal
-          visible={activityOpen}
+          visible={activeOverlay === 'activity'}
           initialDomain={activityDomain}
           initialPubkey={account.active?.pubkey || ''}
-          onClose={() => { setActivityOpen(false); setActivityDomain(null); }}
+          onClose={() => { setActiveOverlay(null); setActivityDomain(null); }}
         />
 
         <WizardOverlay
-          visible={wizardOpen}
-          canClose={account.accounts?.length! > 0}
-          onClose={() => setWizardOpen(false)}
+          visible={activeOverlay === 'wizard'}
+          canClose={(account.accounts?.length ?? 0) > 0}
+          onClose={() => setActiveOverlay(null)}
           onComplete={handleWizardComplete}
         />
 
         <EditProfileOverlay
-          visible={editProfileOpen}
-          onClose={() => setEditProfileOpen(false)}
+          visible={activeOverlay === 'editProfile'}
+          onClose={() => setActiveOverlay(null)}
         />
 
-        {scoringOpen && (
-          <ScoringModal onClose={() => setScoringOpen(false)} />
+        {activeOverlay === 'scoring' && (
+          <ScoringModal onClose={() => setActiveOverlay(null)} />
         )}
 
-        {permsDomain && (
+        {activeOverlay === 'permissions' && permsDomain && (
           <OverlayPanel
             title={t('security.permissions')}
-            onClose={() => setPermsDomain(null)}
-            onBack={() => setPermsDomain(null)}
+            onClose={() => { setActiveOverlay(null); setPermsDomain(null); }}
+            onBack={() => { setActiveOverlay(null); setPermsDomain(null); }}
             zIndex={300}
           >
             <PermissionsSection />

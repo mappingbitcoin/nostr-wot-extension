@@ -2,8 +2,8 @@ import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
   createFromMnemonic, createFromMnemonicAtIndex, generateNewAccount, importNsec, importNpub, connectNip46, importFromMnemonicDerived
-} from '../lib/accounts.js';
-import { nsecEncode, npubEncode } from '../lib/crypto/bech32.js';
+} from '../lib/accounts.ts';
+import { nsecEncode, npubEncode } from '../lib/crypto/bech32.ts';
 
 const VALID_MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 const TEST_PRIVKEY_HEX = 'b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef';

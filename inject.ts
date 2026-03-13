@@ -25,26 +25,67 @@ interface NostrNip44 {
     decrypt: (pubkey: string, ciphertext: string) => Promise<string>;
 }
 
+interface WotDetails {
+    hops: number;
+    paths: number | null;
+    score: number;
+}
+
+interface WotConfig {
+    maxHops: number;
+    timeout: number;
+    scoring: {
+        distanceWeights: Record<number, number>;
+        pathBonus: Record<number, number>;
+        maxPathBonus: number;
+    };
+}
+
+interface WotStatus {
+    configured: boolean;
+    mode: string;
+    hasLocalGraph: boolean;
+}
+
 interface WotApi {
-    getDistance: (target: string) => Promise<unknown>;
-    isInMyWoT: (target: string, maxHops?: number) => Promise<unknown>;
-    getTrustScore: (target: string) => Promise<unknown>;
-    getDetails: (target: string) => Promise<unknown>;
-    getConfig: () => Promise<unknown>;
-    getDistanceBatch: (targets: string[], options?: boolean | Record<string, unknown>) => Promise<unknown>;
-    getTrustScoreBatch: (targets: string[]) => Promise<unknown>;
-    filterByWoT: (pubkeys: string[], maxHops?: number) => Promise<unknown>;
-    getStatus: () => Promise<unknown>;
-    getFollows: (pubkey?: string) => Promise<unknown>;
-    getCommonFollows: (pubkey: string) => Promise<unknown>;
-    getStats: () => Promise<unknown>;
-    getPath: (target: string) => Promise<unknown>;
+    getDistance: (target: string) => Promise<number | null>;
+    isInMyWoT: (target: string, maxHops?: number) => Promise<boolean>;
+    getTrustScore: (target: string) => Promise<number | null>;
+    getDetails: (target: string) => Promise<WotDetails | null>;
+    getConfig: () => Promise<WotConfig>;
+    getDistanceBatch: (targets: string[], options?: boolean | Record<string, unknown>) => Promise<Record<string, number | null>>;
+    getTrustScoreBatch: (targets: string[]) => Promise<Record<string, number | null>>;
+    filterByWoT: (pubkeys: string[], maxHops?: number) => Promise<string[]>;
+    getStatus: () => Promise<WotStatus>;
+    getFollows: (pubkey?: string) => Promise<string[]>;
+    getCommonFollows: (pubkey: string) => Promise<string[]>;
+    getStats: () => Promise<Record<string, unknown>>;
+    getPath: (target: string) => Promise<string[] | null>;
+}
+
+interface SignedEvent {
+    id: string;
+    pubkey: string;
+    created_at: number;
+    kind: number;
+    tags: string[][];
+    content: string;
+    sig: string;
+}
+
+interface WebLNProvider {
+    enabled: boolean;
+    enable(): Promise<void>;
+    getInfo(): Promise<{ node: { alias: string; pubkey: string } }>;
+    sendPayment(paymentRequest: string): Promise<{ preimage: string }>;
+    makeInvoice(args: { amount: number; defaultMemo?: string }): Promise<{ paymentRequest: string }>;
+    getBalance(): Promise<{ balance: number }>;
 }
 
 interface NostrProvider {
     wot: WotApi;
     getPublicKey: () => Promise<string>;
-    signEvent: (event: Record<string, unknown>) => Promise<unknown>;
+    signEvent: (event: Record<string, unknown>) => Promise<SignedEvent>;
     getRelays: () => Promise<Record<string, { read: boolean; write: boolean }>>;
     nip04: NostrNip04;
     nip44: NostrNip44;
@@ -54,14 +95,7 @@ declare global {
     interface Window {
         __nostrWotInjected?: boolean;
         nostr: NostrProvider;
-        webln?: {
-            enabled: boolean;
-            enable(): Promise<void>;
-            getInfo(): Promise<{ node: { alias: string; pubkey: string } }>;
-            sendPayment(paymentRequest: string): Promise<{ preimage: string }>;
-            makeInvoice(args: { amount: number; defaultMemo?: string }): Promise<{ paymentRequest: string }>;
-            getBalance(): Promise<{ balance: number }>;
-        };
+        webln?: WebLNProvider;
     }
 }
 
@@ -70,21 +104,6 @@ declare global {
     if (window.__nostrWotInjected) return;
     window.__nostrWotInjected = true;
 
-    // ── WoT API ──
-
-    const wotPending = new Map<string, PendingEntry>();
-    const WOT_TIMEOUT_MS = 30000;
-
-    // ── NIP-07 API ──
-
-    const nip07Pending = new Map<string, PendingEntry>();
-    const NIP07_TIMEOUT_MS = 120000; // 2 min (user may need time for prompt)
-
-    // ── WebLN API ──
-
-    const weblnPending = new Map<string, PendingEntry>();
-    const WEBLN_TIMEOUT_MS = 120000;
-
     // Crypto-random request ID generator (prevents response spoofing from page scripts)
     function randomId(): string {
         const buf = new Uint8Array(16);
@@ -92,47 +111,49 @@ declare global {
         return Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
     }
 
+    // ── Channel factory ──
+    // Eliminates duplication across WoT, NIP-07, and WebLN pending maps and call functions.
+
+    function createChannel(msgType: string, responseType: string, timeoutMs: number) {
+        const pending = new Map<string, PendingEntry>();
+
+        function call(method: string, params?: unknown): Promise<unknown> {
+            return new Promise((resolve, reject) => {
+                const id = randomId();
+                const timeoutId = setTimeout(() => {
+                    pending.delete(id);
+                    reject(new Error(`${msgType} timeout: ${method}`));
+                }, timeoutMs);
+                pending.set(id, { resolve, reject, timeoutId });
+                window.postMessage({ type: msgType, id, method, params }, window.location.origin);
+            });
+        }
+
+        function handleResponse(ev: MessageEvent): void {
+            if (ev.data?.type !== responseType) return;
+            const entry = pending.get(ev.data.id);
+            if (!entry) return;
+            clearTimeout(entry.timeoutId);
+            pending.delete(ev.data.id);
+            if (ev.data.error) entry.reject(new Error(ev.data.error));
+            else entry.resolve(ev.data.result);
+        }
+
+        return { call, handleResponse };
+    }
+
+    const wot = createChannel('WOT_REQUEST', 'WOT_RESPONSE', 30_000);
+    const nip07 = createChannel('NIP07_REQUEST', 'NIP07_RESPONSE', 120_000);
+    const webln = createChannel('WEBLN_REQUEST', 'WEBLN_RESPONSE', 120_000);
+
+    // Single message listener for all channels
     window.addEventListener('message', async (event: MessageEvent) => {
         if (event.source !== window) return;
 
-        // WoT responses
-        if (event.data?.type === 'WOT_RESPONSE') {
-            const { id, result, error } = event.data;
-            const entry = wotPending.get(id);
-            if (entry) {
-                clearTimeout(entry.timeoutId);
-                wotPending.delete(id);
-                if (error) entry.reject(new Error(error));
-                else entry.resolve(result);
-            }
-            return;
-        }
-
-        // NIP-07 responses
-        if (event.data?.type === 'NIP07_RESPONSE') {
-            const { id, result, error } = event.data;
-            const entry = nip07Pending.get(id);
-            if (entry) {
-                clearTimeout(entry.timeoutId);
-                nip07Pending.delete(id);
-                if (error) entry.reject(new Error(error));
-                else entry.resolve(result);
-            }
-            return;
-        }
-
-        // WebLN responses
-        if (event.data?.type === 'WEBLN_RESPONSE') {
-            const { id, result, error } = event.data;
-            const entry = weblnPending.get(id);
-            if (entry) {
-                weblnPending.delete(id);
-                clearTimeout(entry.timeoutId);
-                if (error) entry.reject(new Error(error));
-                else entry.resolve(result);
-            }
-            return;
-        }
+        // Route responses to the correct channel
+        wot.handleResponse(event);
+        nip07.handleResponse(event);
+        webln.handleResponse(event);
 
         // Account changed notification from background
         if (event.data?.type === 'NOSTR_ACCOUNT_CHANGED') {
@@ -161,87 +182,47 @@ declare global {
         }
     });
 
-    function wotCall(method: string, params: Record<string, unknown>): Promise<unknown> {
-        return new Promise((resolve, reject) => {
-            const id = randomId();
-            const timeoutId = setTimeout(() => {
-                if (wotPending.has(id)) {
-                    wotPending.delete(id);
-                    reject(new Error(`WoT request timeout after ${WOT_TIMEOUT_MS}ms`));
-                }
-            }, WOT_TIMEOUT_MS);
-            wotPending.set(id, { resolve, reject, timeoutId });
-            window.postMessage({ type: 'WOT_REQUEST', id, method, params }, window.location.origin);
-        });
-    }
-
-    function nip07Call(method: string, params: Record<string, unknown>): Promise<unknown> {
-        return new Promise((resolve, reject) => {
-            const id = randomId();
-            const timeoutId = setTimeout(() => {
-                if (nip07Pending.has(id)) {
-                    nip07Pending.delete(id);
-                    reject(new Error(`NIP-07 request timeout`));
-                }
-            }, NIP07_TIMEOUT_MS);
-            nip07Pending.set(id, { resolve, reject, timeoutId });
-            window.postMessage({ type: 'NIP07_REQUEST', id, method, params }, window.location.origin);
-        });
-    }
-
-    function weblnCall(method: string, params: Record<string, unknown>): Promise<unknown> {
-        return new Promise((resolve, reject) => {
-            const id = randomId();
-            const timeoutId = setTimeout(() => {
-                weblnPending.delete(id);
-                reject(new Error('WebLN request timed out'));
-            }, WEBLN_TIMEOUT_MS);
-            weblnPending.set(id, { resolve, reject, timeoutId });
-            window.postMessage({ type: 'WEBLN_REQUEST', id, method, params }, window.location.origin);
-        });
-    }
-
     // ── Expose APIs ──
 
     window.nostr = window.nostr || {} as NostrProvider;
 
     // WoT API (always set)
     window.nostr.wot = {
-        getDistance: (target) => wotCall('getDistance', { target }),
-        isInMyWoT: (target, maxHops) => wotCall('isInMyWoT', { target, maxHops }),
-        getTrustScore: (target) => wotCall('getTrustScore', { target }),
-        getDetails: (target) => wotCall('getDetails', { target }),
-        getConfig: () => wotCall('getConfig', {}),
+        getDistance: (target) => wot.call('getDistance', { target }) as Promise<number | null>,
+        isInMyWoT: (target, maxHops) => wot.call('isInMyWoT', { target, maxHops }) as Promise<boolean>,
+        getTrustScore: (target) => wot.call('getTrustScore', { target }) as Promise<number | null>,
+        getDetails: (target) => wot.call('getDetails', { target }) as Promise<WotDetails | null>,
+        getConfig: () => wot.call('getConfig', {}) as Promise<WotConfig>,
         getDistanceBatch: (targets, options) => {
             const opts = typeof options === 'boolean'
                 ? { includePaths: options }
                 : options || {};
-            return wotCall('getDistanceBatch', { targets, ...opts });
+            return wot.call('getDistanceBatch', { targets, ...opts }) as Promise<Record<string, number | null>>;
         },
-        getTrustScoreBatch: (targets) => wotCall('getTrustScoreBatch', { targets }),
-        filterByWoT: (pubkeys, maxHops) => wotCall('filterByWoT', { pubkeys, maxHops }),
-        getStatus: () => wotCall('getStatus', {}),
-        getFollows: (pubkey) => wotCall('getFollows', { pubkey }),
-        getCommonFollows: (pubkey) => wotCall('getCommonFollows', { pubkey }),
-        getStats: () => wotCall('getStats', {}),
-        getPath: (target) => wotCall('getPath', { target }),
+        getTrustScoreBatch: (targets) => wot.call('getTrustScoreBatch', { targets }) as Promise<Record<string, number | null>>,
+        filterByWoT: (pubkeys, maxHops) => wot.call('filterByWoT', { pubkeys, maxHops }) as Promise<string[]>,
+        getStatus: () => wot.call('getStatus', {}) as Promise<WotStatus>,
+        getFollows: (pubkey) => wot.call('getFollows', { pubkey }) as Promise<string[]>,
+        getCommonFollows: (pubkey) => wot.call('getCommonFollows', { pubkey }) as Promise<string[]>,
+        getStats: () => wot.call('getStats', {}) as Promise<Record<string, unknown>>,
+        getPath: (target) => wot.call('getPath', { target }) as Promise<string[] | null>,
     };
 
     // NIP-07 signer methods
-    window.nostr.getPublicKey = () => nip07Call('getPublicKey', {}) as Promise<string>;
+    window.nostr.getPublicKey = () => nip07.call('getPublicKey', {}) as Promise<string>;
 
-    window.nostr.signEvent = (event) => nip07Call('signEvent', { event });
+    window.nostr.signEvent = (event) => nip07.call('signEvent', { event }) as Promise<SignedEvent>;
 
-    window.nostr.getRelays = () => nip07Call('getRelays', {}) as Promise<Record<string, { read: boolean; write: boolean }>>;
+    window.nostr.getRelays = () => nip07.call('getRelays', {}) as Promise<Record<string, { read: boolean; write: boolean }>>;
 
     window.nostr.nip04 = {
-        encrypt: (pubkey, plaintext) => nip07Call('nip04Encrypt', { pubkey, plaintext }) as Promise<string>,
-        decrypt: (pubkey, ciphertext) => nip07Call('nip04Decrypt', { pubkey, ciphertext }) as Promise<string>
+        encrypt: (pubkey, plaintext) => nip07.call('nip04Encrypt', { pubkey, plaintext }) as Promise<string>,
+        decrypt: (pubkey, ciphertext) => nip07.call('nip04Decrypt', { pubkey, ciphertext }) as Promise<string>
     };
 
     window.nostr.nip44 = {
-        encrypt: (pubkey, plaintext) => nip07Call('nip44Encrypt', { pubkey, plaintext }) as Promise<string>,
-        decrypt: (pubkey, ciphertext) => nip07Call('nip44Decrypt', { pubkey, ciphertext }) as Promise<string>
+        encrypt: (pubkey, plaintext) => nip07.call('nip44Encrypt', { pubkey, plaintext }) as Promise<string>,
+        decrypt: (pubkey, ciphertext) => nip07.call('nip44Decrypt', { pubkey, ciphertext }) as Promise<string>
     };
 
     // WebLN Lightning wallet API
@@ -250,22 +231,22 @@ declare global {
     window.webln = {
         enabled: false,
         async enable() {
-            await weblnCall('enable', {});
+            await webln.call('enable', {});
             weblnEnabled = true;
             window.webln!.enabled = true;
         },
-        getInfo: () => weblnCall('getInfo', {}) as Promise<{ node: { alias: string; pubkey: string } }>,
+        getInfo: () => webln.call('getInfo', {}) as Promise<{ node: { alias: string; pubkey: string } }>,
         sendPayment: (paymentRequest: string) => {
             if (!weblnEnabled) return Promise.reject(new Error('WebLN not enabled. Call webln.enable() first.'));
-            return weblnCall('sendPayment', { paymentRequest }) as Promise<{ preimage: string }>;
+            return webln.call('sendPayment', { paymentRequest }) as Promise<{ preimage: string }>;
         },
         makeInvoice: (args: { amount: number; defaultMemo?: string }) => {
             if (!weblnEnabled) return Promise.reject(new Error('WebLN not enabled. Call webln.enable() first.'));
-            return weblnCall('makeInvoice', args) as Promise<{ paymentRequest: string }>;
+            return webln.call('makeInvoice', args) as Promise<{ paymentRequest: string }>;
         },
         getBalance: () => {
             if (!weblnEnabled) return Promise.reject(new Error('WebLN not enabled. Call webln.enable() first.'));
-            return weblnCall('getBalance', {}) as Promise<{ balance: number }>;
+            return webln.call('getBalance', {}) as Promise<{ balance: number }>;
         },
     };
 

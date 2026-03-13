@@ -66,37 +66,97 @@ if (window.__nostrWotContentInjected) {
         return ++wotRequestCount <= WOT_RATE_LIMIT;
     }
 
-    function forwardViaPort(portName: string, responseType: string, id: string, method: string, params: unknown): void {
+    // ── Persistent port management ──
+    // One port per channel (nip07, webln). Requests are serialized per port because
+    // the background handler does not echo request IDs in responses, so we process
+    // one request at a time to match responses unambiguously.
+
+    interface PortRequest {
+        id: string;
+        responseType: string;
+        method: string;
+        params: unknown;
+    }
+
+    interface PortState {
+        port: ReturnType<typeof browser.runtime.connect> | null;
+        queue: PortRequest[];
+        inflight: PortRequest | null;
+    }
+
+    const portStates: Record<string, PortState> = {
+        nip07: { port: null, queue: [], inflight: null },
+        webln: { port: null, queue: [], inflight: null },
+    };
+
+    function postResponse(responseType: string, id: string, result: unknown, error: unknown): void {
+        window.postMessage({ type: responseType, id, result, error }, window.location.origin);
+    }
+
+    function processNextInQueue(portName: string): void {
+        const state = portStates[portName];
+        if (state.inflight || state.queue.length === 0) return;
+
+        const request = state.queue.shift()!;
+        state.inflight = request;
+
+        const port = getOrCreatePort(portName);
+        if (!port) {
+            state.inflight = null;
+            postResponse(request.responseType, request.id, null, 'Extension context invalidated — reload the page');
+            processNextInQueue(portName);
+            return;
+        }
+
         const origin = window.location.hostname;
+        port.postMessage({
+            method: portName + '_' + request.method,
+            params: { ...(request.params as Record<string, unknown>), origin }
+        });
+    }
+
+    function getOrCreatePort(portName: string): ReturnType<typeof browser.runtime.connect> | null {
+        const state = portStates[portName];
+        if (state.port) return state.port;
+
         try {
             const port = browser.runtime.connect({ name: portName });
-            let responded = false;
-
-            const sendResult = (result: unknown, error: unknown) => {
-                if (responded) return;
-                responded = true;
-                window.postMessage({ type: responseType, id, result, error }, window.location.origin);
-            };
 
             port.onMessage.addListener((response: Record<string, unknown>) => {
-                sendResult(response.result, response.error);
-                try { port.disconnect(); } catch {}
+                const request = state.inflight;
+                if (request) {
+                    state.inflight = null;
+                    postResponse(request.responseType, request.id, response.result, response.error);
+                }
+                processNextInQueue(portName);
             });
 
             port.onDisconnect.addListener(() => {
-                sendResult(null, 'Extension context invalidated — reload the page');
+                state.port = null;
+                // Reject the in-flight request if any
+                if (state.inflight) {
+                    postResponse(state.inflight.responseType, state.inflight.id, null, 'Extension context invalidated — reload the page');
+                    state.inflight = null;
+                }
+                // Reject all queued requests
+                for (const req of state.queue) {
+                    postResponse(req.responseType, req.id, null, 'Extension context invalidated — reload the page');
+                }
+                state.queue = [];
             });
 
-            port.postMessage({
-                method: portName + '_' + method,
-                params: { ...(params as Record<string, unknown>), origin }
-            });
-        } catch {
-            window.postMessage({
-                type: responseType, id, result: null,
-                error: 'Extension context invalidated — reload the page'
-            }, window.location.origin);
+            state.port = port;
+            return port;
+        } catch (err) {
+            console.debug(`[nostr-wot] Failed to create port "${portName}":`, err);
+            return null;
         }
+    }
+
+    function forwardViaPort(portName: string, responseType: string, id: string, method: string, params: unknown): void {
+        const state = portStates[portName];
+        state.queue.push({ id, responseType, method, params });
+        processNextInQueue(portName);
     }
 
     // Bridge between page and extension
@@ -130,7 +190,8 @@ if (window.__nostrWotContentInjected) {
                     result: response.result,
                     error: response.error
                 }, window.location.origin);
-            } catch {
+            } catch (err) {
+                console.debug('[nostr-wot] WoT request failed:', method, err);
                 window.postMessage({
                     type: 'WOT_RESPONSE', id, result: null,
                     error: 'Extension context invalidated — reload the page'
