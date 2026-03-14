@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.4] - 2026-03-14
+
+### Fixed
+- **WebLN zaps broken in Coracle and other clients** — `webln_getInfo` was missing the `supports: ['lightning']` field that clients check to verify Lightning capability; `webln_enable` now adds the requesting domain to the allowed domains list (the standard WebLN connection handshake)
+
 ## [0.3.3] - 2026-03-13
 
 ### Changed

@@ -14,6 +14,7 @@ import { decodeBolt11 } from '../wallet/bolt11.ts';
 import { provisionLnbitsWallet, claimLightningAddress, getLightningAddress, releaseLightningAddress, DEFAULT_LNBITS_URL } from '../wallet/lnbits-provision.ts';
 import type { SignedEvent } from '../types.ts';
 import type { HandlerFn } from './state.ts';
+import { addAllowedDomain } from './domain-handlers.ts';
 
 // ── Shared utilities ──
 
@@ -47,12 +48,20 @@ export function createNip98SignFn(acctId: string, endpointUrl: string): (challen
 // ── Handler Map ──
 
 export const handlers = new Map<string, HandlerFn>([
-    ['webln_enable', async () => true],
+    ['webln_enable', async (params) => {
+        const origin = (params as { origin?: string }).origin;
+        if (origin) await addAllowedDomain(origin);
+        return true;
+    }],
 
     ['webln_getInfo', async () => {
         const { provider, acct } = await getConnectedProvider();
         const info = await provider.getInfo();
-        return { node: { alias: info.alias || '', pubkey: acct.pubkey } };
+        return {
+            node: { alias: info.alias || '', pubkey: acct.pubkey },
+            supports: ['lightning'],
+            methods: ['getInfo', 'sendPayment', 'makeInvoice', 'getBalance'],
+        };
     }],
 
     ['webln_getBalance', async () => {

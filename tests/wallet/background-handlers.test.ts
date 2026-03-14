@@ -100,8 +100,18 @@ function makePayloadNoWallet(): VaultPayload {
 
 type HandlerResult = { result: unknown; error: string | null };
 
-function handleWeblnEnable(): HandlerResult {
-  // Always succeed — vault/wallet checks happen in individual methods.
+async function handleWeblnEnable(params?: { origin?: string }): Promise<HandlerResult> {
+  // Add domain to allowlist (the WebLN connection handshake)
+  const origin = params?.origin;
+  if (origin) {
+    const { default: browser } = await import('../helpers/browser-mock.ts');
+    const data = await browser.storage.local.get('allowedDomains') as Record<string, string[]>;
+    const domains: string[] = data.allowedDomains || [];
+    if (!domains.includes(origin)) {
+      domains.push(origin);
+      await browser.storage.local.set({ allowedDomains: domains });
+    }
+  }
   return { result: true, error: null };
 }
 
@@ -114,7 +124,14 @@ async function handleWeblnGetInfo(): Promise<HandlerResult> {
   try {
     if (!provider.isConnected()) await provider.connect();
     const info = await provider.getInfo();
-    return { result: { node: { alias: info.alias || '', pubkey: acct.pubkey } }, error: null };
+    return {
+      result: {
+        node: { alias: info.alias || '', pubkey: acct.pubkey },
+        supports: ['lightning'],
+        methods: ['getInfo', 'sendPayment', 'makeInvoice', 'getBalance'],
+      },
+      error: null,
+    };
   } catch (e) {
     return { result: null, error: (e as Error).message };
   }
@@ -337,15 +354,15 @@ describe('wallet handlers: webln_enable', () => {
     await vault.create(TEST_PASSWORD, makePayloadWithWallet());
   });
 
-  it('returns true when vault unlocked and wallet configured', () => {
-    const r = handleWeblnEnable();
+  it('returns true when vault unlocked and wallet configured', async () => {
+    const r = await handleWeblnEnable({ origin: 'example.com' });
     assert.strictEqual(r.result, true);
     assert.strictEqual(r.error, null);
   });
 
-  it('returns true even when vault is locked', () => {
+  it('returns true even when vault is locked', async () => {
     vault.lock();
-    const r = handleWeblnEnable();
+    const r = await handleWeblnEnable({ origin: 'example.com' });
     assert.strictEqual(r.result, true);
     assert.strictEqual(r.error, null);
   });
@@ -353,7 +370,29 @@ describe('wallet handlers: webln_enable', () => {
   it('returns true even when no wallet configured', async () => {
     vault.lock();
     await vault.create(TEST_PASSWORD, makePayloadNoWallet());
-    const r = handleWeblnEnable();
+    const r = await handleWeblnEnable({ origin: 'example.com' });
+    assert.strictEqual(r.result, true);
+    assert.strictEqual(r.error, null);
+  });
+
+  it('adds origin to allowed domains list', async () => {
+    await handleWeblnEnable({ origin: 'coracle.social' });
+    const { default: browser } = await import('../helpers/browser-mock.ts');
+    const data = await browser.storage.local.get('allowedDomains') as Record<string, string[]>;
+    assert.ok(data.allowedDomains.includes('coracle.social'));
+  });
+
+  it('does not duplicate domain if already allowed', async () => {
+    await handleWeblnEnable({ origin: 'coracle.social' });
+    await handleWeblnEnable({ origin: 'coracle.social' });
+    const { default: browser } = await import('../helpers/browser-mock.ts');
+    const data = await browser.storage.local.get('allowedDomains') as Record<string, string[]>;
+    const count = data.allowedDomains.filter((d: string) => d === 'coracle.social').length;
+    assert.strictEqual(count, 1);
+  });
+
+  it('returns true when origin is missing', async () => {
+    const r = await handleWeblnEnable({});
     assert.strictEqual(r.result, true);
     assert.strictEqual(r.error, null);
   });
@@ -372,6 +411,8 @@ describe('wallet handlers: webln_getInfo', () => {
     const r = await handleWeblnGetInfo();
     assert.deepStrictEqual(r.result, {
       node: { alias: 'TestWallet', pubkey: TEST_PUBKEY_HEX },
+      supports: ['lightning'],
+      methods: ['getInfo', 'sendPayment', 'makeInvoice', 'getBalance'],
     });
     assert.strictEqual(r.error, null);
   });
